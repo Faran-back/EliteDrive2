@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["customer", "admin", "manager"] },
+        "rewardPoints": { "type": "number" },
+        "avatar": { "type": "string" },
+        "favorites": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "Vehicle": {
+      "title": "Vehicle",
+      "description": "Vehicle details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "pricePerDay": { "type": "number" },
+        "image": { "type": "string" },
+        "rating": { "type": "number" },
+        "reviews": { "type": "number" },
+        "seats": { "type": "number" },
+        "transmission": { "type": "string" },
+        "fuel": { "type": "string" },
+        "location": { "type": "string" },
+        "features": { "type": "array", "items": { "type": "string" } },
+        "description": { "type": "string" },
+        "gallery": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "name", "type", "pricePerDay", "image"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Vehicle booking record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "vehicleId": { "type": "string" },
+        "userId": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "totalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "completed", "cancelled"] },
+        "paymentStatus": { "type": "string", "enum": ["pending", "paid"] },
+        "bookingDate": { "type": "string" }
+      },
+      "required": ["id", "vehicleId", "userId", "startDate", "endDate", "totalPrice", "status", "paymentStatus"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app notification for users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["booking_confirmed", "booking_cancelled", "promotion", "info"] },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "link": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "message", "type", "read", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/vehicles/{vehicleId}": {
+      "schema": "Vehicle",
+      "description": "Available vehicles"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Booking records"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications"
+    }
+  }
+}

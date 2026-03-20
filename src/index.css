@@ -1,0 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  @apply font-sans text-gray-900 bg-[#F5F5F7];
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar for that Apple feel */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1D1D6;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8E8E93;
+}
+
+/* Smooth transitions */
+* {
+  @apply transition-colors duration-200;
+}
+
+/* React Datepicker Custom Styling */
+.react-datepicker-wrapper {
+  width: 100%;
+}
+
+.react-datepicker {
+  font-family: var(--font-sans) !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 24px !important;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
+  overflow: hidden;
+}
+
+.react-datepicker__header {
+  background-color: white !important;
+  border-bottom: 1px solid #F1F5F9 !important;
+  padding-top: 16px !important;
+}
+
+.react-datepicker__current-month {
+  font-weight: 800 !important;
+  color: #1E293B !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.875rem !important;
+}
+
+.react-datepicker__day-name {
+  color: #94A3B8 !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+}
+
+.react-datepicker__day {
+  color: #475569 !important;
+  font-weight: 600 !important;
+  border-radius: 12px !important;
+  transition: all 0.2s !important;
+}
+
+.react-datepicker__day:hover {
+  background-color: #EFF6FF !important;
+  color: #2563EB !important;
+}
+
+.react-datepicker__day--selected, 
+.react-datepicker__day--in-selecting-range, 
+.react-datepicker__day--in-range {
+  background-color: #2563EB !important;
+  color: white !important;
+}
+
+.react-datepicker__day--keyboard-selected {
+  background-color: #DBEAFE !important;
+  color: #2563EB !important;
+}
+
+.react-datepicker__navigation {
+  top: 12px !important;
+}
+
+.react-datepicker__day--outside-month {
+  color: #CBD5E1 !important;
+}
+

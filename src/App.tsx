@@ -15,6 +15,8 @@ import Profile from './pages/Profile';
 import Favorites from './pages/Favorites';
 import AdminDashboard from './pages/AdminDashboard';
 import ManagerDashboard from './pages/ManagerDashboard';
+import EditVehicle from './pages/EditVehicle';
+import AddVehicle from './pages/AddVehicle';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
   const { user, isAuthReady } = useStore();
@@ -40,6 +42,21 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: strin
   return <>{children}</>;
 };
 
+const RootRedirect: React.FC = () => {
+  const { user } = useStore();
+  if (!user) return <Navigate to="/auth" />;
+  
+  if (user.role === 'admin') {
+    return <Navigate to="/admin-dashboard" />;
+  }
+  
+  if (user.role === 'manager') {
+    return <Navigate to="/manager-dashboard" />;
+  }
+  
+  return <Navigate to="/customer-dashboard" />;
+};
+
 const AppContent: React.FC = () => {
   const { isAuthReady } = useStore();
 
@@ -57,7 +74,7 @@ const AppContent: React.FC = () => {
         <Route path="/auth" element={<Auth />} />
         <Route path="/login" element={<Navigate to="/auth" />} />
         <Route path="/signup" element={<Navigate to="/auth" />} />
-        <Route path="/" element={<ProtectedRoute><Layout><Navigate to="/customer-dashboard" /></Layout></ProtectedRoute>} />
+        <Route path="/" element={<ProtectedRoute><Layout><RootRedirect /></Layout></ProtectedRoute>} />
         <Route path="/customer-dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
         <Route path="/dashboard" element={<Navigate to="/customer-dashboard" />} />
         <Route path="/fleet" element={<ProtectedRoute><Layout><Fleet /></Layout></ProtectedRoute>} />
@@ -68,7 +85,9 @@ const AppContent: React.FC = () => {
         <Route path="/favorites" element={<ProtectedRoute><Layout><Favorites /></Layout></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Layout><Profile /></Layout></ProtectedRoute>} />
         <Route path="/admin-dashboard" element={<ProtectedRoute allowedRoles={['admin']}><Layout><AdminDashboard /></Layout></ProtectedRoute>} />
-        <Route path="/manager-dashboard" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><Layout><ManagerDashboard /></Layout></ProtectedRoute>} />
+        <Route path="/manager-dashboard" element={<ProtectedRoute allowedRoles={['manager']}><Layout><ManagerDashboard /></Layout></ProtectedRoute>} />
+        <Route path="/edit-vehicle/:id" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><Layout><EditVehicle /></Layout></ProtectedRoute>} />
+        <Route path="/add-vehicle" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><Layout><AddVehicle /></Layout></ProtectedRoute>} />
         <Route path="/admin" element={<Navigate to="/admin-dashboard" />} />
         <Route path="/manager" element={<Navigate to="/manager-dashboard" />} />
       </Routes>

@@ -8,6 +8,7 @@ import {
   Fuel, 
   Zap, 
   Star,
+  Plus,
   MapPin,
   SlidersHorizontal,
   ArrowRight,
@@ -20,7 +21,7 @@ import { motion } from 'motion/react';
 import VehicleCard from '../components/VehicleCard';
 
 const Fleet: React.FC = () => {
-  const { vehicles } = useStore();
+  const { vehicles, user } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('All');
   const [selectedTransmission, setSelectedTransmission] = useState('All');
@@ -66,7 +67,18 @@ const Fleet: React.FC = () => {
     <div className="space-y-10">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-2">
-          <h1 className="text-4xl font-black tracking-tight text-[#1E293B]">Explore Fleet</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-4xl font-black tracking-tight text-[#1E293B]">Explore Fleet</h1>
+            {(user?.role === 'admin' || user?.role === 'manager') && (
+              <Link 
+                to="/add-vehicle"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+              >
+                <Plus size={16} />
+                Add Vehicle
+              </Link>
+            )}
+          </div>
           <p className="text-[#64748B] text-lg max-w-2xl font-medium">Premium vehicles for every journey, from city commutes to northern adventures.</p>
         </div>
         {(searchQuery || selectedType !== 'All' || selectedTransmission !== 'All' || selectedFuel !== 'All') && (

@@ -7,20 +7,40 @@ export interface User {
   rewardPoints: number;
   avatar: string;
   favorites?: string[];
+  lastUpdatedBy?: string;
+  lastUpdatedAt?: string;
+  pendingInvitation?: {
+    role: 'admin' | 'manager';
+    invitedBy: string;
+    invitedAt: string;
+    invitationId: string;
+  };
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: 'admin' | 'manager';
+  invitedBy: string;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: string;
+  token: string;
 }
 
 export interface Vehicle {
   id: string;
   name: string;
-  type: string;
+  type: 'Sedan' | 'SUV' | 'Hatchback' | 'Luxury';
   pricePerDay: number;
   image: string;
-  transmission: string;
-  fuel: string;
+  transmission: 'Automatic' | 'Manual';
+  fuel: 'Petrol' | 'Diesel' | 'Electric' | 'Hybrid';
   seats: number;
   rating: number;
   location: string;
   features: string[];
+  status: 'available' | 'rented' | 'maintenance';
+  description?: string;
 }
 
 export interface Booking {
@@ -30,9 +50,10 @@ export interface Booking {
   startDate: string;
   endDate: string;
   totalPrice: number;
-  status: 'active' | 'completed' | 'cancelled';
+  status: 'pending' | 'active' | 'completed' | 'cancelled';
   paymentStatus: 'paid' | 'pending';
   bookingDate: string;
+  destination?: string;
 }
 
 export interface Notification {
@@ -40,10 +61,11 @@ export interface Notification {
   userId: string;
   title: string;
   message: string;
-  type: 'booking_confirmed' | 'booking_cancelled' | 'promotion' | 'info';
+  type: 'booking_confirmed' | 'booking_cancelled' | 'promotion' | 'info' | 'invitation';
   read: boolean;
   createdAt: string;
   link?: string;
+  invitationId?: string;
 }
 
 export const INITIAL_VEHICLES: Vehicle[] = [
@@ -58,7 +80,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 4,
     rating: 4.8,
     location: 'Lahore',
-    features: ['Fuel Efficient', 'Compact', 'Parking Sensors']
+    features: ['Fuel Efficient', 'Compact', 'Parking Sensors'],
+    status: 'available'
   },
   {
     id: '2',
@@ -71,7 +94,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.7,
     location: 'Karachi',
-    features: ['Air Conditioning', 'Bluetooth', 'Cruise Control', 'Reverse Camera']
+    features: ['Air Conditioning', 'Bluetooth', 'Cruise Control', 'Reverse Camera'],
+    status: 'available'
   },
   {
     id: '3',
@@ -84,7 +108,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.9,
     location: 'Islamabad',
-    features: ['Sunroof', 'Leather Seats', 'Turbo Engine', 'Apple CarPlay']
+    features: ['Sunroof', 'Leather Seats', 'Turbo Engine', 'Apple CarPlay'],
+    status: 'available'
   },
   {
     id: '4',
@@ -97,7 +122,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.8,
     location: 'Lahore',
-    features: ['4x4', 'Premium Sound', 'Power Tailgate', 'Heated Seats']
+    features: ['4x4', 'Premium Sound', 'Power Tailgate', 'Heated Seats'],
+    status: 'available'
   },
   {
     id: '5',
@@ -110,7 +136,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 7,
     rating: 4.5,
     location: 'Islamabad',
-    features: ['7 Seater', 'Roof Rails', 'Rear AC Vents']
+    features: ['7 Seater', 'Roof Rails', 'Rear AC Vents'],
+    status: 'available'
   },
   {
     id: '6',
@@ -123,7 +150,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 7,
     rating: 4.9,
     location: 'Karachi',
-    features: ['Off-road Pro', 'Leather Interior', 'Diff Lock']
+    features: ['Off-road Pro', 'Leather Interior', 'Diff Lock'],
+    status: 'available'
   },
   {
     id: '7',
@@ -136,7 +164,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.6,
     location: 'Lahore',
-    features: ['Fuel Efficient', 'Power Steering', 'ABS']
+    features: ['Fuel Efficient', 'Power Steering', 'ABS'],
+    status: 'available'
   },
   {
     id: '8',
@@ -149,7 +178,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.4,
     location: 'Rawalpindi',
-    features: ['Spacious Interior', 'Economical', 'Reliable']
+    features: ['Spacious Interior', 'Economical', 'Reliable'],
+    status: 'available'
   },
   {
     id: '9',
@@ -162,7 +192,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.6,
     location: 'Multan',
-    features: ['Modern Design', 'Safety Airbags', 'Smart Entry']
+    features: ['Modern Design', 'Safety Airbags', 'Smart Entry'],
+    status: 'available'
   },
   {
     id: '10',
@@ -175,7 +206,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.7,
     location: 'Faisalabad',
-    features: ['Elegant Look', 'Smooth Drive', 'Digital Display']
+    features: ['Elegant Look', 'Smooth Drive', 'Digital Display'],
+    status: 'available'
   },
   {
     id: '11',
@@ -188,7 +220,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.8,
     location: 'Islamabad',
-    features: ['Panoramic Sunroof', 'Wireless Charging', 'Drive Modes']
+    features: ['Panoramic Sunroof', 'Wireless Charging', 'Drive Modes'],
+    status: 'available'
   },
   {
     id: '12',
@@ -201,7 +234,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.5,
     location: 'Lahore',
-    features: ['Sunroof', 'Cruise Control', 'TPMS']
+    features: ['Sunroof', 'Cruise Control', 'TPMS'],
+    status: 'available'
   },
   {
     id: '13',
@@ -214,7 +248,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.7,
     location: 'Karachi',
-    features: ['MG Pilot', 'Ambient Lighting', 'Sports Seats']
+    features: ['MG Pilot', 'Ambient Lighting', 'Sports Seats'],
+    status: 'available'
   },
   {
     id: '14',
@@ -227,7 +262,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 4,
     rating: 4.6,
     location: 'Peshawar',
-    features: ['Compact Size', 'Modern Features', 'Easy Parking']
+    features: ['Compact Size', 'Modern Features', 'Easy Parking'],
+    status: 'available'
   },
   {
     id: '15',
@@ -240,7 +276,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.8,
     location: 'Lahore',
-    features: ['Smart Trunk', 'Dual Zone AC', 'LED Headlights']
+    features: ['Smart Trunk', 'Dual Zone AC', 'LED Headlights'],
+    status: 'available'
   },
   {
     id: '16',
@@ -253,7 +290,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.9,
     location: 'Quetta',
-    features: ['Heavy Duty', '4x4 Capability', 'Spacious Bed']
+    features: ['Heavy Duty', '4x4 Capability', 'Spacious Bed'],
+    status: 'available'
   },
   {
     id: '17',
@@ -266,7 +304,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.7,
     location: 'Islamabad',
-    features: ['Sporty Look', 'Push Start', 'Cruise Control']
+    features: ['Sporty Look', 'Push Start', 'Cruise Control'],
+    status: 'available'
   },
   {
     id: '18',
@@ -279,7 +318,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.9,
     location: 'Lahore',
-    features: ['Luxury Interior', 'Head-up Display', 'Panoramic Roof']
+    features: ['Luxury Interior', 'Head-up Display', 'Panoramic Roof'],
+    status: 'available'
   },
   {
     id: '19',
@@ -292,7 +332,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.8,
     location: 'Karachi',
-    features: ['L2 Autonomous Driving', '360 Camera', 'Large Screen']
+    features: ['L2 Autonomous Driving', '360 Camera', 'Large Screen'],
+    status: 'available'
   },
   {
     id: '20',
@@ -305,7 +346,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 7,
     rating: 4.0,
     location: 'Gujranwala',
-    features: ['High Capacity', 'Low Maintenance', 'Utility Vehicle']
+    features: ['High Capacity', 'Low Maintenance', 'Utility Vehicle'],
+    status: 'available'
   },
   {
     id: '21',
@@ -318,7 +360,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 4,
     rating: 4.1,
     location: 'Sialkot',
-    features: ['Power Windows', 'LCD Screen', 'Affordable']
+    features: ['Power Windows', 'LCD Screen', 'Affordable'],
+    status: 'available'
   },
   {
     id: '22',
@@ -331,7 +374,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 4,
     rating: 4.0,
     location: 'Lahore',
-    features: ['Reverse Camera', 'Alloy Wheels', 'Compact']
+    features: ['Reverse Camera', 'Alloy Wheels', 'Compact'],
+    status: 'available'
   },
   {
     id: '23',
@@ -344,7 +388,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 7,
     rating: 4.4,
     location: 'Islamabad',
-    features: ['7 Seater', 'Sunroof', 'Turbocharged']
+    features: ['7 Seater', 'Sunroof', 'Turbocharged'],
+    status: 'available'
   },
   {
     id: '24',
@@ -357,6 +402,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     seats: 5,
     rating: 4.6,
     location: 'Karachi',
-    features: ['Panoramic Sunroof', 'Leather Seats', 'Modern Tech']
+    features: ['Panoramic Sunroof', 'Leather Seats', 'Modern Tech'],
+    status: 'available'
   }
 ];

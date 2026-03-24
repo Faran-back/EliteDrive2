@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Car, AlertCircle, Mail, Lock, User as UserIcon, ArrowRight, Github, Chrome } from 'lucide-react';
 import { auth, googleProvider, db } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, updateProfile } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { getAuthErrorMessage } from '../utils/authErrors';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,15 +22,23 @@ const Auth: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast, setUser } = useStore();
+  const [invitationToken, setInvitationToken] = useState<string | null>(null);
 
   // Sync mode with URL if needed, or just default to signin
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const token = params.get('invitation');
+    if (token) {
+      setInvitationToken(token);
+      setMode('signup');
+    }
+
     if (location.pathname === '/signup') {
       setMode('signup');
-    } else {
+    } else if (location.pathname === '/signin' || location.pathname === '/auth') {
       setMode('signin');
     }
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   const {
     register: registerLogin,
@@ -70,7 +78,19 @@ const Auth: React.FC = () => {
     setError(null);
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      let userCredential;
+      try {
+        userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      } catch (err: any) {
+        // Special case for default admin: if login fails because user doesn't exist, try to create it
+        if ((data.email === 'test@test.com' || data.email === 'testingdaflow@test.com') && data.password === 'password' && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
+          userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+          await updateProfile(userCredential.user, { displayName: 'Super Admin' });
+        } else {
+          throw err;
+        }
+      }
+
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
       
       if (userDoc.exists()) {
@@ -78,8 +98,21 @@ const Auth: React.FC = () => {
         setUser(userData);
         handleRedirect(userData.role);
       } else {
-        // Fallback if doc doesn't exist (shouldn't happen with standard flow)
-        navigate('/customer-dashboard');
+        // If doc doesn't exist (e.g. just created default admin), it will be created by StoreContext's onAuthStateChanged
+        // But we can also create it here to be safe and redirect immediately
+        const role = (data.email === 'test@test.com' || data.email === 'testingdaflow@test.com') ? 'admin' : 'customer';
+        const newUser: User = {
+          id: userCredential.user.uid,
+          name: userCredential.user.displayName || 'Super Admin',
+          email: userCredential.user.email || '',
+          phone: '',
+          role,
+          rewardPoints: 0,
+          avatar: `https://ui-avatars.com/api/?name=Super+Admin&background=random`
+        };
+        await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
+        setUser(newUser);
+        handleRedirect(role);
       }
       showToast('Welcome back!', 'success');
     } catch (err: any) {
@@ -100,13 +133,37 @@ const Auth: React.FC = () => {
         displayName: data.name
       });
 
-      // Create user document in Firestore with default "customer" role
+      let role: 'customer' | 'admin' | 'manager' = 'customer';
+      
+      // Check for invitation if token exists
+      if (invitationToken) {
+        try {
+          const invitationsQuery = query(
+            collection(db, 'invitations'),
+            where('token', '==', invitationToken),
+            where('status', '==', 'pending')
+          );
+          const invitationDocs = await getDocs(invitationsQuery);
+          if (!invitationDocs.empty) {
+            const invitation = invitationDocs.docs[0].data() as any;
+            role = invitation.role;
+            // Mark invitation as accepted
+            await updateDoc(doc(db, 'invitations', invitation.id), {
+              status: 'accepted'
+            });
+          }
+        } catch (err) {
+          console.error('Error checking invitation:', err);
+        }
+      }
+
+      // Create user document in Firestore
       const newUser: User = {
         id: userCredential.user.uid,
         name: data.name,
         email: data.email,
         phone: '',
-        role: 'customer', // Default role
+        role,
         rewardPoints: 0,
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=random`
       };
@@ -115,7 +172,7 @@ const Auth: React.FC = () => {
       setUser(newUser);
       
       showToast('Account created successfully!', 'success');
-      navigate('/customer-dashboard');
+      handleRedirect(role);
     } catch (err: any) {
       setError(getAuthErrorMessage(err));
     } finally {
@@ -147,7 +204,7 @@ const Auth: React.FC = () => {
         };
         await setDoc(doc(db, 'users', result.user.uid), newUser);
         setUser(newUser);
-        navigate('/customer-dashboard');
+        handleRedirect('customer');
       }
       showToast('Welcome!', 'success');
     } catch (err: any) {

@@ -58,6 +58,7 @@ const MyBookings: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'pending': return 'bg-amber-50 text-amber-600 border-amber-100';
       case 'active': return 'bg-blue-50 text-[#2563EB] border-blue-100';
       case 'completed': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
       case 'cancelled': return 'bg-red-50 text-red-600 border-red-100';
@@ -67,7 +68,8 @@ const MyBookings: React.FC = () => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'active': return <Clock size={12} />;
+      case 'pending': return <Clock size={12} />;
+      case 'active': return <CheckCircle2 size={12} />;
       case 'completed': return <CheckCircle2 size={12} />;
       case 'cancelled': return <XCircle size={12} />;
       default: return <AlertCircle size={12} />;
@@ -155,16 +157,22 @@ const MyBookings: React.FC = () => {
                         <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Payment</p>
                         <p className="font-black text-emerald-500 text-sm">{booking.paymentStatus.toUpperCase()}</p>
                       </div>
+                      {booking.destination && (
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Destination</p>
+                          <p className="font-black text-[#1E293B] text-sm">{booking.destination}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   <div className="flex md:flex-col gap-3 w-full md:w-auto">
-                    {booking.status === 'active' && (
+                    {(booking.status === 'active' || booking.status === 'pending') && (
                       <button 
                         onClick={(e) => handleCancelClick(e, booking.id)}
                         className="flex-1 md:w-full px-6 py-3 text-xs font-black text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-all"
                       >
-                        Cancel
+                        {booking.status === 'pending' ? 'Cancel Request' : 'Cancel Booking'}
                       </button>
                     )}
                     <button 

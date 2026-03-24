@@ -19,7 +19,7 @@ import {
 import { useStore } from '../context/StoreContext';
 
 const BookingConfirmed: React.FC = () => {
-  const { bookings, vehicles } = useStore();
+  const { bookings, vehicles, setIsChatOpen } = useStore();
   
   // Get the latest booking
   const latestBooking = bookings.length > 0 ? bookings[bookings.length - 1] : null;
@@ -40,7 +40,7 @@ const BookingConfirmed: React.FC = () => {
   const taxes = latestBooking.totalPrice * 0.08;
 
   // Map URL based on location
-  const mapQuery = encodeURIComponent(`${vehicle.location}, Pakistan`);
+  const mapQuery = encodeURIComponent(`${latestBooking.destination || vehicle.location}, Pakistan`);
   
   return (
     <main className="flex-1 flex flex-col items-center justify-start py-8 px-10 md:px-20 font-display">
@@ -76,7 +76,7 @@ const BookingConfirmed: React.FC = () => {
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
               <MapPin className="text-[#2463eb] size-5" />
-              <span className="text-sm font-bold text-slate-900">{vehicle.location} International Airport</span>
+              <span className="text-sm font-bold text-slate-900">{latestBooking.destination || `${vehicle.location} International Airport`}</span>
             </div>
             <a 
               href={`https://www.google.com/maps/search/?api=1&query=${mapQuery}`}
@@ -152,7 +152,7 @@ const BookingConfirmed: React.FC = () => {
               </div>
               <div className="flex flex-col">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Pickup Information</p>
-                <h3 className="text-lg font-bold text-slate-900">{vehicle.location} Airport</h3>
+                <h3 className="text-lg font-bold text-slate-900">{latestBooking.destination || `${vehicle.location} Airport`}</h3>
                 <p className="text-sm font-semibold text-[#2463eb]">
                   Today, 10:00 AM
                 </p>
@@ -205,7 +205,10 @@ const BookingConfirmed: React.FC = () => {
               <Download size={20} />
               Download Receipt
             </button>
-            <button className="flex-1 bg-white text-slate-900 font-bold py-4 px-6 rounded-xl border border-slate-200 hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
+            <button 
+              onClick={() => setIsChatOpen(true)}
+              className="flex-1 bg-white text-slate-900 font-bold py-4 px-6 rounded-xl border border-slate-200 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+            >
               <Headphones size={20} />
               Contact Support
             </button>

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Vehicle, Booking, Notification, INITIAL_VEHICLES } from '../types';
+import { User, Vehicle, Booking, Notification, INITIAL_VEHICLES, Invitation } from '../types';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import Toast from '../components/Toast';
@@ -44,9 +44,31 @@ interface FirestoreErrorInfo {
   }
 }
 
+function safeStringify(obj: any): string {
+  const cache = new WeakSet();
+  return JSON.stringify(obj, (key, value) => {
+    if (typeof value === 'object' && value !== null) {
+      if (cache.has(value)) {
+        return '[Circular]';
+      }
+      cache.add(value);
+      
+      // Handle objects with toJSON that might cause issues if they return circularity
+      // or if they are complex Firebase objects.
+      if (value.constructor && (value.constructor.name === 'Y2' || value.constructor.name === 'Ka')) {
+        return `[FirebaseObject: ${value.constructor.name}]`;
+      }
+    }
+    return value;
+  });
+}
+
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const isPermissionError = errorMessage.toLowerCase().includes('permission') || errorMessage.toLowerCase().includes('insufficient');
+  
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errorMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -63,8 +85,17 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     operationType,
     path
   }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  const stringifiedInfo = safeStringify(errInfo);
+  console.error('Firestore Error: ', stringifiedInfo);
+
+  // Return a user-friendly message for the UI
+  if (isPermissionError) {
+    throw new Error('Access denied. You do not have permission to perform this action. Please contact support if you believe this is an error.');
+  } else if (errorMessage.toLowerCase().includes('offline') || errorMessage.toLowerCase().includes('network')) {
+    throw new Error('Connection lost. Please check your internet connection and try again.');
+  }
+  
+  throw new Error('An unexpected database error occurred. Please try again later.');
 }
 
 interface StoreContextType {
@@ -72,8 +103,11 @@ interface StoreContextType {
   setUser: (user: User | null) => void;
   vehicles: Vehicle[];
   bookings: Booking[];
+  allBookings: Booking[];
+  allUsers: User[];
   notifications: Notification[];
   addBooking: (booking: Booking) => Promise<void>;
+  approveBooking: (id: string) => Promise<void>;
   updateBooking: (id: string, updates: Partial<Booking>) => Promise<void>;
   cancelBooking: (id: string) => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
@@ -84,6 +118,17 @@ interface StoreContextType {
   logout: () => Promise<void>;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   isAuthReady: boolean;
+  inviteUser: (email: string, role: 'admin' | 'manager') => Promise<string>;
+  acceptInvitation: (invitationId: string) => Promise<void>;
+  declineInvitation: (invitationId: string) => Promise<void>;
+  searchUsers: (query: string) => Promise<User[]>;
+  updateUserRole: (userId: string, role: 'admin' | 'manager' | 'customer') => Promise<void>;
+  bulkUpdateUserRoles: (userIds: string[], role: 'admin' | 'manager' | 'customer') => Promise<void>;
+  updateVehicle: (id: string, updates: Partial<Vehicle>) => Promise<void>;
+  deleteVehicle: (id: string) => Promise<void>;
+  addVehicle: (vehicle: Vehicle) => Promise<void>;
+  isChatOpen: boolean;
+  setIsChatOpen: (isOpen: boolean) => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -92,8 +137,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [user, setUser] = useState<User | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>(INITIAL_VEHICLES);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [allBookings, setAllBookings] = useState<Booking[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info'; isVisible: boolean }>({
     message: '',
     type: 'info',
@@ -124,10 +172,30 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 name: firebaseUser.displayName || 'New User',
                 email: firebaseUser.email || '',
                 phone: firebaseUser.phoneNumber || '',
-                role: firebaseUser.email === 'inotfarhan@gmail.com' ? 'admin' : 'customer',
+                role: firebaseUser.email === 'test@test.com' || firebaseUser.email === 'inotfarhan@gmail.com' || firebaseUser.email === 'testingdaflow@test.com' ? 'admin' : 'customer',
                 rewardPoints: 0,
                 avatar: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100'
               };
+
+              // Check if there's an invitation for this email
+              if (firebaseUser.email) {
+                const invitationsQuery = query(
+                  collection(db, 'invitations'),
+                  where('email', '==', firebaseUser.email),
+                  where('status', '==', 'pending')
+                );
+                const invitationDocs = await getDocs(invitationsQuery);
+                if (!invitationDocs.empty) {
+                  const invitation = invitationDocs.docs[0].data() as Invitation;
+                  newUser.pendingInvitation = {
+                    role: invitation.role,
+                    invitedBy: invitation.invitedBy,
+                    invitedAt: invitation.createdAt,
+                    invitationId: invitation.id
+                  };
+                }
+              }
+
               await setDoc(userDocRef, newUser);
               setUser(newUser);
             }
@@ -159,6 +227,40 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setBookings(bookingsData);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'bookings');
+    });
+
+    return () => unsubscribe();
+  }, [isAuthReady, user]);
+
+  useEffect(() => {
+    if (!isAuthReady || !user || (user.role !== 'admin' && user.role !== 'manager')) {
+      setAllBookings([]);
+      return;
+    }
+
+    const allBookingsQuery = query(collection(db, 'bookings'));
+    const unsubscribe = onSnapshot(allBookingsQuery, (snapshot) => {
+      const bookingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
+      setAllBookings(bookingsData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'bookings');
+    });
+
+    return () => unsubscribe();
+  }, [isAuthReady, user]);
+
+  useEffect(() => {
+    if (!isAuthReady || !user || (user.role !== 'admin' && user.role !== 'manager')) {
+      setAllUsers([]);
+      return;
+    }
+
+    const allUsersQuery = query(collection(db, 'users'));
+    const unsubscribe = onSnapshot(allUsersQuery, (snapshot) => {
+      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+      setAllUsers(usersData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'users');
     });
 
     return () => unsubscribe();
@@ -216,19 +318,55 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       await setDoc(doc(db, 'bookings', booking.id), booking);
       
-      // Add notification for booking confirmation
+      // Add notification for booking confirmation (pending approval)
       const vehicle = vehicles.find(v => v.id === booking.vehicleId);
       await addNotification({
         userId: booking.userId,
-        title: 'Booking Confirmed!',
-        message: `Your booking for ${vehicle?.name || 'a vehicle'} has been confirmed for ${new Date(booking.startDate).toLocaleDateString()}.`,
-        type: 'booking_confirmed',
+        title: 'Booking Received',
+        message: `Your booking for ${vehicle?.name || 'a vehicle'} has been received and is pending manager approval.`,
+        type: 'info',
         read: false,
         createdAt: new Date().toISOString(),
         link: '/my-bookings'
       });
+
+      // Notify all managers and admins
+      const managersAndAdmins = allUsers.filter(u => u.role === 'admin' || u.role === 'manager');
+      for (const staff of managersAndAdmins) {
+        await addNotification({
+          userId: staff.id,
+          title: 'New Booking Approval Required',
+          message: `A new booking for ${vehicle?.name || 'a vehicle'} requires your approval.`,
+          type: 'booking_confirmed',
+          read: false,
+          createdAt: new Date().toISOString(),
+          link: staff.role === 'admin' ? '/admin-dashboard?view=bookings' : '/manager-dashboard?view=bookings'
+        });
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, `bookings/${booking.id}`);
+    }
+  };
+
+  const approveBooking = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'bookings', id), { status: 'active' });
+      
+      const booking = allBookings.find(b => b.id === id);
+      if (booking) {
+        const vehicle = vehicles.find(v => v.id === booking.vehicleId);
+        await addNotification({
+          userId: booking.userId,
+          title: 'Booking Approved!',
+          message: `Your booking for ${vehicle?.name || 'a vehicle'} has been approved and is now active.`,
+          type: 'booking_confirmed',
+          read: false,
+          createdAt: new Date().toISOString(),
+          link: '/my-bookings'
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `bookings/${id}`);
     }
   };
 
@@ -244,7 +382,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       await updateDoc(doc(db, 'bookings', id), { status: 'cancelled' });
       
-      const booking = bookings.find(b => b.id === id);
+      const booking = allBookings.find(b => b.id === id);
       if (booking) {
         const vehicle = vehicles.find(v => v.id === booking.vehicleId);
         await addNotification({
@@ -321,14 +459,184 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const inviteUser = async (email: string, role: 'admin' | 'manager') => {
+    if (!user) throw new Error('Not authenticated');
+    const invitationId = Math.random().toString(36).substr(2, 9);
+    const token = Math.random().toString(36).substr(2, 15);
+    
+    const invitation: Invitation = {
+      id: invitationId,
+      email,
+      role,
+      invitedBy: user.name || user.email,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      token
+    };
+
+    try {
+      await setDoc(doc(db, 'invitations', invitationId), invitation);
+      
+      // Check if user already exists to add notification
+      const usersQuery = query(collection(db, 'users'), where('email', '==', email));
+      const userDocs = await getDocs(usersQuery);
+      
+      if (!userDocs.empty) {
+        const targetUserId = userDocs.docs[0].id;
+        await addNotification({
+          userId: targetUserId,
+          title: 'Role Invitation',
+          message: `${user.name} has invited you to become an ${role}.`,
+          type: 'invitation',
+          read: false,
+          createdAt: new Date().toISOString(),
+          invitationId
+        });
+        
+        // Also update the user's pendingInvitation field
+        await updateDoc(doc(db, 'users', targetUserId), {
+          pendingInvitation: {
+            role,
+            invitedBy: user.name || user.email,
+            invitedAt: invitation.createdAt,
+            invitationId
+          }
+        });
+      }
+
+      return token;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `invitations/${invitationId}`);
+      throw error;
+    }
+  };
+
+  const acceptInvitation = async (invitationId: string) => {
+    if (!user) return;
+    try {
+      const invitationDoc = await getDoc(doc(db, 'invitations', invitationId));
+      if (!invitationDoc.exists()) throw new Error('Invitation not found');
+      
+      const invitation = invitationDoc.data() as Invitation;
+      
+      await updateDoc(doc(db, 'users', user.id), {
+        role: invitation.role,
+        pendingInvitation: null
+      });
+      
+      await updateDoc(doc(db, 'invitations', invitationId), {
+        status: 'accepted'
+      });
+      
+      setUser(prev => prev ? { ...prev, role: invitation.role, pendingInvitation: undefined } : null);
+      showToast(`You are now an ${invitation.role}!`, 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `invitations/${invitationId}`);
+    }
+  };
+
+  const declineInvitation = async (invitationId: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'users', user.id), {
+        pendingInvitation: null
+      });
+      
+      await updateDoc(doc(db, 'invitations', invitationId), {
+        status: 'declined'
+      });
+      
+      setUser(prev => prev ? { ...prev, pendingInvitation: undefined } : null);
+      showToast('Invitation declined', 'info');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `invitations/${invitationId}`);
+    }
+  };
+
+  const searchUsers = async (searchTerm: string) => {
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef);
+      const snapshot = await getDocs(q);
+      const allUsers = snapshot.docs.map(doc => doc.data() as User);
+      
+      return allUsers.filter(u => 
+        u.email.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        u.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'users');
+      return [];
+    }
+  };
+
+  const updateUserRole = async (userId: string, role: 'admin' | 'manager' | 'customer') => {
+    try {
+      const updates = { 
+        role,
+        lastUpdatedBy: user?.name || user?.email || 'System',
+        lastUpdatedAt: new Date().toISOString()
+      };
+      await updateDoc(doc(db, 'users', userId), updates);
+      showToast(`Role updated to ${role} successfully`, 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
+    }
+  };
+
+  const bulkUpdateUserRoles = async (userIds: string[], role: 'admin' | 'manager' | 'customer') => {
+    try {
+      const updates = { 
+        role,
+        lastUpdatedBy: user?.name || user?.email || 'System',
+        lastUpdatedAt: new Date().toISOString()
+      };
+      const promises = userIds.map(id => updateDoc(doc(db, 'users', id), updates));
+      await Promise.all(promises);
+      showToast(`Roles updated for ${userIds.length} users`, 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'users/bulk');
+    }
+  };
+
+  const updateVehicle = async (id: string, updates: Partial<Vehicle>) => {
+    try {
+      await updateDoc(doc(db, 'vehicles', id), updates);
+      showToast('Vehicle updated successfully', 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `vehicles/${id}`);
+    }
+  };
+
+  const deleteVehicle = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'vehicles', id));
+      showToast('Vehicle deleted successfully', 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `vehicles/${id}`);
+    }
+  };
+
+  const addVehicle = async (vehicle: Vehicle) => {
+    try {
+      await setDoc(doc(db, 'vehicles', vehicle.id), vehicle);
+      showToast('Vehicle added successfully', 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `vehicles/${vehicle.id}`);
+    }
+  };
+
   return (
     <StoreContext.Provider value={{
       user,
       setUser,
       vehicles,
       bookings,
+      allBookings,
+      allUsers,
       notifications,
       addBooking,
+      approveBooking,
       updateBooking,
       cancelBooking,
       updateUser,
@@ -338,7 +646,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       deleteNotification,
       logout,
       showToast,
-      isAuthReady
+      isAuthReady,
+      inviteUser,
+      acceptInvitation,
+      declineInvitation,
+      searchUsers,
+      updateUserRole,
+      bulkUpdateUserRoles,
+      updateVehicle,
+      deleteVehicle,
+      addVehicle,
+      isChatOpen,
+      setIsChatOpen
     }}>
       {children}
       <Toast 

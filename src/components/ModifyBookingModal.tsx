@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Calendar, Car, AlertCircle, Check } from 'lucide-react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { modifyBookingSchema, ModifyBookingFormData } from '../schemas/booking';
 import { Booking, Vehicle } from '../types';
 import { useStore } from '../context/StoreContext';
+import CustomSelect from './ui/CustomSelect';
 
 interface ModifyBookingModalProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ const ModifyBookingModal: React.FC<ModifyBookingModalProps> = ({
     handleSubmit,
     watch,
     setValue,
+    control,
     formState: { errors },
   } = useForm<ModifyBookingFormData>({
     resolver: zodResolver(modifyBookingSchema),
@@ -121,18 +123,22 @@ const ModifyBookingModal: React.FC<ModifyBookingModalProps> = ({
               <div className="grid md:grid-cols-2 gap-8">
                 <div className="space-y-6">
                   <div className="space-y-2">
-                    <label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                      <Car size={14} />
-                      Select Vehicle
-                    </label>
-                    <select
-                      {...register('vehicleId')}
-                      className={`w-full px-5 py-4 rounded-2xl border ${errors.vehicleId ? 'border-red-500' : 'border-slate-100'} bg-slate-50 text-slate-900 font-bold focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all outline-none appearance-none`}
-                    >
-                      {vehicles.map(v => (
-                        <option key={v.id} value={v.id}>{v.name} - Rs {v.pricePerDay.toLocaleString()}/day</option>
-                      ))}
-                    </select>
+                    <Controller
+                      name="vehicleId"
+                      control={control}
+                      render={({ field }) => (
+                        <CustomSelect
+                          label="Select Vehicle"
+                          value={field.value}
+                          onChange={field.onChange}
+                          options={vehicles.map(v => ({
+                            value: v.id,
+                            label: `${v.name} - Rs ${v.pricePerDay.toLocaleString()}/day`
+                          }))}
+                          icon={<Car size={18} />}
+                        />
+                      )}
+                    />
                     {errors.vehicleId && <p className="text-xs text-red-500 font-bold">{errors.vehicleId.message}</p>}
                   </div>
 

@@ -24,7 +24,7 @@ export const getAuthErrorMessage = (error: any): string => {
     case 'auth/cancelled-popup-request':
       return 'The login request was cancelled.';
     case 'auth/network-request-failed':
-      return 'Network error. Please check your internet connection.';
+      return 'Unable to connect to the server. This could be due to a poor internet connection or a firewall blocking the request. Please check your connection and try again.';
     case 'auth/invalid-credential':
       return 'Invalid login credentials. Please check your email and password.';
     case 'auth/too-many-requests':

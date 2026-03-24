@@ -43,6 +43,9 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
 }) => {
   const { user, toggleFavorite } = useStore();
   const isFavorite = user?.favorites?.includes(vehicle.id);
+  const canEdit = user?.role === 'admin' || user?.role === 'manager';
+
+  const cardLink = canEdit ? `/edit-vehicle/${vehicle.id}` : `/vehicle/${vehicle.id}?days=${rentalDays}`;
 
   const getBadgeText = () => {
     if (index === 0) return 'AI PICK';
@@ -89,7 +92,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
             e.stopPropagation();
             toggleFavorite(vehicle.id);
           }}
-          className={`absolute top-4 left-4 w-10 h-10 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg transition-all ${
+          className={`absolute top-4 left-4 w-10 h-10 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg transition-all z-20 ${
             isFavorite 
               ? 'bg-red-500 text-white' 
               : 'bg-white/90 text-[#64748B] hover:text-red-500'
@@ -97,15 +100,35 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
         >
           <Heart size={20} fill={isFavorite ? "currentColor" : "none"} />
         </button>
+
         {showBadge && (
-          <div className="absolute top-4 right-4 bg-[#2563EB] text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg">
+          <div className="absolute top-4 right-4 bg-[#2563EB] text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg z-20">
             {getBadgeText()}
           </div>
         )}
+
+        <Link to={cardLink} className="absolute inset-0 z-10">
+          <span className="sr-only">View Details</span>
+        </Link>
+
+        <img 
+          src={vehicle.image} 
+          alt={vehicle.name}
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800';
+          }}
+          className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700 ease-in-out"
+        />
       </div>
       
-      <div className="p-8 space-y-6 flex-grow flex flex-col">
-        <div className="flex justify-between items-start">
+      <div className="p-8 space-y-6 flex-grow flex flex-col relative">
+        <Link to={cardLink} className="absolute inset-0 z-10">
+          <span className="sr-only">View Details</span>
+        </Link>
+        
+        <div className="flex justify-between items-start relative z-0">
           <div className="space-y-1">
             <h3 className="text-xl font-black text-[#1E293B]">
               <HighlightText text={vehicle.name} highlight={searchQuery} />
@@ -145,16 +168,16 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
           </div>
         </div>
 
-        <div className="flex justify-between items-center mt-auto">
+        <div className="flex justify-between items-center mt-auto relative z-20">
           <div>
             <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Total ({rentalDays} {rentalDays === 1 ? 'day' : 'days'})</p>
             <p className="text-lg font-black text-[#1E293B]">Rs {(vehicle.pricePerDay * rentalDays).toLocaleString()}</p>
           </div>
           <Link 
-            to={`/vehicle/${vehicle.id}?days=${rentalDays}`}
+            to={canEdit ? `/edit-vehicle/${vehicle.id}` : `/payment/${vehicle.id}?days=${rentalDays}`}
             className="px-8 py-3 rounded-xl font-black text-sm transition-all text-center bg-[#2563EB] text-white shadow-lg shadow-blue-100 hover:bg-blue-700"
           >
-            Rent Now
+            {canEdit ? 'Edit Details' : 'Rent Now'}
           </Link>
         </div>
       </div>

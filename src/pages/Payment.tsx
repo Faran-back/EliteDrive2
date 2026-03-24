@@ -41,7 +41,7 @@ const Payment: React.FC = () => {
   });
 
   useEffect(() => {
-    reset({ paymentDetail: '' });
+    reset({ paymentDetail: '', destination: '' });
   }, [paymentMethod, reset]);
 
   if (!vehicle) return <div>Vehicle not found</div>;
@@ -66,9 +66,10 @@ const Payment: React.FC = () => {
         startDate: startDate.toISOString().split('T')[0],
         endDate: endDate.toISOString().split('T')[0],
         totalPrice: vehicle.pricePerDay * rentalDays,
-        status: 'active' as const,
+        status: 'pending' as const,
         paymentStatus: 'paid' as const,
-        bookingDate: today.toISOString().split('T')[0]
+        bookingDate: today.toISOString().split('T')[0],
+        destination: data.destination
       };
       
       await addBooking(newBooking);
@@ -193,6 +194,24 @@ const Payment: React.FC = () => {
 
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  Destination of the Trip
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                    <MapPin size={18} />
+                  </span>
+                  <input 
+                    {...register('destination')}
+                    className={`w-full pl-10 pr-4 py-3 rounded-lg border ${errors.destination ? 'border-red-500' : 'border-slate-200'} bg-slate-50 focus:ring-2 focus:ring-[#2463eb] focus:border-transparent transition-all font-medium`} 
+                    placeholder="Where are you going?" 
+                    type="text"
+                  />
+                </div>
+                {errors.destination && <p className="text-xs text-red-500 mt-1">{errors.destination.message}</p>}
+              </div>
+
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">
                   {paymentMethod === 'card' ? 'Card Number' : `${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)} Mobile Number`}

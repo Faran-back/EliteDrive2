@@ -1,249 +1,244 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
   TrendingUp, 
-  Users, 
-  Car, 
-  DollarSign, 
-  ArrowUpRight, 
-  ArrowDownRight,
-  MoreHorizontal,
-  Download,
-  Filter,
-  ChevronRight,
-  Activity,
-  MapPin
+  TrendingDown,
+  BookOpen,
+  Key,
+  Wallet,
+  UserPlus,
+  ArrowRight,
+  MoreHorizontal
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { motion } from 'motion/react';
 import { 
-  BarChart, 
-  Bar, 
+  AreaChart, 
+  Area, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer,
-  Cell
+  ResponsiveContainer
 } from 'recharts';
 
-const AdminDashboard: React.FC = () => {
-  const { bookings, vehicles } = useStore();
+// Import new view components
+import Reports from '../components/dashboard/Reports';
+import Customers from '../components/dashboard/Customers';
+import Performance from '../components/dashboard/Performance';
+import SystemConfig from '../components/dashboard/SystemConfig';
+import SupportCenter from '../components/dashboard/SupportCenter';
+import Bookings from '../components/dashboard/Bookings';
+import RoleAssignment from '../components/dashboard/RoleAssignment';
 
-  const data = [
-    { name: 'Mon', revenue: 45000 },
-    { name: 'Tue', revenue: 52000 },
-    { name: 'Wed', revenue: 48000 },
-    { name: 'Thu', revenue: 61000 },
-    { name: 'Fri', revenue: 55000 },
-    { name: 'Sat', revenue: 67000 },
-    { name: 'Sun', revenue: 72000 },
+const AdminDashboard: React.FC = () => {
+  const { allBookings, vehicles, allUsers } = useStore();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const currentView = queryParams.get('view') || 'overview';
+
+  // Dynamic Stats
+  const totalRevenue = allBookings
+    .filter(b => b.paymentStatus === 'paid')
+    .reduce((acc, b) => acc + b.totalPrice, 0);
+  
+  const activeBookingsCount = allBookings.filter(b => b.status === 'active').length;
+  const totalCustomers = allUsers.filter(u => u.role === 'customer').length;
+
+  // Chart data (Monthly performance)
+  const chartData = [
+    { name: 'Jan', revenue: 150000 },
+    { name: 'Feb', revenue: 280000 },
+    { name: 'Mar', revenue: 220000 },
+    { name: 'Apr', revenue: 350000 },
+    { name: 'May', revenue: 420000 },
+    { name: 'Jun', revenue: 380000 },
+    { name: 'Jul', revenue: 450000 },
   ];
 
   const stats = [
-    { label: 'Total Revenue', value: 'Rs. 1.2M', change: '+14%', icon: DollarSign, color: 'blue' },
-    { label: 'Active Bookings', value: '42', change: '+8%', icon: Car, color: 'emerald' },
-    { label: 'New Customers', value: '128', change: '+22%', icon: Users, color: 'purple' },
-    { label: 'Fleet Utilization', value: '85%', change: '-2%', icon: Activity, color: 'amber' },
+    { label: 'Total Bookings', value: allBookings.length.toLocaleString(), change: '+12%', icon: BookOpen, color: 'blue', trending: 'up' },
+    { label: 'Active Rentals', value: activeBookingsCount.toString(), change: '+5%', icon: Key, color: 'amber', trending: 'up' },
+    { label: 'Revenue (PKR)', value: totalRevenue.toLocaleString(), change: '+18%', icon: Wallet, color: 'emerald', trending: 'up' },
+    { label: 'New Users', value: totalCustomers.toString(), change: '-2%', icon: UserPlus, color: 'purple', trending: 'down' },
   ];
 
   return (
-    <div className="space-y-10 pb-20">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-1">
-          <h1 className="text-4xl font-black tracking-tight text-[#1E293B]">Admin Overview</h1>
-          <p className="text-[#64748B] font-medium">Real-time performance metrics for EliteDrive Pakistan.</p>
-        </div>
-        <div className="flex gap-4">
-          <button className="bg-white border border-[#E2E8F0] px-6 py-3 rounded-[20px] font-black text-sm flex items-center gap-2.5 hover:bg-[#F8FAFC] transition-all text-[#64748B] shadow-sm">
-            <Download size={18} />
-            Export Report
-          </button>
-          <button className="bg-[#2563EB] text-white px-6 py-3 rounded-[20px] font-black text-sm flex items-center gap-2.5 hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all">
-            <Filter size={18} />
-            Filters
-          </button>
-        </div>
-      </header>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-        {stats.map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm hover:shadow-xl transition-all group cursor-pointer"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${
-                stat.color === 'blue' ? 'bg-blue-50 text-[#2563EB]' :
-                stat.color === 'emerald' ? 'bg-emerald-50 text-emerald-600' :
-                stat.color === 'purple' ? 'bg-purple-50 text-purple-600' :
-                'bg-amber-50 text-amber-600'
-              } group-hover:scale-110`}>
-                <stat.icon size={28} />
-              </div>
-              <div className={`flex items-center gap-1 text-xs font-black px-2 py-1 rounded-lg ${
-                stat.change.startsWith('+') ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'
-              }`}>
-                {stat.change.startsWith('+') ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                {stat.change}
-              </div>
-            </div>
-            <p className="text-[#64748B] text-sm font-black uppercase tracking-widest">{stat.label}</p>
-            <h3 className="text-3xl font-black mt-2 text-[#1E293B]">{stat.value}</h3>
-          </motion.div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        {/* Revenue Chart */}
-        <div className="lg:col-span-2 bg-white p-10 rounded-[48px] border border-gray-100 shadow-sm space-y-8">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <h2 className="text-2xl font-black text-[#1E293B]">Revenue Trend</h2>
-              <p className="text-sm text-[#64748B] font-medium">Weekly performance overview</p>
-            </div>
-            <select className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-xl text-xs font-black uppercase tracking-widest px-4 py-2 focus:ring-2 focus:ring-blue-500/10 outline-none cursor-pointer">
-              <option>Last 7 Days</option>
-              <option>Last 30 Days</option>
-            </select>
-          </div>
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#94A3B8', fontSize: 12, fontWeight: 700 }} 
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#94A3B8', fontSize: 12, fontWeight: 700 }} 
-                  dx={-10}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    borderRadius: '24px', 
-                    border: 'none', 
-                    boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
-                    padding: '16px'
-                  }}
-                  cursor={{ fill: '#F8FAFC' }}
-                />
-                <Bar dataKey="revenue" radius={[12, 12, 0, 0]} barSize={45}>
-                  {data.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === data.length - 1 ? '#2563EB' : '#E2E8F0'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white p-10 rounded-[48px] border border-gray-100 shadow-sm space-y-8">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-black text-[#1E293B]">Recent Activity</h2>
-            <Activity className="text-[#2563EB]" size={24} />
-          </div>
-          <div className="space-y-8">
-            {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="flex items-center gap-5 group cursor-pointer">
-                <div className="relative">
-                  <img 
-                    src={`https://i.pravatar.cc/150?u=${i}`} 
-                    alt="User" 
-                    className="w-12 h-12 rounded-2xl object-cover border-2 border-white shadow-md"
-                  />
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full"></div>
+    <div className="space-y-8">
+      {currentView === 'overview' && (
+        <>
+          {/* Metrics Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {stats.map((stat) => (
+              <div key={stat.label} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <div className="flex justify-between items-start mb-4">
+                  <div className={`p-2 rounded-lg ${
+                    stat.color === 'blue' ? 'bg-blue-600/10 text-blue-600' :
+                    stat.color === 'amber' ? 'bg-amber-500/10 text-amber-600' :
+                    stat.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-600' :
+                    'bg-purple-500/10 text-purple-600'
+                  }`}>
+                    <stat.icon size={20} />
+                  </div>
+                  <span className={`text-xs font-bold flex items-center gap-1 ${
+                    stat.trending === 'up' ? 'text-emerald-500' : 'text-red-500'
+                  }`}>
+                    {stat.trending === 'up' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                    {stat.change}
+                  </span>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-black text-[#1E293B] group-hover:text-[#2563EB] transition-colors">New Booking</p>
-                  <p className="text-xs text-[#64748B] font-bold">Toyota Corolla • 2 mins ago</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-black text-[#2563EB]">Rs. 8.5k</p>
-                  <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Paid</p>
-                </div>
+                <p className="text-slate-500 text-sm font-medium">{stat.label}</p>
+                <h3 className="text-2xl font-bold mt-1 text-slate-900">{stat.value}</h3>
               </div>
             ))}
           </div>
-          <button className="w-full py-4 text-sm font-black text-[#64748B] hover:text-[#2563EB] transition-all border-t border-gray-50 flex items-center justify-center gap-2">
-            View All Activity
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      </div>
 
-      {/* Fleet Status Table */}
-      <div className="bg-white rounded-[48px] border border-gray-100 shadow-sm overflow-hidden">
-        <div className="p-10 border-b border-gray-50 flex items-center justify-between">
-          <div className="space-y-1">
-            <h2 className="text-2xl font-black text-[#1E293B]">Fleet Status</h2>
-            <p className="text-sm text-[#64748B] font-medium">Real-time vehicle availability and performance</p>
+          {/* Revenue Trend Chart */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Revenue Trend</h3>
+                <p className="text-sm text-slate-500">Monthly performance analytics</p>
+              </div>
+              <div className="flex gap-2">
+                <button className="px-3 py-1 text-xs font-medium bg-slate-100 text-slate-900 rounded-md">Last 7 Months</button>
+                <button className="px-3 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50 rounded-md transition-colors">Yearly</button>
+              </div>
+            </div>
+            <div className="h-64 w-full min-h-[16rem]">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={256} debounce={100}>
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#2563EB" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#94a3b8', fontSize: 12 }} 
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#94a3b8', fontSize: 12 }} 
+                    dx={-10}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      borderRadius: '12px', 
+                      border: 'none', 
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                      padding: '12px'
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stroke="#2563EB" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorRevenue)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <button className="w-12 h-12 hover:bg-[#F8FAFC] rounded-2xl flex items-center justify-center text-[#64748B] transition-all border border-gray-100">
-            <MoreHorizontal size={24} />
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#F8FAFC] text-[#94A3B8] text-[11px] font-black uppercase tracking-widest">
-                <th className="px-10 py-5">Vehicle</th>
-                <th className="px-10 py-5">Status</th>
-                <th className="px-10 py-5">Current Location</th>
-                <th className="px-10 py-5">Revenue (MTD)</th>
-                <th className="px-10 py-5 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {vehicles.map(vehicle => (
-                <tr key={vehicle.id} className="hover:bg-[#F8FAFC]/50 transition-all group">
-                  <td className="px-10 py-7">
-                    <div className="flex items-center gap-5">
-                      <div className="w-16 h-12 rounded-xl overflow-hidden shadow-md border-2 border-white">
-                        <img src={vehicle.image} className="w-full h-full object-cover" />
-                      </div>
-                      <div>
-                        <p className="font-black text-sm text-[#1E293B] group-hover:text-[#2563EB] transition-colors">{vehicle.name}</p>
-                        <p className="text-xs text-[#64748B] font-bold uppercase tracking-widest">{vehicle.type}</p>
-                      </div>
+
+          {/* Tables Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Popular Cars */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden lg:col-span-1">
+              <div className="p-6 border-b border-slate-100">
+                <h3 className="font-bold text-slate-900">Popular Cars</h3>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {vehicles.slice(0, 2).map((vehicle, idx) => (
+                  <div key={vehicle.id} className="p-4 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden">
+                      <img src={vehicle.image} alt={vehicle.name} className="object-cover h-full w-full" />
                     </div>
-                  </td>
-                  <td className="px-10 py-7">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                      <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-100">Available</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-900">{vehicle.name}</p>
+                      <p className="text-xs text-slate-500">{idx === 0 ? '24' : '18'} Bookings this month</p>
                     </div>
-                  </td>
-                  <td className="px-10 py-7">
-                    <div className="flex items-center gap-2 text-sm font-bold text-[#64748B]">
-                      <MapPin size={14} className="text-[#2563EB]" />
-                      {vehicle.location}, Pakistan
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-emerald-600">Active</p>
                     </div>
-                  </td>
-                  <td className="px-10 py-7">
-                    <p className="text-sm font-black text-[#1E293B]">Rs. 145,000</p>
-                    <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">+12% vs last month</p>
-                  </td>
-                  <td className="px-10 py-7 text-right">
-                    <button className="w-10 h-10 hover:bg-white hover:shadow-md rounded-xl text-[#CBD5E1] hover:text-[#1E293B] transition-all flex items-center justify-center mx-auto sm:ml-auto sm:mr-0">
-                      <MoreHorizontal size={20} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 bg-slate-50 text-center">
+                <button className="text-xs text-blue-600 font-semibold hover:underline transition-all">View All Fleet</button>
+              </div>
+            </div>
+
+            {/* Recent Bookings */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden lg:col-span-2">
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                <h3 className="font-bold text-slate-900">Recent Bookings</h3>
+                <button className="text-xs font-semibold text-slate-500 flex items-center gap-1 hover:text-blue-600 transition-colors">
+                  View History <ArrowRight size={14} />
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                    <tr>
+                      <th className="px-6 py-3 font-semibold">Customer</th>
+                      <th className="px-6 py-3 font-semibold">Vehicle</th>
+                      <th className="px-6 py-3 font-semibold">Duration</th>
+                      <th className="px-6 py-3 font-semibold">Amount</th>
+                      <th className="px-6 py-3 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm">
+                    {allBookings.slice(0, 3).map((booking, idx) => {
+                      const user = allUsers.find(u => u.id === booking.userId);
+                      const vehicle = vehicles.find(v => v.id === booking.vehicleId);
+                      return (
+                        <tr key={booking.id}>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden">
+                                <img src={user?.avatar || `https://i.pravatar.cc/150?u=${idx}`} alt="User" className="w-full h-full object-cover" />
+                              </div>
+                              <span className="font-medium text-slate-900">{user?.name || 'Customer'}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-slate-600">{vehicle?.name || 'Vehicle'}</td>
+                          <td className="px-6 py-4 text-slate-600">3 Days</td>
+                          <td className="px-6 py-4 font-medium text-slate-900">PKR {booking.totalPrice.toLocaleString()}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                              booking.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                              booking.status === 'active' ? 'bg-blue-100 text-blue-700' :
+                              'bg-amber-100 text-amber-700'
+                            }`}>
+                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {currentView === 'reports' && <Reports />}
+      {currentView === 'customers' && <Customers />}
+      {currentView === 'performance' && <Performance />}
+      {currentView === 'system-config' && <SystemConfig />}
+      {currentView === 'support-center' && <SupportCenter />}
+      {currentView === 'bookings' && <Bookings />}
+      {currentView === 'role-assignment' && <RoleAssignment />}
     </div>
   );
 };

@@ -10,7 +10,8 @@ import {
   CreditCard,
   LogOut,
   Save,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { motion } from 'motion/react';
@@ -19,11 +20,15 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { profileSchema, ProfileFormData } from '../schemas/profile';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { fileToBase64, validateImage } from '../lib/imageUtils';
+import { useRef } from 'react';
 
 const Profile: React.FC = () => {
   const { user, updateUser, logout, showToast } = useStore();
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -66,6 +71,29 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = validateImage(file, 1); // Limit to 1MB for base64 storage
+    if (!validation.isValid) {
+      showToast(validation.error || 'Invalid image', 'error');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const base64 = await fileToBase64(file);
+      await updateUser({ avatar: base64 });
+      showToast('Profile picture updated!', 'success');
+    } catch (error) {
+      console.error('Image upload error:', error);
+      showToast('Failed to upload image', 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div className="space-y-10 pb-20">
       <header className="space-y-1">
@@ -79,15 +107,33 @@ const Profile: React.FC = () => {
           <div className="bg-white p-10 rounded-[48px] border border-gray-100 shadow-sm text-center space-y-8">
             <div className="relative inline-block">
               <div className="p-1.5 bg-white border border-[#E2E8F0] rounded-full shadow-xl shadow-blue-50">
-                <img 
-                  src={user?.avatar} 
-                  alt="Profile" 
-                  className="w-36 h-36 rounded-full object-cover"
-                />
+                <div className="relative w-36 h-36 rounded-full overflow-hidden bg-slate-100">
+                  <img 
+                    src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`} 
+                    alt="Profile" 
+                    className={`w-full h-full object-cover transition-opacity duration-300 ${isUploading ? 'opacity-40' : 'opacity-100'}`}
+                  />
+                  {isUploading && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Loader2 className="text-blue-600 animate-spin" size={32} />
+                    </div>
+                  )}
+                </div>
               </div>
-              <button className="absolute bottom-1 right-1 p-3 bg-[#2563EB] text-white rounded-full shadow-lg hover:scale-110 transition-all border-4 border-white">
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="absolute bottom-1 right-1 p-3 bg-[#2563EB] text-white rounded-full shadow-lg hover:scale-110 transition-all border-4 border-white disabled:opacity-50 disabled:scale-100"
+              >
                 <Camera size={20} />
               </button>
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                onChange={handleImageUpload}
+                accept="image/*"
+                className="hidden"
+              />
             </div>
             <div className="space-y-1">
               <h2 className="text-3xl font-black text-[#1E293B]">{user?.name}</h2>

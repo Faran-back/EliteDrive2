@@ -28,7 +28,7 @@ import NotificationDropdown from './NotificationDropdown';
 import SupportChatWidget from './SupportChatWidget';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, logout, acceptInvitation, declineInvitation, notifications, markNotificationAsRead, allBookings } = useStore();
+  const { user, logout, acceptInvitation, declineInvitation, notifications, markNotificationAsRead, allBookings, roleRequests } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
@@ -36,6 +36,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isVerticalNav = user?.role === 'admin' || user?.role === 'manager';
 
   const pendingBookingsCount = allBookings.filter(b => b.status === 'pending').length;
+  const pendingRoleRequestsCount = roleRequests.filter(r => r.status === 'pending').length;
 
   if (location.pathname === '/auth') return <>{children}</>;
 
@@ -50,6 +51,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { icon: LayoutDashboard, label: 'Dashboard', path: '/admin-dashboard' },
     { icon: Car, label: 'Fleet Inventory', path: '/fleet' },
     { icon: History, label: 'Bookings', path: '/admin-dashboard?view=bookings', badge: pendingBookingsCount },
+    { icon: ShieldCheck, label: 'Role Requests', path: '/admin-dashboard?view=role-requests', badge: pendingRoleRequestsCount },
     { icon: Users, label: 'Assign Roles', path: '/admin-dashboard?view=role-assignment' },
     { icon: FileText, label: 'Reports', path: '/admin-dashboard?view=reports' },
   ];

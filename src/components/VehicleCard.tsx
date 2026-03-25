@@ -48,24 +48,25 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
   const cardLink = canEdit ? `/edit-vehicle/${vehicle.id}` : `/vehicle/${vehicle.id}?days=${rentalDays}`;
 
   const getBadgeText = () => {
-    if (index === 0) return 'AI PICK';
-    if (index === 1) return 'FAMILY CHOICE';
-    if (index === 2) return 'PREMIUM INTERIOR';
-    return 'LUXURY COMFORT';
+    if (vehicle.rating >= 4.8) return 'TOP RATED';
+    if (vehicle.seats >= 7) return 'FAMILY CHOICE';
+    if (vehicle.pricePerDay >= 15000) return 'LUXURY';
+    return 'POPULAR';
   };
 
   const getSubTitle = () => {
-    if (vehicle.type === 'Hatchback') return 'Economy • Hatchback';
-    if (vehicle.type === 'Sedan') return vehicle.id === '3' ? 'Premium • Sedan' : 'Comfort • Sedan';
-    return 'Luxury • SUV';
+    const category = vehicle.pricePerDay >= 15000 ? 'Premium' : vehicle.pricePerDay >= 8000 ? 'Comfort' : 'Economy';
+    return `${category} • ${vehicle.type}`;
   };
 
   const getHighlightText = () => {
-    if (index === 0) return 'FUEL EFFICIENT';
-    if (index === 1) return 'FAMILY CHOICE';
-    if (index === 2) return 'PREMIUM INTERIOR';
-    return 'LUXURY COMFORT';
+    if (vehicle.fuel === 'Electric') return 'ECO-FRIENDLY';
+    if (vehicle.transmission === 'Automatic') return 'EASY DRIVE';
+    if (vehicle.rating >= 4.9) return 'EXCELLENT SERVICE';
+    return 'BEST VALUE';
   };
+
+  const isVerified = user?.emailVerified && user?.phoneVerified;
 
   return (
     <motion.div
@@ -110,17 +111,6 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
         <Link to={cardLink} className="absolute inset-0 z-10">
           <span className="sr-only">View Details</span>
         </Link>
-
-        <img 
-          src={vehicle.image} 
-          alt={vehicle.name}
-          referrerPolicy="no-referrer"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800';
-          }}
-          className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700 ease-in-out"
-        />
       </div>
       
       <div className="p-8 space-y-6 flex-grow flex flex-col relative">
@@ -174,8 +164,8 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
             <p className="text-lg font-black text-[#1E293B]">Rs {(vehicle.pricePerDay * rentalDays).toLocaleString()}</p>
           </div>
           <Link 
-            to={canEdit ? `/edit-vehicle/${vehicle.id}` : `/payment/${vehicle.id}?days=${rentalDays}`}
-            className="px-8 py-3 rounded-xl font-black text-sm transition-all text-center bg-[#2563EB] text-white shadow-lg shadow-blue-100 hover:bg-blue-700"
+            to={canEdit ? `/edit-vehicle/${vehicle.id}` : `/vehicle/${vehicle.id}?days=${rentalDays}`}
+            className="px-8 py-3 bg-[#2563EB] text-white rounded-xl font-black text-sm shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all text-center"
           >
             {canEdit ? 'Edit Details' : 'Rent Now'}
           </Link>

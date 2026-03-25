@@ -9,6 +9,9 @@ export interface User {
   favorites?: string[];
   lastUpdatedBy?: string;
   lastUpdatedAt?: string;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
+  createdAt?: string;
   pendingInvitation?: {
     role: 'admin' | 'manager';
     invitedBy: string;
@@ -37,6 +40,8 @@ export interface Vehicle {
   fuel: 'Petrol' | 'Diesel' | 'Electric' | 'Hybrid';
   seats: number;
   rating: number;
+  reviews?: number;
+  available?: boolean;
   location: string;
   features: string[];
   status: 'available' | 'rented' | 'maintenance';
@@ -56,12 +61,24 @@ export interface Booking {
   destination?: string;
 }
 
+export interface RoleRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  requestedRole: 'admin' | 'manager';
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  processedBy?: string;
+  processedAt?: string;
+}
+
 export interface Notification {
   id: string;
   userId: string;
   title: string;
   message: string;
-  type: 'booking_confirmed' | 'booking_cancelled' | 'promotion' | 'info' | 'invitation';
+  type: 'booking_confirmed' | 'booking_cancelled' | 'promotion' | 'info' | 'invitation' | 'role_request_approved' | 'role_request_rejected';
   read: boolean;
   createdAt: string;
   link?: string;

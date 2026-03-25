@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Car, AlertCircle, Mail, Lock, User as UserIcon, ArrowRight, Github, Chrome } from 'lucide-react';
+import { Car, AlertCircle, Mail, Lock, User as UserIcon, ArrowRight, Github, Chrome, Shield, ChevronDown, ChevronUp } from 'lucide-react';
 import { auth, googleProvider, db } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
@@ -21,7 +21,7 @@ const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { showToast, setUser } = useStore();
+  const { showToast, setUser, createRoleRequest } = useStore();
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
 
   // Sync mode with URL if needed, or just default to signin
@@ -55,10 +55,18 @@ const Auth: React.FC = () => {
     handleSubmit: handleSubmitSignup,
     formState: { errors: signupErrors },
     reset: resetSignup,
+    setValue: setValueSignup,
+    watch: watchSignup,
   } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
     mode: 'onChange',
+    defaultValues: {
+      requestedRole: 'customer'
+    }
   });
+
+  const requestedRole = watchSignup('requestedRole');
+  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
 
   const handleRedirect = (userRole: string) => {
     switch (userRole) {
@@ -170,6 +178,11 @@ const Auth: React.FC = () => {
 
       await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
       setUser(newUser);
+      
+      // Handle role request if manager or admin selected
+      if (data.requestedRole === 'manager' || data.requestedRole === 'admin') {
+        await createRoleRequest(data.requestedRole, newUser);
+      }
       
       showToast('Account created successfully!', 'success');
       handleRedirect(role);
@@ -350,6 +363,65 @@ const Auth: React.FC = () => {
                       />
                     </div>
                     {signupErrors.name && <p className="text-[10px] text-red-500 font-bold ml-1">{signupErrors.name.message}</p>}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence mode="wait">
+                {mode === 'signup' && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="space-y-2 relative"
+                  >
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Select Role</label>
+                    
+                    <div className="relative">
+                      <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10" size={18} />
+                      <button
+                        type="button"
+                        onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
+                        className={`w-full bg-[#f8faff] border ${signupErrors.requestedRole ? 'border-red-500' : 'border-slate-100'} rounded-2xl py-4 pl-12 pr-4 flex items-center justify-between focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-bold text-slate-900 shadow-sm relative`}
+                      >
+                        <span className="capitalize">{requestedRole}</span>
+                        {isRoleDropdownOpen ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
+                      </button>
+
+                      <AnimatePresence>
+                        {isRoleDropdownOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                            className="absolute z-50 top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden p-2"
+                          >
+                            {(['admin', 'customer', 'manager'] as const).map((role) => (
+                              <button
+                                key={role}
+                                type="button"
+                                onClick={() => {
+                                  setValueSignup('requestedRole', role);
+                                  setIsRoleDropdownOpen(false);
+                                }}
+                                className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-between ${
+                                  requestedRole === role 
+                                    ? 'bg-blue-50 text-blue-600' 
+                                    : 'text-slate-600 hover:bg-slate-50'
+                                }`}
+                              >
+                                <span className="capitalize">{role}</span>
+                                {requestedRole === role && (
+                                  <div className="size-1.5 bg-blue-600 rounded-full" />
+                                )}
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                    
+                    {signupErrors.requestedRole && <p className="text-[10px] text-red-500 font-bold ml-1">{signupErrors.requestedRole.message}</p>}
                   </motion.div>
                 )}
               </AnimatePresence>

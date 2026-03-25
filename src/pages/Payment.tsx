@@ -40,11 +40,21 @@ const Payment: React.FC = () => {
     mode: 'onChange',
   });
 
+  const isVerified = user?.emailVerified && user?.phoneVerified;
+
+  useEffect(() => {
+    if (user && !isVerified) {
+      showToast('Please verify your identity before booking.', 'error');
+      navigate(`/vehicle/${id}?days=${rentalDays}`);
+    }
+  }, [user, isVerified, navigate, id, rentalDays, showToast]);
+
   useEffect(() => {
     reset({ paymentDetail: '', destination: '' });
   }, [paymentMethod, reset]);
 
   if (!vehicle) return <div>Vehicle not found</div>;
+  if (!isVerified) return <LoadingSpinner />;
 
   const onSubmit = async (data: PaymentFormData) => {
     setIsProcessing(true);

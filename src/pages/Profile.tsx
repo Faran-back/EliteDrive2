@@ -11,24 +11,50 @@ import {
   LogOut,
   Save,
   ChevronRight,
-  Loader2
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { profileSchema, ProfileFormData } from '../schemas/profile';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { fileToBase64, validateImage } from '../lib/imageUtils';
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
+import { ConfirmationResult } from 'firebase/auth';
 
 const Profile: React.FC = () => {
-  const { user, updateUser, logout, showToast } = useStore();
+  const { 
+    user, 
+    updateUser, 
+    logout, 
+    showToast, 
+    sendVerificationEmail, 
+    setupRecaptcha, 
+    sendPhoneVerificationCode, 
+    verifyPhoneCode,
+    bookings
+  } = useStore();
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [showOtpInput, setShowOtpInput] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const totalTrips = bookings.filter(b => b.userId === user?.id).length;
+
+  useEffect(() => {
+    setupRecaptcha('recaptcha-container');
+  }, []);
 
   const {
     register,
@@ -94,6 +120,46 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handleSendEmailVerification = async () => {
+    setIsVerifyingEmail(true);
+    try {
+      await sendVerificationEmail();
+    } finally {
+      setIsVerifyingEmail(false);
+    }
+  };
+
+  const handleSendPhoneCode = async () => {
+    if (!user?.phone) {
+      showToast('Please save a phone number first', 'error');
+      return;
+    }
+    setIsSendingCode(true);
+    try {
+      const result = await sendPhoneVerificationCode(user.phone);
+      setConfirmationResult(result);
+      setShowOtpInput(true);
+    } catch (error) {
+      console.error('Phone code error:', error);
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!confirmationResult || !otpCode) return;
+    setIsVerifyingCode(true);
+    try {
+      await verifyPhoneCode(confirmationResult, otpCode);
+      setShowOtpInput(false);
+      setOtpCode('');
+    } catch (error) {
+      console.error('OTP verification error:', error);
+    } finally {
+      setIsVerifyingCode(false);
+    }
+  };
+
   return (
     <div className="space-y-10 pb-20">
       <header className="space-y-1">
@@ -137,11 +203,13 @@ const Profile: React.FC = () => {
             </div>
             <div className="space-y-1">
               <h2 className="text-3xl font-black text-[#1E293B]">{user?.name}</h2>
-              <p className="text-[#64748B] font-bold text-sm">Member since 2023</p>
+              <p className="text-[#64748B] font-bold text-sm">
+                Member since {user?.createdAt ? new Date(user.createdAt).getFullYear() : new Date().getFullYear()}
+              </p>
             </div>
             <div className="pt-8 border-t border-gray-50 flex justify-around">
               <div className="space-y-1">
-                <p className="text-3xl font-black text-[#1E293B]">12</p>
+                <p className="text-3xl font-black text-[#1E293B]">{totalTrips}</p>
                 <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Trips</p>
               </div>
               <div className="w-px bg-gray-100" />
@@ -152,15 +220,25 @@ const Profile: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-[#2563EB] rounded-[40px] p-8 text-white space-y-4 shadow-2xl shadow-blue-100 relative overflow-hidden">
+          <div className={`${(user?.emailVerified && user?.phoneVerified) ? 'bg-[#2563EB]' : 'bg-rose-500'} rounded-[40px] p-8 text-white space-y-4 shadow-2xl shadow-blue-100 relative overflow-hidden`}>
             <div className="relative z-10 space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                  <ShieldCheck className="text-white" size={24} />
+                  {user?.emailVerified && user?.phoneVerified ? (
+                    <ShieldCheck className="text-white" size={24} />
+                  ) : (
+                    <AlertCircle className="text-white" size={24} />
+                  )}
                 </div>
-                <p className="font-black text-lg">Identity Verified</p>
+                <p className="font-black text-lg">
+                  {user?.emailVerified && user?.phoneVerified ? 'Identity Verified' : 'Identity Not Verified'}
+                </p>
               </div>
-              <p className="text-blue-100 text-sm font-medium leading-relaxed">Your account is fully verified for premium vehicle rentals in Pakistan.</p>
+              <p className="text-blue-100 text-sm font-medium leading-relaxed">
+                {user?.emailVerified && user?.phoneVerified 
+                  ? 'Your account is fully verified for premium vehicle rentals in Pakistan.' 
+                  : 'Please verify your email and phone number to unlock vehicle bookings.'}
+              </p>
             </div>
             <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full"></div>
           </div>
@@ -183,7 +261,23 @@ const Profile: React.FC = () => {
                 {errors.name && <p className="text-xs text-red-500 ml-1">{errors.name.message}</p>}
               </div>
               <div className="space-y-3">
-                <label className="text-sm font-black text-[#64748B] ml-1">Email Address</label>
+                <div className="flex items-center justify-between ml-1">
+                  <label className="text-sm font-black text-[#64748B]">Email Address</label>
+                  {user?.emailVerified ? (
+                    <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 uppercase tracking-wider">
+                      <CheckCircle size={12} /> Verified
+                    </span>
+                  ) : (
+                    <button 
+                      type="button"
+                      onClick={handleSendEmailVerification}
+                      disabled={isVerifyingEmail}
+                      className="text-[10px] font-black text-blue-600 uppercase tracking-wider hover:underline disabled:opacity-50"
+                    >
+                      {isVerifyingEmail ? 'Sending...' : 'Verify Now'}
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={20} />
                   <input 
@@ -195,12 +289,29 @@ const Profile: React.FC = () => {
                 {errors.email && <p className="text-xs text-red-500 ml-1">{errors.email.message}</p>}
               </div>
               <div className="space-y-3">
-                <label className="text-sm font-black text-[#64748B] ml-1">Phone Number</label>
+                <div className="flex items-center justify-between ml-1">
+                  <label className="text-sm font-black text-[#64748B]">Phone Number</label>
+                  {user?.phoneVerified ? (
+                    <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 uppercase tracking-wider">
+                      <CheckCircle size={12} /> Verified
+                    </span>
+                  ) : (
+                    <button 
+                      type="button"
+                      onClick={handleSendPhoneCode}
+                      disabled={isSendingCode || !user?.phone}
+                      className="text-[10px] font-black text-blue-600 uppercase tracking-wider hover:underline disabled:opacity-50"
+                    >
+                      {isSendingCode ? 'Sending...' : 'Verify Now'}
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={20} />
                   <input 
                     type="text" 
                     {...register('phone')}
+                    placeholder="+923001234567"
                     className={`w-full bg-[#F8FAFC] border ${errors.phone ? 'border-red-500' : 'border-[#F1F5F9]'} rounded-[24px] py-5 pl-14 pr-6 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-[#2563EB] transition-all font-bold text-[#1E293B]`}
                   />
                 </div>
@@ -279,6 +390,75 @@ const Profile: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      <div id="recaptcha-container"></div>
+
+      <AnimatePresence>
+        {showOtpInput && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowOtpInput(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative bg-white w-full max-w-md rounded-[48px] p-10 shadow-2xl space-y-8"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center">
+                  <Phone className="text-blue-600" size={28} />
+                </div>
+                <button 
+                  onClick={() => setShowOtpInput(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <X size={24} className="text-gray-400" />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-[#1E293B]">Verify Phone</h3>
+                <p className="text-[#64748B] font-medium">Enter the 6-digit code sent to {user?.phone}</p>
+              </div>
+
+              <div className="space-y-4">
+                <input 
+                  type="text" 
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  className="w-full bg-[#F8FAFC] border border-[#F1F5F9] rounded-[24px] py-6 text-center text-4xl font-black tracking-[0.5em] focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-[#2563EB] transition-all text-[#1E293B]"
+                />
+                
+                <button 
+                  onClick={handleVerifyOtp}
+                  disabled={isVerifyingCode || otpCode.length !== 6}
+                  className="w-full bg-[#2563EB] text-white py-6 rounded-[24px] font-black flex items-center justify-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 disabled:opacity-50"
+                >
+                  {isVerifyingCode ? (
+                    <>
+                      <Loader2 className="animate-spin" size={20} />
+                      Verifying...
+                    </>
+                  ) : (
+                    'Verify Code'
+                  )}
+                </button>
+              </div>
+
+              <p className="text-center text-xs text-[#94A3B8] font-bold">
+                Didn't receive the code? <button className="text-blue-600 hover:underline">Resend</button>
+              </p>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

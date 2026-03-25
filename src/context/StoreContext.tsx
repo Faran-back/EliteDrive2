@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Vehicle, Booking, Notification, INITIAL_VEHICLES, Invitation } from '../types';
+import { User, Vehicle, Booking, Notification, INITIAL_VEHICLES, Invitation, RoleRequest } from '../types';
 import { auth, db } from '../firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, sendEmailVerification, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import Toast from '../components/Toast';
 import { 
   collection, 
@@ -106,6 +106,7 @@ interface StoreContextType {
   allBookings: Booking[];
   allUsers: User[];
   notifications: Notification[];
+  roleRequests: RoleRequest[];
   addBooking: (booking: Booking) => Promise<void>;
   approveBooking: (id: string) => Promise<void>;
   updateBooking: (id: string, updates: Partial<Booking>) => Promise<void>;
@@ -124,9 +125,16 @@ interface StoreContextType {
   searchUsers: (query: string) => Promise<User[]>;
   updateUserRole: (userId: string, role: 'admin' | 'manager' | 'customer') => Promise<void>;
   bulkUpdateUserRoles: (userIds: string[], role: 'admin' | 'manager' | 'customer') => Promise<void>;
+  createRoleRequest: (requestedRole: 'admin' | 'manager', userData?: User) => Promise<void>;
+  approveRoleRequest: (requestId: string) => Promise<void>;
+  rejectRoleRequest: (requestId: string) => Promise<void>;
   updateVehicle: (id: string, updates: Partial<Vehicle>) => Promise<void>;
   deleteVehicle: (id: string) => Promise<void>;
   addVehicle: (vehicle: Vehicle) => Promise<void>;
+  sendVerificationEmail: () => Promise<void>;
+  setupRecaptcha: (containerId: string) => void;
+  sendPhoneVerificationCode: (phoneNumber: string) => Promise<ConfirmationResult>;
+  verifyPhoneCode: (confirmationResult: ConfirmationResult, code: string) => Promise<void>;
   isChatOpen: boolean;
   setIsChatOpen: (isOpen: boolean) => void;
 }
@@ -140,8 +148,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [roleRequests, setRoleRequests] = useState<RoleRequest[]>([]);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [recaptchaVerifier, setRecaptchaVerifier] = useState<RecaptchaVerifier | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info'; isVisible: boolean }>({
     message: '',
     type: 'info',
@@ -174,7 +184,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 phone: firebaseUser.phoneNumber || '',
                 role: firebaseUser.email === 'test@test.com' || firebaseUser.email === 'inotfarhan@gmail.com' || firebaseUser.email === 'testingdaflow@test.com' ? 'admin' : 'customer',
                 rewardPoints: 0,
-                avatar: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100'
+                avatar: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100',
+                emailVerified: firebaseUser.emailVerified,
+                createdAt: new Date().toISOString()
               };
 
               // Check if there's an invitation for this email
@@ -261,6 +273,25 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setAllUsers(usersData);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'users');
+    });
+
+    return () => unsubscribe();
+  }, [isAuthReady, user]);
+
+  useEffect(() => {
+    if (!isAuthReady || !user || user.role !== 'admin') {
+      setRoleRequests([]);
+      return;
+    }
+
+    const roleRequestsQuery = query(collection(db, 'roleRequests'));
+    const unsubscribe = onSnapshot(roleRequestsQuery, (snapshot) => {
+      const requestsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RoleRequest));
+      // Sort by createdAt descending
+      requestsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setRoleRequests(requestsData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'roleRequests');
     });
 
     return () => unsubscribe();
@@ -599,6 +630,105 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const createRoleRequest = async (requestedRole: 'admin' | 'manager', userData?: User) => {
+    const currentUser = userData || user;
+    if (!currentUser) return;
+    const id = Math.random().toString(36).substr(2, 9);
+    const request: RoleRequest = {
+      id,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userEmail: currentUser.email,
+      requestedRole,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      await setDoc(doc(db, 'roleRequests', id), request);
+      showToast(`Request for ${requestedRole} role submitted!`, 'success');
+      
+      // Notify admins
+      const admins = allUsers.filter(u => u.role === 'admin');
+      for (const admin of admins) {
+        await addNotification({
+          userId: admin.id,
+          title: 'New Role Request',
+          message: `${currentUser.name} is requesting to become an ${requestedRole}.`,
+          type: 'info',
+          read: false,
+          createdAt: new Date().toISOString(),
+          link: '/admin-dashboard?view=role-requests'
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `roleRequests/${id}`);
+    }
+  };
+
+  const approveRoleRequest = async (requestId: string) => {
+    if (!user || user.role !== 'admin') return;
+    try {
+      const requestDoc = await getDoc(doc(db, 'roleRequests', requestId));
+      if (!requestDoc.exists()) return;
+      const request = requestDoc.data() as RoleRequest;
+
+      // Update user role
+      await updateDoc(doc(db, 'users', request.userId), { role: request.requestedRole });
+      
+      // Update request status
+      await updateDoc(doc(db, 'roleRequests', requestId), {
+        status: 'approved',
+        processedBy: user.name || user.email,
+        processedAt: new Date().toISOString()
+      });
+
+      // Notify user
+      await addNotification({
+        userId: request.userId,
+        title: 'Role Request Approved!',
+        message: `Your request for the ${request.requestedRole} role has been approved.`,
+        type: 'role_request_approved',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+
+      showToast(`Approved ${request.userName} as ${request.requestedRole}`, 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `roleRequests/${requestId}`);
+    }
+  };
+
+  const rejectRoleRequest = async (requestId: string) => {
+    if (!user || user.role !== 'admin') return;
+    try {
+      const requestDoc = await getDoc(doc(db, 'roleRequests', requestId));
+      if (!requestDoc.exists()) return;
+      const request = requestDoc.data() as RoleRequest;
+
+      // Update request status
+      await updateDoc(doc(db, 'roleRequests', requestId), {
+        status: 'rejected',
+        processedBy: user.name || user.email,
+        processedAt: new Date().toISOString()
+      });
+
+      // Notify user
+      await addNotification({
+        userId: request.userId,
+        title: 'Role Request Rejected',
+        message: `Your request for the ${request.requestedRole} role has been rejected.`,
+        type: 'role_request_rejected',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+
+      showToast(`Rejected ${request.userName}'s request`, 'info');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `roleRequests/${requestId}`);
+    }
+  };
+
   const updateVehicle = async (id: string, updates: Partial<Vehicle>) => {
     try {
       await updateDoc(doc(db, 'vehicles', id), updates);
@@ -623,6 +753,68 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       showToast('Vehicle added successfully', 'success');
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, `vehicles/${vehicle.id}`);
+    }
+  };
+
+  const sendVerificationEmail = async () => {
+    if (!auth.currentUser) throw new Error('Not authenticated');
+    try {
+      await sendEmailVerification(auth.currentUser);
+      showToast('Verification email sent! Please check your inbox.', 'success');
+    } catch (error) {
+      console.error('Email verification error:', error);
+      showToast('Failed to send verification email. Please try again later.', 'error');
+    }
+  };
+
+  const setupRecaptcha = (containerId: string) => {
+    if (recaptchaVerifier) return;
+    try {
+      const verifier = new RecaptchaVerifier(auth, containerId, {
+        size: 'invisible',
+        callback: () => {
+          console.log('Recaptcha verified');
+        }
+      });
+      setRecaptchaVerifier(verifier);
+    } catch (error) {
+      console.error('Recaptcha setup error:', error);
+    }
+  };
+
+  const sendPhoneVerificationCode = async (phoneNumber: string) => {
+    if (!recaptchaVerifier) throw new Error('Recaptcha not initialized');
+    try {
+      const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+      showToast('Verification code sent to your phone.', 'success');
+      return confirmationResult;
+    } catch (error: any) {
+      console.error('Phone verification error:', error);
+      if (error.code === 'auth/operation-not-allowed') {
+        showToast('Phone authentication is not enabled in Firebase. Please enable it in the Firebase Console.', 'error');
+      } else {
+        showToast('Failed to send verification code. Please check the number and try again.', 'error');
+      }
+      throw error;
+    }
+  };
+
+  const verifyPhoneCode = async (confirmationResult: ConfirmationResult, code: string) => {
+    try {
+      await confirmationResult.confirm(code);
+      if (user) {
+        await updateDoc(doc(db, 'users', user.id), { phoneVerified: true });
+        setUser(prev => prev ? { ...prev, phoneVerified: true } : null);
+      }
+      showToast('Phone number verified successfully!', 'success');
+    } catch (error: any) {
+      console.error('Code verification error:', error);
+      if (error.code === 'auth/operation-not-allowed') {
+        showToast('Phone authentication is not enabled in Firebase. Please enable it in the Firebase Console.', 'error');
+      } else {
+        showToast('Invalid verification code. Please try again.', 'error');
+      }
+      throw error;
     }
   };
 
@@ -653,11 +845,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       searchUsers,
       updateUserRole,
       bulkUpdateUserRoles,
+      createRoleRequest,
+      approveRoleRequest,
+      rejectRoleRequest,
       updateVehicle,
       deleteVehicle,
       addVehicle,
+      sendVerificationEmail,
+      setupRecaptcha,
+      sendPhoneVerificationCode,
+      verifyPhoneCode,
       isChatOpen,
-      setIsChatOpen
+      setIsChatOpen,
+      roleRequests
     }}>
       {children}
       <Toast 

@@ -74,25 +74,33 @@ const ManagerDashboard: React.FC = () => {
 
   const stats = [
     { label: 'Total Vehicles', value: vehicles.length.toLocaleString(), trend: '+4%', trendUp: true },
-    { label: 'Active Rentals', value: allBookings.filter(b => b.status === 'active').length.toLocaleString(), trend: '88% Occ.', trendUp: null },
+    { label: 'Active Rentals', value: allBookings.filter(b => b.status === 'active').length.toLocaleString(), trend: `${Math.round((allBookings.filter(b => b.status === 'active').length / (vehicles.length || 1)) * 100)}% Occ.`, trendUp: null },
     { label: 'Daily Revenue', value: `Rs. ${Math.round(dailyRevenue / 1000)}k`, trend: '+12%', trendUp: true },
-    { label: 'Maintenance', value: '48 Units', trend: '12 Alerts', trendUp: false },
+    { label: 'Maintenance', value: `${vehicles.filter(v => v.status === 'maintenance').length} Units`, trend: '0 Alerts', trendUp: false },
   ];
 
   const inventory = vehicles.slice(0, 3).map(v => ({
     id: v.id,
     name: v.name,
     type: v.type,
-    year: 2024,
+    year: new Date().getFullYear(),
     status: v.status === 'available' ? 'AVAILABLE' : v.status === 'rented' ? 'RENTED' : 'MAINTENANCE',
     location: v.location,
     price: v.pricePerDay
   }));
 
-  const maintenanceAlerts = [
-    { title: 'Brake System Fault', vehicle: 'Honda Civic • Plate LEW-24-772', type: 'error', icon: 'error' },
-    { title: 'Oil Change Due', vehicle: 'Suzuki Cultus • Plate ICT-441-MX', type: 'warning', icon: 'build' },
-  ];
+  const maintenanceAlerts = vehicles
+    .filter(v => v.status === 'maintenance')
+    .map(v => ({
+      title: 'Scheduled Maintenance',
+      vehicle: `${v.name} • Plate ${v.id.slice(0, 8).toUpperCase()}`,
+      type: 'warning',
+      icon: 'build'
+    }));
+
+  if (maintenanceAlerts.length === 0) {
+    maintenanceAlerts.push({ title: 'System Check Required', vehicle: 'All systems operational', type: 'warning', icon: 'check_circle' });
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -339,7 +347,7 @@ const ManagerDashboard: React.FC = () => {
                 <div className="p-6 bg-slate-50/50 flex justify-between items-center">
                   <div>
                     <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-0.5">Main Terminal: Lahore</p>
-                    <p className="text-[10px] text-slate-500 font-bold">Tracking 1,132 active units</p>
+                    <p className="text-[10px] text-slate-500 font-bold">Tracking {vehicles.length.toLocaleString()} active units</p>
                   </div>
                   <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black text-blue-600 uppercase tracking-widest hover:bg-blue-50 transition-all">
                     Live View

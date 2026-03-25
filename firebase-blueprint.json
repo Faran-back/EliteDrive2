@@ -12,7 +12,10 @@
         "role": { "type": "string", "enum": ["customer", "admin", "manager"] },
         "rewardPoints": { "type": "number" },
         "avatar": { "type": "string" },
-        "favorites": { "type": "array", "items": { "type": "string" } }
+        "favorites": { "type": "array", "items": { "type": "string" } },
+        "emailVerified": { "type": "boolean" },
+        "phoneVerified": { "type": "boolean" },
+        "createdAt": { "type": "string" }
       },
       "required": ["id", "name", "email", "role"]
     },
@@ -64,12 +67,29 @@
         "userId": { "type": "string" },
         "title": { "type": "string" },
         "message": { "type": "string" },
-        "type": { "type": "string", "enum": ["booking_confirmed", "booking_cancelled", "promotion", "info"] },
+        "type": { "type": "string", "enum": ["booking_confirmed", "booking_cancelled", "promotion", "info", "role_request_approved", "role_request_rejected"] },
         "read": { "type": "boolean" },
         "createdAt": { "type": "string" },
         "link": { "type": "string" }
       },
       "required": ["id", "userId", "title", "message", "type", "read", "createdAt"]
+    },
+    "RoleRequest": {
+      "title": "RoleRequest",
+      "description": "Request for a higher role (admin or manager)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string", "format": "email" },
+        "requestedRole": { "type": "string", "enum": ["admin", "manager"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string" },
+        "processedBy": { "type": "string" },
+        "processedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "userName", "userEmail", "requestedRole", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -88,6 +108,10 @@
     "/notifications/{notificationId}": {
       "schema": "Notification",
       "description": "User notifications"
+    },
+    "/roleRequests/{requestId}": {
+      "schema": "RoleRequest",
+      "description": "Role change requests"
     }
   }
 }

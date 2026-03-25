@@ -15,6 +15,9 @@ service cloud.firestore {
     //   - role: string (required, enum: ["customer", "admin", "manager"])
     //   - rewardPoints: number
     //   - avatar: string
+    //   - emailVerified: bool
+    //   - phoneVerified: bool
+    //   - createdAt: string
     //
     // Collection: vehicles
     // Document ID: {vehicleId}
@@ -110,6 +113,13 @@ service cloud.firestore {
       return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
 
+    function isVerified() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.emailVerified == true &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.phoneVerified == true;
+    }
+
     // ===============================================================
     // Domain Validators
     // ===============================================================
@@ -122,8 +132,11 @@ service cloud.firestore {
              data.role in ['customer', 'admin', 'manager'] &&
              (!('phone' in data) || (data.phone is string && data.phone.size() < 20)) &&
              (!('rewardPoints' in data) || data.rewardPoints is number) &&
-             (!('avatar' in data) || (data.avatar is string && data.avatar.size() < 500)) &&
-             (!('favorites' in data) || data.favorites is list);
+             (!('avatar' in data) || (data.avatar is string && data.avatar.size() < 1500000)) &&
+             (!('favorites' in data) || data.favorites is list) &&
+             (!('emailVerified' in data) || data.emailVerified is bool) &&
+             (!('phoneVerified' in data) || data.phoneVerified is bool) &&
+             (!('createdAt' in data) || data.createdAt is string);
     }
 
     function isValidVehicle(data) {
@@ -163,10 +176,23 @@ service cloud.firestore {
              data.userId is string && data.userId.size() > 0 &&
              data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
              data.message is string && data.message.size() > 0 && data.message.size() < 500 &&
-             data.type in ['booking_confirmed', 'booking_cancelled', 'promotion', 'info'] &&
+             data.type in ['booking_confirmed', 'booking_cancelled', 'promotion', 'info', 'role_request_approved', 'role_request_rejected'] &&
              data.read is bool &&
              data.createdAt is string &&
              (!('link' in data) || (data.link is string && data.link.size() < 500));
+    }
+
+    function isValidRoleRequest(data) {
+      return hasRequiredFields(['id', 'userId', 'userName', 'userEmail', 'requestedRole', 'status', 'createdAt']) &&
+             data.id is string && data.id.size() > 0 &&
+             data.userId is string && data.userId.size() > 0 &&
+             data.userName is string && data.userName.size() > 0 &&
+             isValidEmail(data.userEmail) &&
+             data.requestedRole in ['admin', 'manager'] &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             data.createdAt is string &&
+             (!('processedBy' in data) || data.processedBy is string) &&
+             (!('processedAt' in data) || data.processedAt is string);
     }
 
     // ===============================================================
@@ -174,7 +200,10 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'customer' || (request.resource.data.role == 'admin' && request.resource.data.email in ["inotfarhan@gmail.com", "test@test.com", "testingdaflow@test.com"]));
+      allow update: if ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin()) && isValidUser(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /vehicles/{vehicleId} {
@@ -183,7 +212,10 @@ service cloud.firestore {
     }
 
     match /bookings/{bookingId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isManager());
+      allow create: if isVerified() && isOwner(request.resource.data.userId) && isValidBooking(request.resource.data);
+      allow update: if isManager() && isValidBooking(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /notifications/{notificationId} {
@@ -192,6 +224,13 @@ service cloud.firestore {
 
     match /invitations/{invitationId} {
       allow read, write: if isAuthenticated();
+    }
+
+    match /roleRequests/{requestId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(request.resource.data.userId) && isValidRoleRequest(request.resource.data);
+      allow update: if isAdmin() && isValidRoleRequest(request.resource.data);
+      allow delete: if isAdmin();
     }
   }
 }

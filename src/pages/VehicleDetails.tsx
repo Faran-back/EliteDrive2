@@ -12,7 +12,8 @@ import {
   Calendar,
   MapPin,
   Heart,
-  Share2
+  Share2,
+  AlertCircle
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { motion } from 'motion/react';
@@ -21,9 +22,19 @@ const VehicleDetails: React.FC = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { vehicles } = useStore();
+  const { vehicles, user } = useStore();
   const vehicle = vehicles.find(v => v.id === id);
   const rentalDays = parseInt(searchParams.get('days') || '2');
+  const isVerified = user?.emailVerified && user?.phoneVerified;
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() + 1);
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + rentalDays);
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
   if (!vehicle) return <div>Vehicle not found</div>;
 
@@ -110,7 +121,7 @@ const VehicleDetails: React.FC = () => {
               <span className="bg-[#2563EB] text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-md shadow-blue-100">Premium</span>
               <div className="flex items-center gap-1 text-amber-500">
                 <Star size={14} fill="currentColor" />
-                <span className="text-xs font-black text-[#1E293B]">{vehicle.rating} (120+ Reviews)</span>
+                <span className="text-xs font-black text-[#1E293B]">{vehicle.rating} ({vehicle.reviews || 0}+ Reviews)</span>
               </div>
             </div>
             <h1 className="text-4xl font-black tracking-tight text-[#1E293B]">{vehicle.name}</h1>
@@ -155,13 +166,33 @@ const VehicleDetails: React.FC = () => {
                 <Calendar className="text-[#2563EB]" size={20} />
                 <div className="flex-1">
                   <p className="text-[9px] font-bold text-[#94A3B8] uppercase tracking-widest">Rental Period</p>
-                  <p className="font-black text-[#1E293B] text-sm">Mar 20 - Mar 22, 2024 ({rentalDays} {rentalDays === 1 ? 'Day' : 'Days'})</p>
+                  <p className="font-black text-[#1E293B] text-sm">{formatDate(startDate)} - {formatDate(endDate)}, {endDate.getFullYear()} ({rentalDays} {rentalDays === 1 ? 'Day' : 'Days'})</p>
                 </div>
               </div>
 
+              {!isVerified && (
+                <div className="bg-rose-50 p-5 rounded-[20px] border border-rose-100 flex items-start gap-3">
+                  <AlertCircle className="text-rose-500 shrink-0 mt-0.5" size={18} />
+                  <div className="space-y-1">
+                    <p className="text-xs font-black text-rose-600 uppercase tracking-wider">Verification Required</p>
+                    <p className="text-[11px] font-bold text-rose-500 leading-relaxed">
+                      You must verify your email and phone number in your profile before you can book a vehicle.
+                    </p>
+                    <Link to="/profile" className="text-[11px] font-black text-rose-600 underline uppercase tracking-wider block pt-1">
+                      Go to Profile
+                    </Link>
+                  </div>
+                </div>
+              )}
+
               <Link 
-                to={`/payment/${vehicle.id}?days=${rentalDays}`}
-                className="w-full bg-[#2563EB] text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-[0.98]"
+                to={isVerified ? `/payment/${vehicle.id}?days=${rentalDays}` : '#'}
+                onClick={(e) => {
+                  if (!isVerified) {
+                    e.preventDefault();
+                  }
+                }}
+                className={`w-full ${isVerified ? 'bg-[#2563EB] hover:bg-blue-700 shadow-xl shadow-blue-100' : 'bg-gray-200 cursor-not-allowed text-gray-400'} text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]`}
               >
                 Proceed to Booking
                 <ShieldCheck size={20} />

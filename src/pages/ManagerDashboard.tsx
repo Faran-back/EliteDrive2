@@ -25,7 +25,7 @@ import {
   ChevronRight,
   User as UserIcon,
   MapPin,
-  IndianRupee,
+  Banknote,
   X,
   Car
 } from 'lucide-react';
@@ -75,7 +75,7 @@ const ManagerDashboard: React.FC = () => {
   const stats = [
     { label: 'Total Vehicles', value: vehicles.length.toLocaleString(), trend: '+4%', trendUp: true },
     { label: 'Active Rentals', value: allBookings.filter(b => b.status === 'active').length.toLocaleString(), trend: `${Math.round((allBookings.filter(b => b.status === 'active').length / (vehicles.length || 1)) * 100)}% Occ.`, trendUp: null },
-    { label: 'Daily Revenue', value: `Rs. ${Math.round(dailyRevenue / 1000)}k`, trend: '+12%', trendUp: true },
+    { label: 'Daily Revenue', value: `PKR ${Math.round(dailyRevenue / 1000)}k`, trend: '+12%', trendUp: true },
     { label: 'Maintenance', value: `${vehicles.filter(v => v.status === 'maintenance').length} Units`, trend: '0 Alerts', trendUp: false },
   ];
 
@@ -200,7 +200,7 @@ const ManagerDashboard: React.FC = () => {
                             </span>
                           </td>
                           <td className="px-8 py-5 text-xs font-bold text-slate-500">{item.location}</td>
-                          <td className="px-8 py-5 text-sm font-black text-slate-900">Rs. {item.price.toLocaleString()}</td>
+                          <td className="px-8 py-5 text-sm font-black text-slate-900">PKR {item.price.toLocaleString()}</td>
                           <td className="px-8 py-5 text-right flex items-center justify-end gap-3">
                             <Link 
                               to={`/edit-vehicle/${item.id}`}

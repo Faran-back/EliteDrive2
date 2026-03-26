@@ -87,7 +87,7 @@ const AppContent: React.FC = () => {
         <Route path="/admin-dashboard" element={<ProtectedRoute allowedRoles={['admin']}><Layout><AdminDashboard /></Layout></ProtectedRoute>} />
         <Route path="/manager-dashboard" element={<ProtectedRoute allowedRoles={['manager']}><Layout><ManagerDashboard /></Layout></ProtectedRoute>} />
         <Route path="/edit-vehicle/:id" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><Layout><EditVehicle /></Layout></ProtectedRoute>} />
-        <Route path="/add-vehicle" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><Layout><AddVehicle /></Layout></ProtectedRoute>} />
+        <Route path="/add-vehicle" element={<ProtectedRoute allowedRoles={['admin']}><Layout><AddVehicle /></Layout></ProtectedRoute>} />
         <Route path="/admin" element={<Navigate to="/admin-dashboard" />} />
         <Route path="/manager" element={<Navigate to="/manager-dashboard" />} />
       </Routes>

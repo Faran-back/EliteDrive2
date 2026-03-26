@@ -151,7 +151,7 @@ const MyBookings: React.FC = () => {
                       </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Total Price</p>
-                        <p className="font-black text-[#2563EB] text-sm">Rs {booking.totalPrice.toLocaleString()}</p>
+                        <p className="font-black text-[#2563EB] text-sm">PKR {booking.totalPrice.toLocaleString()}</p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Payment</p>

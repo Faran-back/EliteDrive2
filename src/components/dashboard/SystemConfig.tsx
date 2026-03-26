@@ -20,8 +20,9 @@ import {
 import { useStore } from '../../context/StoreContext';
 
 const SystemConfig: React.FC = () => {
-  const { allUsers, showToast } = useStore();
+  const { allUsers, showToast, migrateVehicleIds } = useStore();
   const [activeTab, setActiveTab] = useState<'roles' | 'fleet' | 'integrations' | 'backup'>('roles');
+  const [isMigrating, setIsMigrating] = useState(false);
 
   const tabs = [
     { id: 'roles', label: 'Roles & Permissions', icon: Shield },
@@ -32,6 +33,17 @@ const SystemConfig: React.FC = () => {
 
   const handleSave = () => {
     showToast('Settings saved successfully', 'success');
+  };
+
+  const handleMigrate = async () => {
+    if (window.confirm('Are you sure you want to migrate all legacy vehicle IDs to random strings? This will update all vehicles, bookings, and user favorites.')) {
+      setIsMigrating(true);
+      try {
+        await migrateVehicleIds();
+      } finally {
+        setIsMigrating(false);
+      }
+    }
   };
 
   return (
@@ -122,16 +134,16 @@ const SystemConfig: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Maintenance Threshold (km)</label>
-                  <input type="number" defaultValue={5000} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-600/20 transition-all" />
+                  <input type="number" placeholder="5000" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-600/20 transition-all" />
                 </div>
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Max Booking Duration (Days)</label>
-                  <input type="number" defaultValue={30} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-600/20 transition-all" />
+                  <input type="number" placeholder="30" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-600/20 transition-all" />
                 </div>
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Default Currency</label>
                   <select className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-600/20 transition-all">
-                    <option>PKR (Rs.)</option>
+                    <option>PKR</option>
                     <option>USD ($)</option>
                     <option>EUR (€)</option>
                   </select>
@@ -217,6 +229,22 @@ const SystemConfig: React.FC = () => {
                     <p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed">Restore your system to a previous state. Warning: This will overwrite current data.</p>
                     <button className="w-full py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all">
                       Select Restore Point
+                    </button>
+                  </div>
+                </div>
+                <div className="p-8 rounded-[32px] bg-amber-50 border border-amber-100 space-y-6">
+                  <div className="size-16 rounded-3xl bg-amber-600 text-white flex items-center justify-center shadow-lg shadow-amber-200">
+                    <RefreshCw size={32} className={isMigrating ? 'animate-spin' : ''} />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-slate-900 mb-2">Migrate Vehicle IDs</h4>
+                    <p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed">Convert all legacy numeric vehicle IDs to random alphanumeric strings. This ensures system-wide consistency.</p>
+                    <button 
+                      onClick={handleMigrate}
+                      disabled={isMigrating}
+                      className="w-full py-4 bg-amber-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-amber-700 transition-all shadow-xl shadow-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isMigrating ? 'Migrating...' : 'Migrate Now'}
                     </button>
                   </div>
                 </div>

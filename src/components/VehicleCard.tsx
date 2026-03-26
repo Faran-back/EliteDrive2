@@ -120,8 +120,11 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
         
         <div className="flex justify-between items-start relative z-0">
           <div className="space-y-1">
-            <h3 className="text-xl font-black text-[#1E293B]">
+            <h3 className="text-xl font-black text-[#1E293B] flex flex-wrap items-center gap-2">
               <HighlightText text={vehicle.name} highlight={searchQuery} />
+              <span className="text-[10px] font-mono font-medium text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 uppercase">
+                ID: {vehicle.id}
+              </span>
             </h3>
             <div className="flex items-center gap-1 text-amber-500">
               <Star size={14} fill="currentColor" />
@@ -138,7 +141,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
             </p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-black text-[#2563EB]">Rs {vehicle.pricePerDay.toLocaleString()}</p>
+            <p className="text-2xl font-black text-[#2563EB]">PKR {vehicle.pricePerDay.toLocaleString()}</p>
             <p className="text-[10px] font-bold text-[#94A3B8] uppercase">/ day</p>
           </div>
         </div>
@@ -161,7 +164,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
         <div className="flex justify-between items-center mt-auto relative z-20">
           <div>
             <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Total ({rentalDays} {rentalDays === 1 ? 'day' : 'days'})</p>
-            <p className="text-lg font-black text-[#1E293B]">Rs {(vehicle.pricePerDay * rentalDays).toLocaleString()}</p>
+            <p className="text-lg font-black text-[#1E293B]">PKR {(vehicle.pricePerDay * rentalDays).toLocaleString()}</p>
           </div>
           <Link 
             to={canEdit ? `/edit-vehicle/${vehicle.id}` : `/vehicle/${vehicle.id}?days=${rentalDays}`}

@@ -137,7 +137,7 @@ const Customers: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Spent</p>
-                      <p className="text-lg font-black text-blue-600">Rs. {(totalSpent / 1000).toFixed(1)}k</p>
+                      <p className="text-lg font-black text-blue-600">PKR {(totalSpent / 1000).toFixed(1)}k</p>
                     </div>
                   </div>
 
@@ -242,7 +242,7 @@ const Customers: React.FC = () => {
                                 </div>
                               </div>
                               <div className="text-right">
-                                <p className="text-sm font-black text-slate-900">Rs. {booking.totalPrice.toLocaleString()}</p>
+                                <p className="text-sm font-black text-slate-900">PKR {booking.totalPrice.toLocaleString()}</p>
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Price</p>
                               </div>
                             </div>

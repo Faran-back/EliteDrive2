@@ -140,11 +140,11 @@ const Payment: React.FC = () => {
               <div className="flex flex-col gap-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Daily Rate</span>
-                  <span className="text-slate-900">Rs {vehicle.pricePerDay.toLocaleString()} / day</span>
+                  <span className="text-slate-900">PKR {vehicle.pricePerDay.toLocaleString()} / day</span>
                 </div>
                 <div className="flex justify-between text-sm font-bold border-t border-slate-100 pt-3 text-lg">
                   <span className="text-slate-900">Total Amount</span>
-                  <span className="text-[#2463eb]">Rs {(vehicle.pricePerDay * rentalDays).toLocaleString()}</span>
+                  <span className="text-[#2463eb]">PKR {(vehicle.pricePerDay * rentalDays).toLocaleString()}</span>
                 </div>
               </div>
             </div>

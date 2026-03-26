@@ -133,7 +133,7 @@ const ModifyBookingModal: React.FC<ModifyBookingModalProps> = ({
                           onChange={field.onChange}
                           options={vehicles.map(v => ({
                             value: v.id,
-                            label: `${v.name} - Rs ${v.pricePerDay.toLocaleString()}/day`
+                            label: `${v.name} - PKR ${v.pricePerDay.toLocaleString()}/day`
                           }))}
                           icon={<Car size={18} />}
                         />
@@ -188,11 +188,11 @@ const ModifyBookingModal: React.FC<ModifyBookingModalProps> = ({
                     <div className="space-y-3 pt-4 border-t border-slate-200">
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-500 font-bold">Daily Rate</span>
-                        <span className="text-slate-900 font-black">Rs {selectedVehicle?.pricePerDay.toLocaleString()}</span>
+                        <span className="text-slate-900 font-black">PKR {selectedVehicle?.pricePerDay.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between text-lg">
                         <span className="text-slate-900 font-black">New Total</span>
-                        <span className="text-blue-600 font-black">Rs {calculatedPrice.toLocaleString()}</span>
+                        <span className="text-blue-600 font-black">PKR {calculatedPrice.toLocaleString()}</span>
                       </div>
                     </div>
 

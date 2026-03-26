@@ -6,7 +6,7 @@ import {
   Users, 
   Zap, 
   Fuel, 
-  IndianRupee, 
+  Banknote, 
   Save,
   Trash2,
   AlertCircle,
@@ -215,8 +215,8 @@ const EditVehicle: React.FC = () => {
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <p className="text-xs font-bold text-slate-400">Vehicle ID</p>
-                <p className="text-xs font-black text-slate-900">#{vehicle.id}</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Vehicle ID</p>
+                <p className="text-[10px] font-mono font-black text-slate-900 bg-slate-50 px-2 py-1 rounded border border-slate-100 uppercase">{vehicle.id}</p>
               </div>
             </div>
           </div>
@@ -251,6 +251,7 @@ const EditVehicle: React.FC = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-600/20 transition-all"
+                  placeholder="e.g. Toyota Camry 2024"
                   required
                 />
               </div>
@@ -271,14 +272,15 @@ const EditVehicle: React.FC = () => {
 
               {/* Price */}
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Price Per Day (Rs)</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Price Per Day (PKR)</label>
                 <div className="relative">
-                  <IndianRupee className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <Banknote className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input 
                     type="number" 
                     value={formData.pricePerDay}
                     onChange={(e) => setFormData({ ...formData, pricePerDay: parseInt(e.target.value) })}
                     className="w-full pl-14 pr-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-600/20 transition-all"
+                    placeholder="e.g. 5000"
                     required
                   />
                 </div>
@@ -292,6 +294,7 @@ const EditVehicle: React.FC = () => {
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-600/20 transition-all"
+                  placeholder="e.g. Lahore, Pakistan"
                   required
                 />
               </div>

@@ -188,7 +188,7 @@ const Reports: React.FC = () => {
             </div>
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Avg. Booking Value</p>
-              <h4 className="text-xl font-black text-slate-900">Rs. 12,450</h4>
+              <h4 className="text-xl font-black text-slate-900">PKR 12,450</h4>
             </div>
           </div>
           <div className="flex items-center gap-2 text-emerald-500 text-[10px] font-black uppercase">

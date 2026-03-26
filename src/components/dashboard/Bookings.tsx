@@ -180,7 +180,7 @@ const Bookings: React.FC = () => {
                   <div className="flex items-center gap-8 w-full lg:w-auto justify-between lg:justify-end">
                     <div className="text-right">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Amount</p>
-                      <p className="text-xl font-black text-slate-900">Rs. {booking.totalPrice.toLocaleString()}</p>
+                      <p className="text-xl font-black text-slate-900">PKR {booking.totalPrice.toLocaleString()}</p>
                     </div>
                     
                       <div className="flex items-center gap-3">
@@ -355,7 +355,7 @@ const Bookings: React.FC = () => {
                       </div>
                       <div className="flex justify-between items-center pt-3 border-t border-slate-200">
                         <span className="text-sm font-black text-slate-900">Total Paid</span>
-                        <span className="text-xl font-black text-blue-600">Rs. {selectedBooking.totalPrice.toLocaleString()}</span>
+                        <span className="text-xl font-black text-blue-600">PKR {selectedBooking.totalPrice.toLocaleString()}</span>
                       </div>
                     </div>
                   </div>

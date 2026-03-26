@@ -111,7 +111,7 @@ const SupportCenter: React.FC = () => {
   };
 
   const faqs = [
-    { q: 'How do I add a new vehicle to the fleet?', a: 'Navigate to the Fleet Inventory section and click on the "Add Vehicle" button. Fill in the required details and save.' },
+    { q: 'How do I add a new vehicle to the fleet?', a: 'Only administrators can add new vehicles. If you are an admin, navigate to the Fleet Inventory section and click on the "Add Vehicle" button.' },
     { q: 'How can I cancel a customer booking?', a: 'Go to the Bookings section, find the specific booking, and click the "Cancel" button. The customer will be notified automatically.' },
     { q: 'Where can I download revenue reports?', a: 'Revenue reports are available in the Reports section. You can export them as PDF or Excel files.' },
     { q: 'How do I manage user permissions?', a: 'System administrators can manage roles and permissions in the Role Assignment section.' },

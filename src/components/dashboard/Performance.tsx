@@ -131,8 +131,8 @@ const Performance: React.FC = () => {
             <div className="space-y-4">
               {[
                 { title: 'Low Utilization: Luxury Segment', detail: '3 vehicles idle for > 48hrs', type: 'warning' },
-                { title: 'Maintenance Overdue', detail: 'Vehicle ID #8821 requires urgent service', type: 'error' },
-                { title: 'High Fuel Consumption', detail: 'SUV #1229 exceeding benchmark by 15%', type: 'warning' },
+                { title: 'Maintenance Overdue', detail: 'Vehicle ID vh-8821x requires urgent service', type: 'error' },
+                { title: 'High Fuel Consumption', detail: 'SUV vh-1229y exceeding benchmark by 15%', type: 'warning' },
               ].map((alert, i) => (
                 <div key={i} className={`p-4 rounded-2xl border ${
                   alert.type === 'error' ? 'bg-rose-50 border-rose-100' : 'bg-amber-50 border-amber-100'

@@ -71,7 +71,7 @@ const Dashboard: React.FC = () => {
                   bestMatch.pricePerDay <= 5000 ? "reliable and economical" : 
                   "premium choice for your comfort";
 
-    setRecommendation(`${bestMatch.name} – fits within Rs ${budget.toLocaleString()}/day, ${reason}`);
+    setRecommendation(`${bestMatch.name} – fits within PKR ${budget.toLocaleString()}/day, ${reason}`);
   };
 
   const handleTagClick = (tag: string) => {
@@ -288,7 +288,7 @@ const Dashboard: React.FC = () => {
 
                 <div className="pt-4 border-t border-white/10 flex justify-between items-center">
                   <span className="text-xs font-bold opacity-60 uppercase tracking-widest">Price line</span>
-                  <span className="text-sm font-black">Rs {budget.toLocaleString()} max</span>
+                  <span className="text-sm font-black">PKR {budget.toLocaleString()} max</span>
                 </div>
 
                 <button 
@@ -304,7 +304,7 @@ const Dashboard: React.FC = () => {
                   <div className="flex justify-between items-end">
                     <p className="text-sm font-bold opacity-80">Daily Budget</p>
                     <div className="bg-white/10 px-3 py-1.5 rounded-xl border border-white/20">
-                      <span className="text-sm font-black">Rs {budget.toLocaleString()} max</span>
+                      <span className="text-sm font-black">PKR {budget.toLocaleString()} max</span>
                     </div>
                   </div>
                   <input 

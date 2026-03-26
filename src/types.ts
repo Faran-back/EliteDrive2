@@ -87,7 +87,7 @@ export interface Notification {
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
-    id: '1',
+    id: 'vh-7k2m9p1x',
     name: 'Suzuki Alto',
     type: 'Hatchback',
     pricePerDay: 4000,
@@ -101,7 +101,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '2',
+    id: 'vh-b2c3d4e5',
     name: 'Toyota Corolla',
     type: 'Sedan',
     pricePerDay: 7500,
@@ -115,7 +115,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '3',
+    id: 'vh-3m5n7p9q',
     name: 'Honda Civic',
     type: 'Sedan',
     pricePerDay: 11000,
@@ -129,7 +129,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '4',
+    id: 'vh-8n2m4p6q',
     name: 'Kia Sportage',
     type: 'SUV',
     pricePerDay: 13500,
@@ -143,7 +143,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '5',
+    id: 'vh-4x9y2z1w',
     name: 'Honda BR-V',
     type: 'SUV',
     pricePerDay: 9000,
@@ -157,7 +157,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '6',
+    id: 'vh-1z6w4v2u',
     name: 'Toyota Fortuner',
     type: 'SUV',
     pricePerDay: 28000,
@@ -171,7 +171,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '7',
+    id: 'vh-5y3t1r9e',
     name: 'Suzuki Cultus',
     type: 'Hatchback',
     pricePerDay: 5500,
@@ -185,7 +185,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '8',
+    id: 'vh-2w8q4m6n',
     name: 'Suzuki Wagon R',
     type: 'Hatchback',
     pricePerDay: 4500,
@@ -199,7 +199,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '9',
+    id: 'vh-6v4b2n8m',
     name: 'Toyota Yaris',
     type: 'Sedan',
     pricePerDay: 7000,
@@ -213,7 +213,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '10',
+    id: 'vh-7u5i3o1p',
     name: 'Honda City',
     type: 'Sedan',
     pricePerDay: 8000,
@@ -227,7 +227,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '11',
+    id: 'vh-8t4r2e6w',
     name: 'Hyundai Tucson',
     type: 'SUV',
     pricePerDay: 14000,
@@ -241,7 +241,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '12',
+    id: 'vh-9s5d1f3g',
     name: 'Changan Alsvin',
     type: 'Sedan',
     pricePerDay: 6500,
@@ -255,7 +255,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '13',
+    id: 'vh-1r7t3y5u',
     name: 'MG HS',
     type: 'SUV',
     pricePerDay: 15000,
@@ -269,7 +269,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '14',
+    id: 'vh-2q6w4e8r',
     name: 'Kia Picanto',
     type: 'Hatchback',
     pricePerDay: 5000,
@@ -283,7 +283,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '15',
+    id: 'vh-3p5o7i1u',
     name: 'Hyundai Elantra',
     type: 'Sedan',
     pricePerDay: 10000,
@@ -297,7 +297,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '16',
+    id: 'vh-4o9i2u6y',
     name: 'Toyota Hilux Revo',
     type: 'SUV',
     pricePerDay: 22000,
@@ -311,7 +311,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '17',
+    id: 'vh-5n8m2k4j',
     name: 'Suzuki Swift',
     type: 'Hatchback',
     pricePerDay: 6500,
@@ -325,7 +325,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '18',
+    id: 'vh-6m9n1b3v',
     name: 'Hyundai Sonata',
     type: 'Sedan',
     pricePerDay: 18000,
@@ -339,7 +339,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '19',
+    id: 'vh-7l2k4j6h',
     name: 'Haval H6',
     type: 'SUV',
     pricePerDay: 16000,
@@ -353,7 +353,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '20',
+    id: 'vh-8k3j5h7g',
     name: 'Suzuki Bolan',
     type: 'Hatchback',
     pricePerDay: 3500,
@@ -367,7 +367,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '21',
+    id: 'vh-9j1h3g5f',
     name: 'Prince Pearl',
     type: 'Hatchback',
     pricePerDay: 3800,
@@ -381,7 +381,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '22',
+    id: 'vh-1i4u7y2t',
     name: 'United Bravo',
     type: 'Hatchback',
     pricePerDay: 3700,
@@ -395,7 +395,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '23',
+    id: 'vh-2h9g6f3d',
     name: 'DFSK Glory 580',
     type: 'SUV',
     pricePerDay: 11000,
@@ -409,7 +409,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     status: 'available'
   },
   {
-    id: '24',
+    id: 'vh-3g6f9d2s',
     name: 'MG ZS',
     type: 'SUV',
     pricePerDay: 12000,

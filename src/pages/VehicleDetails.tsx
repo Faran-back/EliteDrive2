@@ -124,7 +124,12 @@ const VehicleDetails: React.FC = () => {
                 <span className="text-xs font-black text-[#1E293B]">{vehicle.rating} ({vehicle.reviews || 0}+ Reviews)</span>
               </div>
             </div>
-            <h1 className="text-4xl font-black tracking-tight text-[#1E293B]">{vehicle.name}</h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-4xl font-black tracking-tight text-[#1E293B]">{vehicle.name}</h1>
+              <span className="text-xs font-mono font-medium text-gray-400 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 uppercase mt-1">
+                ID: {vehicle.id}
+              </span>
+            </div>
             <div className="flex items-center gap-2 text-[#64748B] font-bold text-sm">
               <MapPin size={16} className="text-[#2563EB]" />
               {vehicle.location}, Pakistan
@@ -153,7 +158,7 @@ const VehicleDetails: React.FC = () => {
             <div className="flex justify-between items-end">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Total Price</p>
-                <h2 className="text-3xl font-black text-[#1E293B]">Rs {vehicle.pricePerDay.toLocaleString()}</h2>
+                <h2 className="text-3xl font-black text-[#1E293B]">PKR {vehicle.pricePerDay.toLocaleString()}</h2>
                 <p className="text-[#64748B] font-bold text-xs">Inclusive of all taxes</p>
               </div>
               <div className="text-right">
@@ -201,7 +206,7 @@ const VehicleDetails: React.FC = () => {
 
             <div className="flex items-start gap-3 text-xs text-[#64748B] bg-white/50 p-5 rounded-[20px] border border-white/50">
               <Info size={18} className="mt-0.5 shrink-0 text-[#2563EB]" />
-              <p className="font-medium leading-relaxed">Free cancellation up to 24 hours before pickup. Security deposit of Rs. 20,000 required.</p>
+              <p className="font-medium leading-relaxed">Free cancellation up to 24 hours before pickup. Security deposit of PKR 20,000 required.</p>
             </div>
           </div>
         </div>

@@ -255,6 +255,7 @@ const Profile: React.FC = () => {
                   <input 
                     type="text" 
                     {...register('name')}
+                    placeholder="e.g. John Doe"
                     className={`w-full bg-[#F8FAFC] border ${errors.name ? 'border-red-500' : 'border-[#F1F5F9]'} rounded-[24px] py-5 pl-14 pr-6 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-[#2563EB] transition-all font-bold text-[#1E293B]`}
                   />
                 </div>
@@ -283,6 +284,7 @@ const Profile: React.FC = () => {
                   <input 
                     type="email" 
                     {...register('email')}
+                    placeholder="e.g. john@example.com"
                     className={`w-full bg-[#F8FAFC] border ${errors.email ? 'border-red-500' : 'border-[#F1F5F9]'} rounded-[24px] py-5 pl-14 pr-6 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-[#2563EB] transition-all font-bold text-[#1E293B]`}
                   />
                 </div>
@@ -324,6 +326,7 @@ const Profile: React.FC = () => {
                   <input 
                     type="text" 
                     {...register('location')}
+                    placeholder="e.g. Lahore, Pakistan"
                     className={`w-full bg-[#F8FAFC] border ${errors.location ? 'border-red-500' : 'border-[#F1F5F9]'} rounded-[24px] py-5 pl-14 pr-6 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-[#2563EB] transition-all font-bold text-[#1E293B]`}
                   />
                 </div>

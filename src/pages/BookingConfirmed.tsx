@@ -180,19 +180,19 @@ const BookingConfirmed: React.FC = () => {
             <div className="space-y-3">
               <div className="flex justify-between text-sm text-slate-500">
                 <span>Base Rate ({vehicle.type})</span>
-                <span className="font-medium text-slate-700">Rs {Math.round(baseRate).toLocaleString()}</span>
+                <span className="font-medium text-slate-700">PKR {Math.round(baseRate).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm text-slate-500">
                 <span>Airport Surcharge</span>
-                <span className="font-medium text-slate-700">Rs {Math.round(surcharge).toLocaleString()}</span>
+                <span className="font-medium text-slate-700">PKR {Math.round(surcharge).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm text-slate-500">
                 <span>Taxes & Service Fee</span>
-                <span className="font-medium text-slate-700">Rs {Math.round(taxes).toLocaleString()}</span>
+                <span className="font-medium text-slate-700">PKR {Math.round(taxes).toLocaleString()}</span>
               </div>
               <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
                 <span className="font-bold text-slate-900">Total Amount</span>
-                <span className="text-xl font-black text-[#2463eb]">Rs {latestBooking.totalPrice.toLocaleString()}</span>
+                <span className="text-xl font-black text-[#2463eb]">PKR {latestBooking.totalPrice.toLocaleString()}</span>
               </div>
             </div>
           </div>

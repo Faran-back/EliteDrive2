@@ -130,7 +130,8 @@ interface StoreContextType {
   rejectRoleRequest: (requestId: string) => Promise<void>;
   updateVehicle: (id: string, updates: Partial<Vehicle>) => Promise<void>;
   deleteVehicle: (id: string) => Promise<void>;
-  addVehicle: (vehicle: Vehicle) => Promise<void>;
+  addVehicle: (vehicleData: Omit<Vehicle, 'id'>) => Promise<void>;
+  migrateVehicleIds: () => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   setupRecaptcha: (containerId: string) => void;
   sendPhoneVerificationCode: (phoneNumber: string) => Promise<ConfirmationResult>;
@@ -174,15 +175,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           try {
             const userDoc = await getDoc(userDocRef);
             if (userDoc.exists()) {
-              setUser(userDoc.data() as User);
+              const userData = userDoc.data() as User;
+              // Ensure admin emails have admin role
+              const adminEmails = ['test@test.com', 'inotfarhan@gmail.com', 'testingdaflow@test.com'];
+              if (firebaseUser.email && adminEmails.includes(firebaseUser.email) && userData.role !== 'admin') {
+                userData.role = 'admin';
+                await updateDoc(userDocRef, { role: 'admin' });
+              }
+              setUser(userData);
             } else {
               // Create a new user profile if it doesn't exist
+              const adminEmails = ['test@test.com', 'inotfarhan@gmail.com', 'testingdaflow@test.com'];
               const newUser: User = {
                 id: firebaseUser.uid,
                 name: firebaseUser.displayName || 'New User',
                 email: firebaseUser.email || '',
                 phone: firebaseUser.phoneNumber || '',
-                role: firebaseUser.email === 'test@test.com' || firebaseUser.email === 'inotfarhan@gmail.com' || firebaseUser.email === 'testingdaflow@test.com' ? 'admin' : 'customer',
+                role: firebaseUser.email && adminEmails.includes(firebaseUser.email) ? 'admin' : 'customer',
                 rewardPoints: 0,
                 avatar: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100',
                 emailVerified: firebaseUser.emailVerified,
@@ -325,9 +334,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // If vehicles collection is empty, seed it with INITIAL_VEHICLES
         // ONLY if the user is an admin
         if (user?.role === 'admin' || user?.email === 'inotfarhan@gmail.com') {
+          console.log('Seeding initial vehicles with random IDs...');
           INITIAL_VEHICLES.forEach(async (vehicle) => {
             try {
-              await setDoc(doc(db, 'vehicles', vehicle.id), vehicle);
+              const newId = generateVehicleId();
+              const newVehicle = { ...vehicle, id: newId };
+              await setDoc(doc(db, 'vehicles', newId), newVehicle);
             } catch (error) {
               console.error('Error seeding vehicle:', error);
             }
@@ -747,12 +759,101 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const addVehicle = async (vehicle: Vehicle) => {
+  const generateVehicleId = () => `vh-${Math.random().toString(36).substring(2, 11)}`;
+
+  const addVehicle = async (vehicleData: Omit<Vehicle, 'id'>) => {
     try {
-      await setDoc(doc(db, 'vehicles', vehicle.id), vehicle);
+      const newId = generateVehicleId();
+      const newVehicle = { ...vehicleData, id: newId };
+      await setDoc(doc(db, 'vehicles', newId), newVehicle);
       showToast('Vehicle added successfully', 'success');
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `vehicles/${vehicle.id}`);
+      handleFirestoreError(error, OperationType.CREATE, 'vehicles');
+    }
+  };
+
+  const migrateVehicleIds = async () => {
+    const adminEmails = ['test@test.com', 'inotfarhan@gmail.com', 'testingdaflow@test.com'];
+    const isAdmin = user?.role === 'admin' || (user?.email && adminEmails.includes(user.email));
+
+    if (!user || !isAdmin) {
+      showToast('Only administrators can perform this action', 'error');
+      return;
+    }
+    
+    try {
+      showToast('Scanning for legacy vehicle IDs...', 'info');
+      console.log('Starting migration scan...');
+      
+      const vehiclesSnapshot = await getDocs(collection(db, 'vehicles'));
+      console.log(`Found ${vehiclesSnapshot.size} total vehicles.`);
+
+      // Find vehicles with numeric IDs (legacy IDs) or IDs that don't start with 'vh-'
+      // Also include the hardcoded IDs from INITIAL_VEHICLES to ensure they get randomized
+      const vehiclesToMigrate = vehiclesSnapshot.docs.filter(doc => {
+        const id = doc.id;
+        const isNumeric = !isNaN(Number(id));
+        const hasNoPrefix = !id.startsWith('vh-');
+        const isHardcoded = INITIAL_VEHICLES.some(v => v.id === id);
+        
+        return isNumeric || hasNoPrefix || isHardcoded;
+      });
+      
+      console.log(`Identified ${vehiclesToMigrate.length} legacy vehicles to migrate.`);
+
+      if (vehiclesToMigrate.length === 0) {
+        showToast('All vehicle IDs are already in the correct format.', 'success');
+        return;
+      }
+
+      showToast(`Migrating ${vehiclesToMigrate.length} vehicles...`, 'info');
+
+      let migratedCount = 0;
+      for (const vehicleDoc of vehiclesToMigrate) {
+        const oldId = vehicleDoc.id;
+        const vehicleData = vehicleDoc.data() as Vehicle;
+        
+        // Generate new random ID
+        const newId = generateVehicleId();
+        const newVehicle = { ...vehicleData, id: newId };
+        
+        console.log(`Migrating ${oldId} -> ${newId}`);
+
+        // 1. Create new document with random ID
+        await setDoc(doc(db, 'vehicles', newId), newVehicle);
+        
+        // 2. Update bookings that reference this old ID
+        const bookingsQuery = query(collection(db, 'bookings'), where('vehicleId', '==', oldId));
+        const bookingsSnapshot = await getDocs(bookingsQuery);
+        console.log(`Updating ${bookingsSnapshot.size} bookings for vehicle ${oldId}`);
+        
+        const bookingPromises = bookingsSnapshot.docs.map(bookingDoc => 
+          updateDoc(doc(db, 'bookings', bookingDoc.id), { vehicleId: newId })
+        );
+        await Promise.all(bookingPromises);
+        
+        // 3. Update user favorites that reference this old ID
+        const usersWithFavoriteQuery = query(collection(db, 'users'), where('favorites', 'array-contains', oldId));
+        const usersSnapshot = await getDocs(usersWithFavoriteQuery);
+        console.log(`Updating favorites for ${usersSnapshot.size} users for vehicle ${oldId}`);
+
+        const userPromises = usersSnapshot.docs.map(async (userDoc) => {
+          const userData = userDoc.data() as User;
+          const newFavorites = userData.favorites?.map(favId => favId === oldId ? newId : favId) || [];
+          return updateDoc(doc(db, 'users', userDoc.id), { favorites: newFavorites });
+        });
+        await Promise.all(userPromises);
+        
+        // 4. Delete old document with numeric ID
+        await deleteDoc(doc(db, 'vehicles', oldId));
+        migratedCount++;
+      }
+      
+      showToast(`Successfully migrated ${migratedCount} vehicles.`, 'success');
+      console.log('Migration completed successfully.');
+    } catch (error) {
+      console.error('Migration error:', error);
+      showToast('Migration failed. Check console for details.', 'error');
     }
   };
 
@@ -851,6 +952,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       updateVehicle,
       deleteVehicle,
       addVehicle,
+      migrateVehicleIds,
       sendVerificationEmail,
       setupRecaptcha,
       sendPhoneVerificationCode,

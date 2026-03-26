@@ -69,7 +69,7 @@ const Fleet: React.FC = () => {
         <div className="space-y-2">
           <div className="flex items-center gap-4">
             <h1 className="text-4xl font-black tracking-tight text-[#1E293B]">Explore Fleet</h1>
-            {(user?.role === 'admin' || user?.role === 'manager') && (
+            {user?.role === 'admin' && (
               <Link 
                 to="/add-vehicle"
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"

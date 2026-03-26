@@ -6,7 +6,7 @@ import {
   Users, 
   Zap, 
   Fuel, 
-  IndianRupee, 
+  Banknote, 
   Plus,
   Car,
   Loader2,
@@ -30,8 +30,8 @@ const AddVehicle: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800',
-    pricePerDay: 0,
-    seats: 4,
+    pricePerDay: '' as unknown as number,
+    seats: '' as unknown as number,
     transmission: 'Automatic' as Vehicle['transmission'],
     fuel: 'Petrol' as Vehicle['fuel'],
     description: '',
@@ -56,13 +56,12 @@ const AddVehicle: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const newVehicle: Vehicle = {
+      const vehicleData = {
         ...formData,
-        id: Math.random().toString(36).substr(2, 9),
         rating: 5.0,
         features: ['Air Conditioning', 'Bluetooth', 'GPS']
       };
-      await addVehicle(newVehicle);
+      await addVehicle(vehicleData);
       showToast('Vehicle added successfully!', 'success');
       navigate('/fleet');
     } catch (error) {
@@ -213,14 +212,15 @@ const AddVehicle: React.FC = () => {
 
               {/* Price */}
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Price Per Day (Rs)</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Price Per Day (PKR)</label>
                 <div className="relative">
-                  <IndianRupee className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <Banknote className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input 
                     type="number" 
                     value={formData.pricePerDay}
-                    onChange={(e) => setFormData({ ...formData, pricePerDay: parseInt(e.target.value) })}
+                    onChange={(e) => setFormData({ ...formData, pricePerDay: e.target.value === '' ? '' as any : parseInt(e.target.value) })}
                     className="w-full pl-14 pr-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-600/20 transition-all"
+                    placeholder="e.g. 5000"
                     required
                   />
                 </div>
@@ -244,6 +244,7 @@ const AddVehicle: React.FC = () => {
                 label="Seating Capacity"
                 value={formData.seats}
                 onChange={(val) => setFormData({ ...formData, seats: val })}
+                placeholder="e.g. 4 Seater"
                 options={[
                   { value: 2, label: '2 Seater' },
                   { value: 4, label: '4 Seater' },

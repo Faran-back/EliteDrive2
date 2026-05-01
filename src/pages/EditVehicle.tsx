@@ -181,7 +181,7 @@ const EditVehicle: React.FC = () => {
                 )}
                 <div 
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                  className="absolute inset-0 bg-blue-600/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
                 >
                   <Upload className="text-white mb-2" size={32} />
                   <span className="text-white text-[10px] font-black uppercase tracking-widest">Change Photo</span>

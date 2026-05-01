@@ -66,7 +66,7 @@ const BookingConfirmed: React.FC = () => {
                 Confirmed
               </span>
               <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight text-center">Your trip is booked!</h1>
-              <p className="text-slate-500 font-medium">Booking ID: <span className="text-[#2463eb] font-bold">{latestBooking.id.toUpperCase()}</span></p>
+              <p className="text-slate-500 font-medium">Booking ID: <span className="text-[#2463eb] font-bold">{(latestBooking.id || '').toUpperCase()}</span></p>
             </div>
           </div>
         </div>

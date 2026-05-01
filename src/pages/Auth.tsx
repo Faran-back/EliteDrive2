@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Car, AlertCircle, Mail, Lock, User as UserIcon, ArrowRight, Github, Chrome, Shield, ChevronDown, ChevronUp } from 'lucide-react';
+import { Car, AlertCircle, Mail, Lock, User as UserIcon, ArrowRight, Github, Chrome, Shield, ChevronDown, ChevronUp, IdCard, FileBadge, Info } from 'lucide-react';
 import { auth, googleProvider, db } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
@@ -67,6 +67,26 @@ const Auth: React.FC = () => {
 
   const requestedRole = watchSignup('requestedRole');
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+  const [docImages, setDocImages] = useState<{ [key: string]: string | null }>({
+    cnicFront: null,
+    cnicBack: null,
+    license: null
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('File size must be less than 5MB', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setDocImages(prev => ({ ...prev, [field]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleRedirect = (userRole: string) => {
     switch (userRole) {
@@ -239,10 +259,10 @@ const Auth: React.FC = () => {
       <div className="w-full max-w-[1100px] grid lg:grid-cols-2 bg-white rounded-[40px] overflow-hidden shadow-2xl shadow-slate-200/60 border border-slate-100 relative">
         
         {/* Left Side: Brand & Visuals */}
-        <div className="hidden lg:flex flex-col justify-between p-16 bg-slate-900 text-white relative overflow-hidden">
+        <div className="hidden lg:flex flex-col justify-between p-16 bg-blue-50 text-slate-900 relative overflow-hidden">
           {/* Decorative background elements */}
-          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-600/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl"></div>
+          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-200/20 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-200/20 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl"></div>
           
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-12">
@@ -257,11 +277,11 @@ const Auth: React.FC = () => {
                 key={mode}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-5xl font-black leading-[1.1] tracking-tight"
+                className="text-5xl font-black leading-[1.1] tracking-tight text-slate-900"
               >
                 {mode === 'signin' ? 'Unlock your premium journey.' : 'Join the elite mobility club.'}
               </motion.h2>
-              <p className="text-slate-400 text-xl font-medium leading-relaxed">
+              <p className="text-slate-500 text-xl font-medium leading-relaxed">
                 Experience the most advanced AI-driven vehicle rental platform in Pakistan.
               </p>
             </div>
@@ -273,20 +293,20 @@ const Auth: React.FC = () => {
                 {[1, 2, 3, 4].map((i) => (
                   <img 
                     key={i}
-                    className="w-10 h-10 rounded-full border-2 border-slate-900 object-cover"
+                    className="w-10 h-10 rounded-full border-2 border-white shadow-sm object-cover"
                     src={`https://i.pravatar.cc/150?u=${i}`}
                     alt="User"
                   />
                 ))}
               </div>
-              <p className="text-sm font-bold text-slate-300">
-                Joined by <span className="text-white">2,000+</span> premium members
+              <p className="text-sm font-bold text-slate-500">
+                Joined by <span className="text-blue-600">2,000+</span> premium members
               </p>
             </div>
             
-            <div className="flex gap-8 text-xs font-black uppercase tracking-widest text-slate-500">
-              <span className="hover:text-white cursor-pointer transition-colors">Privacy Policy</span>
-              <span className="hover:text-white cursor-pointer transition-colors">Terms of Service</span>
+            <div className="flex gap-8 text-xs font-black uppercase tracking-widest text-slate-400">
+              <span className="hover:text-blue-600 cursor-pointer transition-colors">Privacy Policy</span>
+              <span className="hover:text-blue-600 cursor-pointer transition-colors">Terms of Service</span>
             </div>
           </div>
         </div>
@@ -426,6 +446,7 @@ const Auth: React.FC = () => {
                 )}
               </AnimatePresence>
 
+
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Email Address</label>
                 <div className="relative">
@@ -466,6 +487,66 @@ const Auth: React.FC = () => {
                   </p>
                 )}
               </div>
+
+              <AnimatePresence mode="wait">
+                {mode === 'signup' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="space-y-4 pt-2"
+                  >
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Identity Documents</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { id: 'cnicFront', label: 'CNIC FRONT', icon: <IdCard size={24} /> },
+                        { id: 'cnicBack', label: 'CNIC BACK', icon: <IdCard size={24} /> },
+                        { id: 'license', label: 'DRIVING LICENSE', icon: <FileBadge size={24} /> },
+                      ].map((doc) => (
+                        <div key={doc.id} className="relative group">
+                          <input 
+                            type="file" 
+                            id={`file-${doc.id}`}
+                            className="hidden" 
+                            accept="image/*"
+                            onChange={(e) => handleFileChange(e, doc.id)}
+                          />
+                          <label 
+                            htmlFor={`file-${doc.id}`}
+                            className={`h-24 border-2 border-dashed ${docImages[doc.id] ? 'border-blue-600 bg-blue-50/20' : 'border-slate-100 bg-slate-50/30'} rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-blue-50/50 hover:border-blue-200 transition-all cursor-pointer overflow-hidden relative`}
+                          >
+                            {docImages[doc.id] ? (
+                              <img src={docImages[doc.id]!} alt={doc.label} className="w-full h-full object-cover" />
+                            ) : (
+                              <>
+                                <div className="text-slate-400 group-hover:text-blue-600 transition-colors">
+                                  {doc.icon}
+                                </div>
+                                <span className="text-[8px] font-black uppercase tracking-tight text-slate-500 text-center px-1">{doc.label}</span>
+                              </>
+                            )}
+                            
+                            {docImages[doc.id] && (
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <span className="text-[8px] font-black text-white uppercase tracking-widest">Change</span>
+                              </div>
+                            )}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="bg-blue-50/50 border-l-4 border-blue-600 p-4 rounded-xl flex items-start gap-3">
+                      <div className="p-1.5 bg-blue-100 rounded-lg shrink-0">
+                        <Info className="text-blue-600" size={14} />
+                      </div>
+                      <p className="text-[10px] font-bold text-slate-600 leading-relaxed pt-0.5">
+                        Your documents will be verified within 24 hours. You can browse but cannot book until verified.
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <button 
                 disabled={loading}

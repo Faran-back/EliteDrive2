@@ -4,6 +4,16 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-primary: #2470eb;
+  --color-background-light: #f6f7f8;
+  --color-background-dark: #111721;
+  --color-slate-custom: #64748b;
+}
+
+@utility glass-effect {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 body {
@@ -59,6 +69,13 @@ body {
   border-radius: 24px !important;
   box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
   overflow: hidden;
+  display: flex !important;
+  flex-direction: row !important;
+  background-color: white !important;
+}
+
+.react-datepicker__month-container {
+  float: none !important;
 }
 
 .react-datepicker__header {
@@ -111,5 +128,58 @@ body {
 
 .react-datepicker__day--outside-month {
   color: #CBD5E1 !important;
+}
+
+.react-datepicker__time-container {
+  border-left: 1px solid #F1F5F9 !important;
+  width: 120px !important;
+  height: auto !important;
+}
+
+.react-datepicker__time-box {
+  width: 120px !important;
+  border-radius: 0 0 24px 0 !important;
+}
+
+.react-datepicker__time-list {
+  padding: 0 !important;
+  height: 220px !important; /* Slightly shorter to fit better */
+}
+
+.react-datepicker__triangle {
+  display: none !important;
+}
+
+.react-datepicker__time-list-item {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  padding: 10px 0 !important;
+  color: #475569 !important;
+}
+
+.react-datepicker__time-list-item--selected {
+  background-color: #2563EB !important;
+  color: white !important;
+}
+
+.react-datepicker__time-list-item:hover {
+  background-color: #EFF6FF !important;
+  color: #2563EB !important;
+}
+
+.react-datepicker-time__header {
+  font-size: 0.75rem !important;
+  font-weight: 800 !important;
+  color: #1E293B !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  margin-bottom: 0 !important;
+  padding: 16px 0 !important;
+}
+
+.react-datepicker__header--time {
+  padding: 0 !important;
+  background-color: white !important;
+  border-bottom: 1px solid #F1F5F9 !important;
 }
 

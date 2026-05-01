@@ -1,413 +1,328 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import DatePicker from 'react-datepicker';
-import "react-datepicker/dist/react-datepicker.css";
+import { useNavigate } from 'react-router-dom';
+import CustomCalendar from '../components/ui/CustomCalendar';
 import { 
-  TrendingUp, 
-  Calendar as CalendarIcon, 
-  Award, 
-  ChevronRight, 
   MapPin, 
-  Clock,
-  ArrowRight,
-  ShieldCheck,
-  Car,
-  Search,
-  Heart,
-  Star,
-  Users,
-  Zap,
-  Fuel,
-  Info,
-  CheckCircle2
+  Navigation, 
+  Search, 
+  TrendingUp, 
+  Mountain, 
+  ChevronRight, 
+  BadgeCheck, 
+  XCircle,
+  Minus,
+  Plus,
+  RefreshCw,
+  Calendar
 } from 'lucide-react';
-import { useStore } from '../context/StoreContext';
 import { motion } from 'motion/react';
-import VehicleCard from '../components/VehicleCard';
+import { useStore } from '../context/StoreContext';
 
 const Dashboard: React.FC = () => {
-  const { user, bookings, vehicles } = useStore();
-  const [budget, setBudget] = useState(4000);
+  const navigate = useNavigate();
+  const { vehicles } = useStore();
+  
+  // Form State
+  const [pickupLocation, setPickupLocation] = useState('Lahore, Pakistan');
+  const [dropoffLocation, setDropoffLocation] = useState('');
+  const [pickupDate, setPickupDate] = useState<Date | null>(new Date());
+  const [returnDate, setReturnDate] = useState<Date | null>(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
+  const [carType, setCarType] = useState('Sedan');
   const [passengers, setPassengers] = useState(4);
-  
-  // Set default dates to today and 5 days from now
-  const today = new Date();
-  const nextWeek = new Date();
-  nextWeek.setDate(today.getDate() + 5);
-  
-  const [startDate, setStartDate] = useState<Date | null>(today);
-  const [endDate, setEndDate] = useState<Date | null>(nextWeek);
+  const [transmission, setTransmission] = useState<'Auto' | 'Manual'>('Auto');
+  const [needDriver, setNeedDriver] = useState(false);
+  const [fuelType, setFuelType] = useState('Petrol');
 
-  const activeBookingsCount = bookings.filter(b => b.status === 'active').length;
-  const totalTripsCount = bookings.length;
-  const rewardPoints = user?.rewardPoints || 0;
-  const nextRewardThreshold = 1500;
-  const rewardProgress = Math.min((rewardPoints / nextRewardThreshold) * 100, 100);
-
-  const calculateDays = (start: Date | null, end: Date | null) => {
-    if (!start || !end) return 5;
-    const diff = end.getTime() - start.getTime();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    return days > 0 ? days : 1;
-  };
-
-  const rentalDays = calculateDays(startDate, endDate);
-  const [recommendation, setRecommendation] = useState<string | null>(null);
-  const [isFilterActive, setIsFilterActive] = useState(false);
-
-  const handleFindBestCar = () => {
-    setIsFilterActive(true);
-    const filtered = vehicles.filter(v => v.pricePerDay <= budget && v.seats >= passengers);
-    
-    if (filtered.length === 0) {
-      setRecommendation("Consider increasing budget for better options.");
-      return;
-    }
-
-    // Sort by rating and price to find the "best"
-    const bestMatch = [...filtered].sort((a, b) => b.rating - a.rating || a.pricePerDay - b.pricePerDay)[0];
-    
-    const reason = bestMatch.seats >= 7 ? "perfect for large groups" : 
-                  bestMatch.pricePerDay <= 5000 ? "reliable and economical" : 
-                  "premium choice for your comfort";
-
-    setRecommendation(`${bestMatch.name} – fits within PKR ${budget.toLocaleString()}/day, ${reason}`);
-  };
-
-  const handleTagClick = (tag: string) => {
-    setIsFilterActive(true);
-    if (tag === 'Family Trip') {
-      setPassengers(7);
-      setBudget(15000);
-    } else if (tag === 'Business Travel') {
-      setPassengers(4);
-      setBudget(12000);
-    } else if (tag === 'Budget Saver') {
-      setPassengers(4);
-      setBudget(5000);
-    }
-    // Trigger recommendation update after state changes
-    setTimeout(() => handleFindBestCar(), 0);
-  };
-
-  const displayVehicles = isFilterActive 
-    ? vehicles.filter(v => v.pricePerDay <= budget && v.seats >= passengers)
-    : vehicles;
-
-  const handleReset = () => {
-    setRecommendation(null);
-    setIsFilterActive(false);
-    setBudget(4000);
-    setPassengers(4);
+  const handleSearch = () => {
+    // Navigate to fleet with applied filters (conceptually)
+    navigate('/fleet');
   };
 
   return (
-    <div className="space-y-10">
-      {/* Top Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm flex items-center justify-between group cursor-pointer hover:shadow-md transition-all">
-          <div className="space-y-1">
-            <p className="text-[11px] font-bold text-[#94A3B8] uppercase tracking-widest">Active Bookings</p>
-            <div className="flex items-baseline gap-3">
-              <h3 className="text-4xl font-black text-[#1E293B]">{activeBookingsCount}</h3>
-              <span className="text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-lg">
-                {activeBookingsCount > 0 ? 'On schedule' : 'No active trips'}
-              </span>
-            </div>
+    <div className="animate-in fade-in duration-700">
+      {/* Progress Indicator */}
+      <div className="flex justify-center mb-12">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-primary uppercase tracking-tighter">Step 1 of 3: Search</span>
+          <div className="flex gap-1.5">
+            <div className="h-1.5 w-8 bg-primary rounded-full"></div>
+            <div className="h-1.5 w-8 bg-slate-200 rounded-full"></div>
+            <div className="h-1.5 w-8 bg-slate-200 rounded-full"></div>
           </div>
-          <ChevronRight className="text-[#CBD5E1] group-hover:text-[#1E293B] transition-colors" size={24} />
-        </div>
-
-        <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-[11px] font-bold text-[#94A3B8] uppercase tracking-widest">Total Trips</p>
-            <div className="flex items-baseline gap-3">
-              <h3 className="text-4xl font-black text-[#1E293B]">{totalTripsCount}</h3>
-              <span className="text-xs font-bold text-[#2563EB] bg-[#EFF6FF] px-2 py-0.5 rounded-lg">
-                {totalTripsCount >= 10 ? 'Elite Member' : 'Member'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <p className="text-[11px] font-bold text-[#94A3B8] uppercase tracking-widest">Reward Points</p>
-              <div className="flex items-center gap-2">
-                <h3 className="text-4xl font-black text-[#1E293B]">{rewardPoints.toLocaleString()}</h3>
-                <div className="w-6 h-6 bg-[#2563EB] rounded-full flex items-center justify-center">
-                  <Star className="text-white w-3.5 h-3.5 fill-white" />
-                </div>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-[#94A3B8] uppercase">Next Reward: {nextRewardThreshold} pts</p>
-              <div className="w-32 h-1.5 bg-gray-100 rounded-full mt-1 overflow-hidden">
-                <div className="h-full bg-[#2563EB] rounded-full transition-all duration-500" style={{ width: `${rewardProgress}%` }}></div>
-              </div>
-            </div>
-          </div>
-          <button className="w-full py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[13px] font-bold text-[#2563EB] hover:bg-[#F8FAFC] transition-all">
-            Redeem 500 points for 10% off
-          </button>
         </div>
       </div>
 
-      {/* Middle Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        {/* Quick Search */}
-        <div className="lg:col-span-2 bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm space-y-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Search className="text-[#2563EB]" size={24} />
-              <h2 className="text-2xl font-bold text-[#1E293B]">Quick Search</h2>
-            </div>
-            <div className="flex gap-2">
-              {['Family Trip', 'Business Travel', 'Budget Saver'].map((chip) => (
-                <button 
-                  key={chip} 
-                  onClick={() => handleTagClick(chip)}
-                  className="px-4 py-1.5 rounded-full border border-[#E2E8F0] text-[12px] font-bold text-[#64748B] hover:border-[#2563EB] hover:text-[#2563EB] transition-all"
-                >
-                  {chip}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <p className="text-[13px] font-bold text-[#64748B] ml-1">Pickup Location</p>
-              <div className="relative">
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={20} />
-                <input 
-                  type="text" 
-                  defaultValue="Lahore, Pakistan"
-                  className="w-full bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-[#2563EB] transition-all font-medium text-[#1E293B]"
-                />
-              </div>
-              <p className="text-[11px] font-bold text-emerald-500 ml-1">
-                {displayVehicles.length} cars available for your search
-              </p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-[13px] font-bold text-[#64748B] ml-1">Return Location</p>
-              <div className="relative">
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={20} />
-                <input 
-                  type="text" 
-                  defaultValue="Islamabad, Pakistan"
-                  className="w-full bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-[#2563EB] transition-all font-medium text-[#1E293B]"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-[13px] font-bold text-[#64748B] ml-1">Rental Period</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="relative">
-                <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8] z-10" size={20} />
-                <DatePicker
-                  selected={startDate}
-                  onChange={(date) => setStartDate(date)}
-                  selectsStart
-                  startDate={startDate}
-                  endDate={endDate}
-                  placeholderText="Start Date"
-                  className="w-full bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-[#2563EB] transition-all font-medium text-[#1E293B]"
-                />
-              </div>
-              <div className="relative">
-                <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8] z-10" size={20} />
-                <DatePicker
-                  selected={endDate}
-                  onChange={(date) => setEndDate(date)}
-                  selectsEnd
-                  startDate={startDate}
-                  endDate={endDate}
-                  minDate={startDate || undefined}
-                  placeholderText="End Date"
-                  className="w-full bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-[#2563EB] transition-all font-medium text-[#1E293B]"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-[#EFF6FF] p-4 rounded-2xl flex items-center gap-3">
-            <div className="w-6 h-6 bg-[#2563EB] rounded-full flex items-center justify-center shrink-0">
-              <MapPin className="text-white w-3.5 h-3.5" />
-            </div>
-            <p className="text-[13px] font-bold text-[#1E293B]">
-              AI Suggestion: <span className="text-[#2563EB]">Extend return by 1 day</span> for cheaper weekly rates.
-            </p>
-          </div>
-        </div>
-
-        {/* AI Recommendation Card */}
-        <div className="bg-[#2563EB] p-10 rounded-[40px] text-white space-y-8 relative overflow-hidden shadow-2xl shadow-blue-200">
-          <div className="relative z-10 space-y-6">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <Zap className="fill-white" size={24} />
-                <h2 className="text-2xl font-bold">AI Recommendation</h2>
-              </div>
-              <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                Highly Recommended
-              </div>
-            </div>
-
-            {recommendation ? (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white/10 backdrop-blur-xl p-8 rounded-[32px] border border-white/20 space-y-4"
-              >
-                <div className="space-y-1">
-                  <h3 className="text-xl font-black">Best match for your budget</h3>
-                  <p className="text-xs font-bold opacity-70">Optimized for {passengers === 7 ? '7+' : passengers} passengers</p>
-                </div>
-                
-                <div className="bg-white text-[#2563EB] px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest w-fit">
-                  Highly Recommended
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-lg font-bold leading-tight">
-                    {recommendation.includes('–') ? (
-                      <>
-                        <span className="text-white">{recommendation.split(' – ')[0]}</span>
-                        <span className="opacity-80 font-medium text-sm block mt-1"> – {recommendation.split(' – ')[1]}</span>
-                      </>
-                    ) : (
-                      <span className="text-white">{recommendation}</span>
-                    )}
-                  </p>
-                </div>
-
-                <div className="pt-4 border-t border-white/10 flex justify-between items-center">
-                  <span className="text-xs font-bold opacity-60 uppercase tracking-widest">Price line</span>
-                  <span className="text-sm font-black">PKR {budget.toLocaleString()} max</span>
-                </div>
-
-                <button 
-                  onClick={handleReset}
-                  className="w-full mt-4 text-xs font-bold opacity-60 hover:opacity-100 transition-opacity"
-                >
-                  Reset Search
-                </button>
-              </motion.div>
-            ) : (
-              <>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-end">
-                    <p className="text-sm font-bold opacity-80">Daily Budget</p>
-                    <div className="bg-white/10 px-3 py-1.5 rounded-xl border border-white/20">
-                      <span className="text-sm font-black">PKR {budget.toLocaleString()} max</span>
-                    </div>
-                  </div>
-                  <input 
-                    type="range" 
-                    min="2000" 
-                    max="20000" 
-                    step="500"
-                    value={budget}
-                    onChange={(e) => setBudget(parseInt(e.target.value))}
-                    className="w-full accent-white h-1.5 bg-white/20 rounded-full appearance-none cursor-pointer"
-                  />
-                  <div className="flex items-center gap-2 text-[11px] font-bold opacity-80">
-                    <CheckCircle2 size={14} />
-                    Best match for your budget
+      <div className="flex flex-col lg:flex-row gap-12">
+        {/* Left Column: Search Form (65%) */}
+        <div className="lg:w-[65%]">
+          <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 mb-10">Where are you going?</h2>
+          
+          <div className="bg-white rounded-[32px] p-8 lg:p-10 border border-slate-200 shadow-2xl shadow-slate-200/40">
+            <form className="space-y-8" onSubmit={(e) => { e.preventDefault(); handleSearch(); }}>
+              {/* Locations */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-2.5">
+                  <label className="text-sm font-bold text-slate-500 ml-1">Pickup Location</label>
+                  <div className="relative flex items-center">
+                    <MapPin className="absolute left-4 text-slate-400" size={20} />
+                    <input 
+                      type="text" 
+                      value={pickupLocation}
+                      onChange={(e) => setPickupLocation(e.target.value)}
+                      placeholder="City or airport"
+                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-primary text-slate-900 font-semibold"
+                    />
                   </div>
                 </div>
+                <div className="space-y-2.5">
+                  <label className="text-sm font-bold text-slate-500 ml-1">Drop-off Location</label>
+                  <div className="relative flex items-center">
+                    <Navigation className="absolute left-4 text-slate-400" size={20} />
+                    <input 
+                      type="text" 
+                      value={dropoffLocation}
+                      onChange={(e) => setDropoffLocation(e.target.value)}
+                      placeholder="Same as pickup"
+                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-primary text-slate-900 font-semibold"
+                    />
+                  </div>
+                </div>
+              </div>
 
-                <div className="space-y-4">
-                  <p className="text-sm font-bold opacity-80">Passengers</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[2, 4, 7].map((num) => (
-                      <button 
-                        key={num}
-                        onClick={() => setPassengers(num)}
-                        className={`py-3 rounded-xl font-bold text-sm transition-all ${
-                          passengers === num 
-                            ? 'bg-white text-[#2563EB]' 
-                            : 'bg-white/10 border border-white/20 hover:bg-white/20'
+              {/* Dates and Times */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <CustomCalendar
+                  label="Pickup Date & Time"
+                  selected={pickupDate}
+                  onChange={(date) => setPickupDate(date)}
+                  showTimeSelect
+                />
+                <CustomCalendar
+                  label="Return Date & Time"
+                  selected={returnDate}
+                  onChange={(date) => setReturnDate(date)}
+                  minDate={pickupDate || undefined}
+                  showTimeSelect
+                />
+              </div>
+
+              {/* Car Specs Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-2.5">
+                  <label className="text-sm font-bold text-slate-500 ml-1">Car Type</label>
+                  <select 
+                    value={carType}
+                    onChange={(e) => setCarType(e.target.value)}
+                    className="w-full px-4 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-primary text-slate-900 font-bold appearance-none cursor-pointer"
+                  >
+                    <option>Economy</option>
+                    <option>Sedan</option>
+                    <option>SUV</option>
+                    <option>Luxury</option>
+                  </select>
+                </div>
+                <div className="space-y-2.5">
+                  <label className="text-sm font-bold text-slate-500 ml-1">Passengers</label>
+                  <div className="flex items-center bg-slate-50 rounded-2xl px-5 py-2 h-[64px]">
+                    <button 
+                      type="button"
+                      onClick={() => setPassengers(Math.max(1, passengers - 1))}
+                      className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-200 text-primary transition-colors"
+                    >
+                      <Minus size={20} />
+                    </button>
+                    <span className="bg-transparent border-none text-center font-black w-full text-slate-900 text-lg">
+                      {passengers}
+                    </span>
+                    <button 
+                      type="button"
+                      onClick={() => setPassengers(Math.min(9, passengers + 1))}
+                      className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-200 text-primary transition-colors"
+                    >
+                      <Plus size={20} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Toggles & Options */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-4">
+                <div className="space-y-5">
+                  <label className="text-sm font-bold text-slate-500 ml-1">Transmission</label>
+                  <div className="flex p-1.5 bg-slate-100 rounded-2xl w-fit">
+                    {(['Auto', 'Manual'] as const).map(type => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setTransmission(type)}
+                        className={`px-10 py-3 rounded-xl text-sm font-black transition-all ${
+                          transmission === type 
+                            ? 'bg-white text-primary shadow-sm' 
+                            : 'text-slate-500 hover:text-slate-700'
                         }`}
                       >
-                        {num === 7 ? '7+' : num}
+                        {type}
                       </button>
                     ))}
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] font-bold opacity-80">
-                    <CheckCircle2 size={14} />
-                    Optimized for {passengers === 7 ? '7+' : passengers} passengers
+                </div>
+                <div className="space-y-5">
+                  <label className="text-sm font-bold text-slate-500 ml-1">Need a driver?</label>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      type="button"
+                      onClick={() => setNeedDriver(!needDriver)}
+                      className={`relative inline-flex h-10 w-16 items-center rounded-full transition-colors focus:outline-none ring-offset-2 focus:ring-2 focus:ring-primary ${
+                        needDriver ? 'bg-primary' : 'bg-slate-200'
+                      }`}
+                    >
+                      <span className={`inline-block h-7 w-7 transform rounded-full bg-white transition-transform ${
+                        needDriver ? 'translate-x-8' : 'translate-x-1'
+                      }`} />
+                    </button>
+                    <span className="text-sm font-semibold text-slate-600">Professional chauffeur service</span>
                   </div>
                 </div>
+              </div>
 
-                <button 
-                  onClick={handleFindBestCar}
-                  className="w-full bg-white text-[#2563EB] py-5 rounded-3xl font-black text-lg hover:bg-blue-50 transition-all shadow-xl"
-                >
-                  Find Best Car
-                </button>
-              </>
-            )}
+              {/* Fuel Type Chips */}
+              <div className="space-y-5">
+                <label className="text-sm font-bold text-slate-500 ml-1">Fuel Type</label>
+                <div className="flex flex-wrap gap-4">
+                  {['Petrol', 'Diesel', 'Hybrid'].map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setFuelType(type)}
+                      className={`px-8 py-3 rounded-full border-2 font-black text-sm transition-all ${
+                        fuelType === type
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-slate-200 text-slate-500 hover:border-primary/50'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* CTA */}
+              <button 
+                type="submit"
+                className="w-full bg-primary hover:bg-blue-700 text-white py-6 rounded-2xl text-xl font-black transition-all shadow-2xl shadow-primary/30 flex items-center justify-center gap-4 mt-10 active:scale-[0.98]"
+              >
+                <Search size={24} strokeWidth={3} />
+                Search Available Cars
+              </button>
+            </form>
           </div>
-          
-          {/* Decorative background circles */}
-          <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/5 rounded-full"></div>
-          <div className="absolute -left-10 -bottom-10 w-60 h-60 bg-white/5 rounded-full"></div>
+        </div>
+
+        {/* Right Column: Hero Content (35%) */}
+        <div className="lg:w-[35%] flex flex-col gap-8">
+          <div className="relative group h-[500px] rounded-[40px] overflow-hidden shadow-2xl">
+            <img 
+              alt="Premium Sedan" 
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" 
+              src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&q=80&w=1000"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-10">
+              <span className="bg-primary text-white text-[11px] font-black uppercase tracking-[0.25em] px-4 py-1.5 rounded-full w-fit mb-4">Premium Choice</span>
+              <h3 className="text-white text-4xl font-black mb-4 leading-tight tracking-tight">Explore Pakistan with comfort.</h3>
+              <p className="text-white/80 text-base font-medium leading-relaxed">Experience the thrill of the open road in our top-rated sedan fleet.</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[32px] p-8 border border-slate-200 shadow-sm">
+            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 px-1">Popular Destinations</h4>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer group">
+                <div className="flex items-center gap-4">
+                  <div className="size-10 bg-blue-50 rounded-xl flex items-center justify-center text-primary">
+                    <TrendingUp size={20} />
+                  </div>
+                  <span className="text-sm font-black text-slate-900">Lahore to Islamabad</span>
+                </div>
+                <ChevronRight className="text-slate-300 group-hover:text-primary transition-all" size={20} />
+              </div>
+              <div className="flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer group border-t border-slate-100">
+                <div className="flex items-center gap-4 pt-2">
+                  <div className="size-10 bg-blue-50 rounded-xl flex items-center justify-center text-primary">
+                    <Mountain size={20} />
+                  </div>
+                  <span className="text-sm font-black text-slate-900">Murree Hill Station</span>
+                </div>
+                <ChevronRight className="text-slate-300 group-hover:text-primary transition-all pt-2" size={20} />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-5 px-4 pt-2">
+            <div className="flex items-center gap-3 text-emerald-600">
+              <BadgeCheck size={24} />
+              <span className="text-sm font-black">Best prices guaranteed</span>
+            </div>
+            <div className="flex items-center gap-3 text-slate-500">
+              <XCircle size={24} />
+              <span className="text-sm font-bold">Free cancellation up to 24h before</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Bottom Section */}
-      <div className="space-y-8">
+      {/* Featured Fleet Section */}
+      <div className="mt-24 space-y-10">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h2 className="text-3xl font-black tracking-tight text-[#1E293B]">
-              {isFilterActive ? 'AI Recommendations' : 'Recommended for you'}
-            </h2>
-            {isFilterActive && (
-              <button 
-                onClick={handleReset}
-                className="text-xs font-bold text-[#2563EB] bg-[#EFF6FF] px-3 py-1 rounded-full hover:bg-blue-100 transition-all"
-              >
-                Clear Filter
-              </button>
-            )}
+          <div>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Today's Featured Fleet</h2>
+            <p className="text-slate-500 font-medium mt-1">Available at {pickupLocation || 'your location'}</p>
           </div>
-          <Link to="/fleet" className="text-sm font-bold text-[#2563EB] hover:underline">View All</Link>
+          <button 
+            onClick={() => navigate('/fleet')}
+            className="flex items-center gap-2 text-primary font-black text-sm uppercase tracking-widest hover:gap-3 transition-all"
+          >
+            Explore Fleet
+            <ChevronRight size={18} />
+          </button>
         </div>
-
-        {displayVehicles.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {displayVehicles.map((vehicle, index) => (
-              <VehicleCard 
-                key={vehicle.id} 
-                vehicle={vehicle} 
-                index={index} 
-                rentalDays={rentalDays} 
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="bg-white p-20 rounded-[40px] border border-dashed border-gray-200 flex flex-col items-center justify-center text-center space-y-4">
-            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-gray-300">
-              <Car size={32} />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-xl font-bold text-[#1E293B]">No matches found</h3>
-              <p className="text-[#64748B] max-w-xs">Try increasing your budget or adjusting the passenger count.</p>
-            </div>
-            <button 
-              onClick={handleReset}
-              className="px-6 py-2 bg-[#2563EB] text-white rounded-xl font-bold text-sm hover:bg-blue-600 transition-all"
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {vehicles.slice(0, 3).map((vehicle, idx) => (
+            <motion.div
+              key={vehicle.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.1 }}
+              className="bg-white rounded-[32px] overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all group"
             >
-              Reset Filters
-            </button>
-          </div>
-        )}
+              <div className="h-56 overflow-hidden">
+                <img 
+                  src={vehicle.image} 
+                  alt={vehicle.name}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                />
+              </div>
+              <div className="p-8">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900">{vehicle.name}</h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{vehicle.type} • {vehicle.transmission}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-black text-primary">PKR {vehicle.pricePerDay.toLocaleString()}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Per Day</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => navigate(`/vehicle/${vehicle.id}`)}
+                  className="w-full py-4 bg-slate-50 text-slate-900 font-black rounded-xl hover:bg-primary hover:text-white transition-all text-sm"
+                >
+                  View Details
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </div>
   );

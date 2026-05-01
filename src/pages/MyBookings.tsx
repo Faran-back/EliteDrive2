@@ -155,7 +155,7 @@ const MyBookings: React.FC = () => {
                       </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Payment</p>
-                        <p className="font-black text-emerald-500 text-sm">{booking.paymentStatus.toUpperCase()}</p>
+                        <p className="font-black text-emerald-500 text-sm">{(booking.paymentStatus || 'unpaid').toUpperCase()}</p>
                       </div>
                       {booking.destination && (
                         <div className="space-y-1">
@@ -207,7 +207,7 @@ const MyBookings: React.FC = () => {
                         <div className="flex gap-4">
                           <Link 
                             to={`/vehicle/${vehicle?.id}`}
-                            className="flex-1 bg-[#1E293B] text-white py-4 rounded-2xl font-black text-sm text-center hover:bg-black transition-all"
+                            className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black text-sm text-center hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
                           >
                             View Vehicle Specs
                           </Link>

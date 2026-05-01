@@ -30,6 +30,7 @@ import SupportCenter from '../components/dashboard/SupportCenter';
 import Bookings from '../components/dashboard/Bookings';
 import RoleAssignment from '../components/dashboard/RoleAssignment';
 import RoleRequests from '../components/dashboard/RoleRequests';
+import FleetInventory from '../components/dashboard/FleetInventory';
 
 const AdminDashboard: React.FC = () => {
   const { allBookings, vehicles, allUsers } = useStore();
@@ -228,7 +229,7 @@ const AdminDashboard: React.FC = () => {
                               booking.status === 'active' ? 'bg-blue-100 text-blue-700' :
                               'bg-amber-100 text-amber-700'
                             }`}>
-                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                              {(booking.status || 'pending').charAt(0).toUpperCase() + (booking.status || 'pending').slice(1)}
                             </span>
                           </td>
                         </tr>
@@ -250,6 +251,7 @@ const AdminDashboard: React.FC = () => {
       {currentView === 'bookings' && <Bookings />}
       {currentView === 'role-assignment' && <RoleAssignment />}
       {currentView === 'role-requests' && <RoleRequests />}
+      {currentView === 'inventory' && <FleetInventory />}
     </div>
   );
 };

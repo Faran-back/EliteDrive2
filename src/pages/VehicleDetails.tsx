@@ -22,7 +22,7 @@ const VehicleDetails: React.FC = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { vehicles, user } = useStore();
+  const { vehicles, user, showToast } = useStore();
   const vehicle = vehicles.find(v => v.id === id);
   const rentalDays = parseInt(searchParams.get('days') || '2');
   const isVerified = user?.emailVerified && user?.phoneVerified;
@@ -195,6 +195,7 @@ const VehicleDetails: React.FC = () => {
                 onClick={(e) => {
                   if (!isVerified) {
                     e.preventDefault();
+                    showToast('Verification Required: Please verify your email and phone in your profile.', 'error');
                   }
                 }}
                 className={`w-full ${isVerified ? 'bg-[#2563EB] hover:bg-blue-700 shadow-xl shadow-blue-100' : 'bg-gray-200 cursor-not-allowed text-gray-400'} text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]`}

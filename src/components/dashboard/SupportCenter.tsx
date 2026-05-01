@@ -258,7 +258,7 @@ const SupportCenter: React.FC = () => {
                     key={idx} 
                     className={`flex gap-4 max-w-[85%] ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : ''}`}
                   >
-                    <div className={`size-10 rounded-xl flex items-center justify-center text-white shrink-0 ${msg.role === 'user' ? 'bg-slate-900' : 'bg-blue-600'}`}>
+                    <div className={`size-10 rounded-xl flex items-center justify-center text-white shrink-0 ${msg.role === 'user' ? 'bg-indigo-600' : 'bg-blue-600'}`}>
                       {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
                     </div>
                     <div className={`p-4 shadow-sm border border-slate-100 ${

@@ -161,7 +161,7 @@ const SupportChatWidget: React.FC = () => {
                       key={idx} 
                       className={`flex gap-3 max-w-[90%] ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : ''}`}
                     >
-                      <div className={`size-8 rounded-lg flex items-center justify-center text-white shrink-0 ${msg.role === 'user' ? 'bg-slate-900' : 'bg-blue-600'}`}>
+                      <div className={`size-8 rounded-lg flex items-center justify-center text-white shrink-0 ${msg.role === 'user' ? 'bg-indigo-600' : 'bg-blue-600'}`}>
                         {msg.role === 'user' ? <User size={16} /> : <Bot size={16} />}
                       </div>
                       <div className={`p-3 shadow-sm border border-slate-100 ${

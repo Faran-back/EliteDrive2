@@ -89,14 +89,14 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        ((request.auth.token.email in ["inotfarhan@gmail.com", "test@test.com", "testingdaflow@test.com"] && request.auth.token.email_verified == true) ||
+        ((request.auth.token.email in ["inotfarhan@gmail.com", "test@test.com", "testingdaflow@test.com"]) ||
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
 
     function isManager() {
       return isAuthenticated() &&
-        ((request.auth.token.email in ["inotfarhan@gmail.com", "test@test.com", "testingdaflow@test.com"] && request.auth.token.email_verified == true) ||
+        ((request.auth.token.email in ["inotfarhan@gmail.com", "test@test.com", "testingdaflow@test.com"]) ||
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'manager']));
     }
@@ -115,9 +115,12 @@ service cloud.firestore {
 
     function isVerified() {
       return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.emailVerified == true &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.phoneVerified == true;
+             (isAdmin() || (
+               exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.emailVerified == true &&
+               (!('phoneVerified' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) || 
+                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.phoneVerified == true)
+             ));
     }
 
     // ===============================================================

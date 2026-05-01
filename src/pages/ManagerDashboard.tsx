@@ -39,6 +39,7 @@ import Performance from '../components/dashboard/Performance';
 import SystemConfig from '../components/dashboard/SystemConfig';
 import SupportCenter from '../components/dashboard/SupportCenter';
 import Bookings from '../components/dashboard/Bookings';
+import FleetInventory from '../components/dashboard/FleetInventory';
 
 const ManagerDashboard: React.FC = () => {
   const { vehicles, allBookings, allUsers, cancelBooking, showToast, user } = useStore();
@@ -93,14 +94,16 @@ const ManagerDashboard: React.FC = () => {
     .filter(v => v.status === 'maintenance')
     .map(v => ({
       title: 'Scheduled Maintenance',
-      vehicle: `${v.name} • Plate ${v.id.slice(0, 8).toUpperCase()}`,
+      vehicle: `${v.name} • Plate ${(v.id || '').slice(0, 8).toUpperCase()}`,
       type: 'warning',
       icon: 'build'
     }));
 
+  /*
   if (maintenanceAlerts.length === 0) {
     maintenanceAlerts.push({ title: 'System Check Required', vehicle: 'All systems operational', type: 'warning', icon: 'check_circle' });
   }
+  */
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -163,7 +166,12 @@ const ManagerDashboard: React.FC = () => {
               <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
                 <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center">
                   <h2 className="font-black text-lg text-slate-900">Vehicle Inventory</h2>
-                  <button className="text-blue-600 text-xs font-black hover:underline tracking-widest uppercase">See all</button>
+                  <Link 
+                    to="/manager-dashboard?view=inventory"
+                    className="text-blue-600 text-xs font-black hover:underline tracking-widest uppercase"
+                  >
+                    See all
+                  </Link>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
@@ -365,6 +373,7 @@ const ManagerDashboard: React.FC = () => {
       {currentView === 'performance' && <Performance />}
       {currentView === 'system-config' && <SystemConfig />}
       {currentView === 'support-center' && <SupportCenter />}
+      {currentView === 'inventory' && <FleetInventory />}
 
     </div>
   );

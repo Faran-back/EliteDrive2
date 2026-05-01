@@ -8,6 +8,9 @@ import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import Fleet from './pages/Fleet';
 import VehicleDetails from './pages/VehicleDetails';
+import RulesPolicies from './pages/RulesPolicies';
+import PenaltyCharges from './pages/PenaltyCharges';
+import ReportIncident from './pages/ReportIncident';
 import Payment from './pages/Payment';
 import BookingConfirmed from './pages/BookingConfirmed';
 import MyBookings from './pages/MyBookings';
@@ -21,6 +24,8 @@ import AddVehicle from './pages/AddVehicle';
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
   const { user, isAuthReady } = useStore();
 
+  // AUTH BYPASS: Commented out for now as per user request
+  /*
   if (!isAuthReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
@@ -38,13 +43,16 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: strin
     if (user.role === 'manager') return <Navigate to="/manager-dashboard" />;
     return <Navigate to="/customer-dashboard" />;
   }
+  */
 
   return <>{children}</>;
 };
 
 const RootRedirect: React.FC = () => {
   const { user } = useStore();
-  if (!user) return <Navigate to="/auth" />;
+  
+  // AUTH BYPASS: Allow access to customer dashboard by default if no user
+  if (!user) return <Navigate to="/customer-dashboard" />;
   
   if (user.role === 'admin') {
     return <Navigate to="/admin-dashboard" />;
@@ -60,6 +68,7 @@ const RootRedirect: React.FC = () => {
 const AppContent: React.FC = () => {
   const { isAuthReady } = useStore();
 
+  /*
   if (!isAuthReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
@@ -67,6 +76,7 @@ const AppContent: React.FC = () => {
       </div>
     );
   }
+  */
 
   return (
     <Router>
@@ -78,6 +88,9 @@ const AppContent: React.FC = () => {
         <Route path="/customer-dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
         <Route path="/dashboard" element={<Navigate to="/customer-dashboard" />} />
         <Route path="/fleet" element={<ProtectedRoute><Layout><Fleet /></Layout></ProtectedRoute>} />
+        <Route path="/rules-policies" element={<ProtectedRoute><Layout><RulesPolicies /></Layout></ProtectedRoute>} />
+        <Route path="/penalty-charges" element={<ProtectedRoute><Layout><PenaltyCharges /></Layout></ProtectedRoute>} />
+        <Route path="/report-incident" element={<ProtectedRoute><Layout><ReportIncident /></Layout></ProtectedRoute>} />
         <Route path="/vehicle/:id" element={<ProtectedRoute><Layout><VehicleDetails /></Layout></ProtectedRoute>} />
         <Route path="/payment/:id" element={<ProtectedRoute><Layout><Payment /></Layout></ProtectedRoute>} />
         <Route path="/booking-confirmed" element={<ProtectedRoute><Layout><BookingConfirmed /></Layout></ProtectedRoute>} />

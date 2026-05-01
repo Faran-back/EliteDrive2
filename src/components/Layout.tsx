@@ -18,7 +18,8 @@ import {
   Users,
   BarChart3,
   FileText,
-  Search
+  AlertCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
@@ -45,22 +46,31 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { icon: Compass, label: 'Explore Fleet', path: '/fleet' },
     { icon: Heart, label: 'Favorites', path: '/favorites' },
     { icon: History, label: 'My Bookings', path: '/my-bookings' },
+    { icon: ShieldCheck, label: 'Rules & Policies', path: '/rules-policies' },
+    { icon: AlertCircle, label: 'Penalty & Charges', path: '/penalty-charges' },
+    { icon: AlertTriangle, label: 'Report Incident', path: '/report-incident' },
   ];
 
   const adminNavItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/admin-dashboard' },
-    { icon: Car, label: 'Fleet Inventory', path: '/fleet' },
+    { icon: Car, label: 'Fleet Inventory', path: '/admin-dashboard?view=inventory' },
     { icon: History, label: 'Bookings', path: '/admin-dashboard?view=bookings', badge: pendingBookingsCount },
     { icon: ShieldCheck, label: 'Role Requests', path: '/admin-dashboard?view=role-requests', badge: pendingRoleRequestsCount },
     { icon: Users, label: 'Assign Roles', path: '/admin-dashboard?view=role-assignment' },
     { icon: FileText, label: 'Reports', path: '/admin-dashboard?view=reports' },
+    { icon: ShieldCheck, label: 'Rules & Policies', path: '/rules-policies' },
+    { icon: AlertCircle, label: 'Penalty & Charges', path: '/penalty-charges' },
+    { icon: AlertTriangle, label: 'Report Incident', path: '/report-incident' },
   ];
 
   const managerNavItems = [
     { icon: BarChart3, label: 'Overview', path: '/manager-dashboard' },
-    { icon: Car, label: 'Fleet Inventory', path: '/fleet' },
+    { icon: Car, label: 'Fleet Inventory', path: '/manager-dashboard?view=inventory' },
     { icon: History, label: 'Bookings', path: '/manager-dashboard?view=bookings', badge: pendingBookingsCount },
     { icon: FileText, label: 'Reports', path: '/manager-dashboard?view=reports' },
+    { icon: ShieldCheck, label: 'Rules & Policies', path: '/rules-policies' },
+    { icon: AlertCircle, label: 'Penalty & Charges', path: '/penalty-charges' },
+    { icon: AlertTriangle, label: 'Report Incident', path: '/report-incident' },
   ];
 
   const managementNavItems = [
@@ -125,7 +135,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className={`min-h-screen bg-[#f6f6f8] font-display overflow-hidden ${isVerticalNav ? 'flex' : 'flex-col'}`}>
       <AnimatePresence>
         {user?.pendingInvitation && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/60 backdrop-blur-md p-4">
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -172,6 +182,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </button>
       )}
 
+      {/* Horizontal Nav Mobile Toggle (Customer) */}
+      {!isVerticalNav && (
+        <button 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="lg:hidden fixed bottom-6 right-6 z-[60] size-14 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-all"
+        >
+          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      )}
+
       {/* Sidebar Navigation (Vertical) */}
       {isVerticalNav && (
         <aside className={`
@@ -179,11 +199,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         `}>
           <div className="p-6 flex items-center gap-2">
-            <div className="text-blue-600 flex items-center">
-              <Car size={32} strokeWidth={2.5} />
-            </div>
+            <Car className="text-primary" size={32} strokeWidth={2.5} />
             <div className="flex flex-col -gap-1">
-              <h1 className="text-xl font-bold tracking-tight text-slate-900">EliteDrive</h1>
+              <span className="text-xl font-black tracking-tighter text-slate-900 italic">ELITE<span className="text-primary">DRIVE</span></span>
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                 {user?.role === 'admin' ? 'Admin Panel' : 'Manager Panel'}
               </p>
@@ -227,15 +245,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Main Content Area */}
       <main className={`flex-1 flex flex-col h-screen overflow-hidden relative ${!isVerticalNav ? 'w-full' : ''}`}>
         {/* Top Bar / Horizontal Nav */}
-        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 shrink-0 z-40 sticky top-0">
-          <div className="flex items-center gap-8 flex-1">
+        <header className="h-20 bg-white/80 backdrop-blur-xl border-b border-slate-200 flex items-center justify-between px-6 md:px-8 shrink-0 z-40 sticky top-0">
+          <div className="flex items-center gap-4 md:gap-8 flex-1">
             {/* Logo for Horizontal Nav */}
             {!isVerticalNav && (
-              <Link to="/customer-dashboard" className="flex items-center gap-3">
-                <div className="size-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
-                  <Car size={24} strokeWidth={2.5} />
-                </div>
-                <h1 className="text-2xl font-black tracking-tight text-slate-900 hidden sm:block">EliteDrive</h1>
+              <Link to="/customer-dashboard" className="flex items-center gap-2">
+                <Car className="text-primary size-7 md:size-8" strokeWidth={2.5} />
+                <span className="text-xl md:text-2xl font-black tracking-tighter text-slate-900 italic">ELITE<span className="text-primary">DRIVE</span></span>
               </Link>
             )}
 
@@ -255,16 +271,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Search Bar */}
-            <div className="relative w-64 hidden md:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input 
-                type="text" 
-                placeholder="Search data..." 
-                className="w-full pl-10 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all placeholder:text-slate-400"
-              />
-            </div>
-
             {/* Notifications */}
             <div className="relative">
               <NotificationDropdown />
@@ -341,7 +347,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
         {/* Page Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className="p-8 lg:p-12 max-w-[1600px] mx-auto">
+          <div className="px-6 py-2 md:px-10 md:py-4 lg:px-12 lg:py-6 max-w-[1600px] mx-auto">
             {children}
           </div>
         </div>

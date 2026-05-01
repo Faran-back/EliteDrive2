@@ -191,7 +191,7 @@ const RoleAssignment: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-8 py-4 rounded-[32px] shadow-2xl flex items-center gap-8 border border-slate-800 backdrop-blur-md"
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 bg-white text-slate-900 px-8 py-4 rounded-[32px] shadow-2xl flex items-center gap-8 border border-slate-100 backdrop-blur-md"
           >
             <div className="flex items-center gap-3">
               <div className="size-8 bg-blue-600 rounded-xl flex items-center justify-center font-black text-xs">
@@ -200,7 +200,7 @@ const RoleAssignment: React.FC = () => {
               <span className="text-sm font-black uppercase tracking-widest">Selected</span>
             </div>
             
-            <div className="h-6 w-px bg-slate-800" />
+            <div className="h-6 w-px bg-slate-200" />
             
             <div className="flex items-center gap-4">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assign Bulk Role:</span>
@@ -209,7 +209,7 @@ const RoleAssignment: React.FC = () => {
                   <button
                     key={role}
                     onClick={() => setConfirmModal({ isOpen: true, newRole: role, isBulk: true })}
-                    className="px-4 py-2 bg-slate-800 hover:bg-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                    className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                   >
                     {role}
                   </button>

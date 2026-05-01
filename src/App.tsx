@@ -24,8 +24,6 @@ import AddVehicle from './pages/AddVehicle';
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
   const { user, isAuthReady } = useStore();
 
-  // AUTH BYPASS: Commented out for now as per user request
-  /*
   if (!isAuthReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
@@ -43,7 +41,6 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: strin
     if (user.role === 'manager') return <Navigate to="/manager-dashboard" />;
     return <Navigate to="/customer-dashboard" />;
   }
-  */
 
   return <>{children}</>;
 };
@@ -51,8 +48,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: strin
 const RootRedirect: React.FC = () => {
   const { user } = useStore();
   
-  // AUTH BYPASS: Allow access to customer dashboard by default if no user
-  if (!user) return <Navigate to="/customer-dashboard" />;
+  if (!user) return <Navigate to="/auth" />;
   
   if (user.role === 'admin') {
     return <Navigate to="/admin-dashboard" />;
@@ -68,7 +64,6 @@ const RootRedirect: React.FC = () => {
 const AppContent: React.FC = () => {
   const { isAuthReady } = useStore();
 
-  /*
   if (!isAuthReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
@@ -76,7 +71,6 @@ const AppContent: React.FC = () => {
       </div>
     );
   }
-  */
 
   return (
     <Router>

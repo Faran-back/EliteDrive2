@@ -34,7 +34,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
-  const isVerticalNav = user?.role === 'admin' || user?.role === 'manager';
+  const isManagementRoute = location.pathname.includes('admin') || 
+                           location.pathname.includes('manager') || 
+                           location.pathname === '/add-vehicle' || 
+                           location.pathname.startsWith('/edit-vehicle');
+  
+  const isVerticalNav = (user?.role === 'admin' || user?.role === 'manager') && isManagementRoute;
 
   const pendingBookingsCount = allBookings.filter(b => b.status === 'pending').length;
   const pendingRoleRequestsCount = roleRequests.filter(r => r.status === 'pending').length;

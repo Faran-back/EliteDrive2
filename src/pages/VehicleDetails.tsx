@@ -24,13 +24,26 @@ const VehicleDetails: React.FC = () => {
   const navigate = useNavigate();
   const { vehicles, user, showToast } = useStore();
   const vehicle = vehicles.find(v => v.id === id);
-  const rentalDays = parseInt(searchParams.get('days') || '2');
   const isVerified = user?.emailVerified && user?.phoneVerified;
 
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() + 1);
-  const endDate = new Date(startDate);
-  endDate.setDate(startDate.getDate() + rentalDays);
+  const startDate = (() => {
+    const saved = localStorage.getItem('elitedrive_pickup_date');
+    if (saved) return new Date(saved);
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d;
+  })();
+
+  const endDate = (() => {
+    const saved = localStorage.getItem('elitedrive_return_date');
+    if (saved) return new Date(saved);
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + 3);
+    return d;
+  })();
+
+  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+  const rentalDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -158,8 +171,8 @@ const VehicleDetails: React.FC = () => {
             <div className="flex justify-between items-end">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Total Price</p>
-                <h2 className="text-3xl font-black text-[#1E293B]">PKR {vehicle.pricePerDay.toLocaleString()}</h2>
-                <p className="text-[#64748B] font-bold text-xs">Inclusive of all taxes</p>
+                <h2 className="text-3xl font-black text-[#1E293B]">PKR {(vehicle.pricePerDay * rentalDays).toLocaleString()}</h2>
+                <p className="text-[#64748B] font-bold text-xs">PKR {vehicle.pricePerDay.toLocaleString()} / Day • {rentalDays} {rentalDays === 1 ? 'Day' : 'Days'}</p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full inline-block mb-1 shadow-sm">Available Now</p>

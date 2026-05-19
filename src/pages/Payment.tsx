@@ -32,13 +32,23 @@ const Payment: React.FC = () => {
   const [rentalType, setRentalType] = useState<'hourly' | 'daily' | 'weekly'>('daily');
   
   // Dates logic
-  const initialStartDate = new Date();
-  initialStartDate.setDate(initialStartDate.getDate() + 1);
-  const initialEndDate = new Date(initialStartDate);
-  initialEndDate.setDate(initialEndDate.getDate() + 3);
+  const [startDate, setStartDate] = useState<Date | null>(() => {
+    const saved = localStorage.getItem('elitedrive_pickup_date');
+    if (saved) return new Date(saved);
+    const initialStartDate = new Date();
+    initialStartDate.setDate(initialStartDate.getDate() + 1);
+    return initialStartDate;
+  });
 
-  const [startDate, setStartDate] = useState<Date | null>(initialStartDate);
-  const [endDate, setEndDate] = useState<Date | null>(initialEndDate);
+  const [endDate, setEndDate] = useState<Date | null>(() => {
+    const saved = localStorage.getItem('elitedrive_return_date');
+    if (saved) return new Date(saved);
+    const savedStart = localStorage.getItem('elitedrive_pickup_date');
+    const startObj = savedStart ? new Date(savedStart) : new Date();
+    const initialEndDate = new Date(startObj);
+    initialEndDate.setDate(initialEndDate.getDate() + 3);
+    return initialEndDate;
+  });
   
   const [coupon, setCoupon] = useState('WELCOME');
   const [isCouponApplied, setIsCouponApplied] = useState(true);

@@ -20,6 +20,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import ManagerDashboard from './pages/ManagerDashboard';
 import EditVehicle from './pages/EditVehicle';
 import AddVehicle from './pages/AddVehicle';
+import About from './pages/About';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
   const { user, isAuthReady } = useStore();
@@ -91,6 +92,7 @@ const AppContent: React.FC = () => {
         <Route path="/my-bookings" element={<ProtectedRoute><Layout><MyBookings /></Layout></ProtectedRoute>} />
         <Route path="/favorites" element={<ProtectedRoute><Layout><Favorites /></Layout></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Layout><Profile /></Layout></ProtectedRoute>} />
+        <Route path="/about" element={<ProtectedRoute><Layout><About /></Layout></ProtectedRoute>} />
         <Route path="/admin-dashboard" element={<ProtectedRoute allowedRoles={['admin']}><Layout><AdminDashboard /></Layout></ProtectedRoute>} />
         <Route path="/manager-dashboard" element={<ProtectedRoute allowedRoles={['manager']}><Layout><ManagerDashboard /></Layout></ProtectedRoute>} />
         <Route path="/edit-vehicle/:id" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><Layout><EditVehicle /></Layout></ProtectedRoute>} />

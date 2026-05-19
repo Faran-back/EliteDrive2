@@ -54,6 +54,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { icon: ShieldCheck, label: 'Rules & Policies', path: '/rules-policies' },
     { icon: AlertCircle, label: 'Penalty & Charges', path: '/penalty-charges' },
     { icon: AlertTriangle, label: 'Report Incident', path: '/report-incident' },
+    { icon: HelpCircle, label: 'About App', path: '/about' },
   ];
 
   const adminNavItems = [
@@ -66,6 +67,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { icon: ShieldCheck, label: 'Rules & Policies', path: '/rules-policies' },
     { icon: AlertCircle, label: 'Penalty & Charges', path: '/penalty-charges' },
     { icon: AlertTriangle, label: 'Report Incident', path: '/report-incident' },
+    { icon: HelpCircle, label: 'About App', path: '/about' },
   ];
 
   const managerNavItems = [
@@ -76,6 +78,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { icon: ShieldCheck, label: 'Rules & Policies', path: '/rules-policies' },
     { icon: AlertCircle, label: 'Penalty & Charges', path: '/penalty-charges' },
     { icon: AlertTriangle, label: 'Report Incident', path: '/report-incident' },
+    { icon: HelpCircle, label: 'About App', path: '/about' },
   ];
 
   const managementNavItems = [

@@ -27,13 +27,31 @@ const Fleet: React.FC = () => {
   // Search/Filter State
   const [pickupLocation, setPickupLocation] = useState('Lahore, Pakistan');
   const [dropoffLocation, setDropoffLocation] = useState('');
-  const [pickupDate, setPickupDate] = useState<Date | null>(new Date());
-  const [returnDate, setReturnDate] = useState<Date | null>(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
+  const [pickupDate, setPickupDate] = useState<Date | null>(() => {
+    const saved = localStorage.getItem('elitedrive_pickup_date');
+    return saved ? new Date(saved) : new Date();
+  });
+  const [returnDate, setReturnDate] = useState<Date | null>(() => {
+    const saved = localStorage.getItem('elitedrive_return_date');
+    return saved ? new Date(saved) : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+  });
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [transmission, setTransmission] = useState('Any');
   const [fuelType, setFuelType] = useState('Any');
   const [seating, setSeating] = useState('Any');
   const [priceRange, setPriceRange] = useState([8000, 35000]);
+
+  useEffect(() => {
+    if (pickupDate) {
+      localStorage.setItem('elitedrive_pickup_date', pickupDate.toISOString());
+    }
+  }, [pickupDate]);
+
+  useEffect(() => {
+    if (returnDate) {
+      localStorage.setItem('elitedrive_return_date', returnDate.toISOString());
+    }
+  }, [returnDate]);
 
   const categories = ['All', 'Sedan', 'SUV', 'Luxury', 'Economy', 'Pickup'];
   const transmissions = ['Auto', 'Manual', 'Any'];

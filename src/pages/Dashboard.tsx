@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CustomCalendar from '../components/ui/CustomCalendar';
 import { 
@@ -25,13 +25,31 @@ const Dashboard: React.FC = () => {
   // Form State
   const [pickupLocation, setPickupLocation] = useState('Lahore, Pakistan');
   const [dropoffLocation, setDropoffLocation] = useState('');
-  const [pickupDate, setPickupDate] = useState<Date | null>(new Date());
-  const [returnDate, setReturnDate] = useState<Date | null>(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
+  const [pickupDate, setPickupDate] = useState<Date | null>(() => {
+    const saved = localStorage.getItem('elitedrive_pickup_date');
+    return saved ? new Date(saved) : new Date();
+  });
+  const [returnDate, setReturnDate] = useState<Date | null>(() => {
+    const saved = localStorage.getItem('elitedrive_return_date');
+    return saved ? new Date(saved) : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+  });
   const [carType, setCarType] = useState('Sedan');
   const [passengers, setPassengers] = useState(4);
   const [transmission, setTransmission] = useState<'Auto' | 'Manual'>('Auto');
   const [needDriver, setNeedDriver] = useState(false);
   const [fuelType, setFuelType] = useState('Petrol');
+
+  useEffect(() => {
+    if (pickupDate) {
+      localStorage.setItem('elitedrive_pickup_date', pickupDate.toISOString());
+    }
+  }, [pickupDate]);
+
+  useEffect(() => {
+    if (returnDate) {
+      localStorage.setItem('elitedrive_return_date', returnDate.toISOString());
+    }
+  }, [returnDate]);
 
   const handleSearch = () => {
     // Navigate to fleet with applied filters (conceptually)

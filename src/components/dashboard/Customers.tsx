@@ -16,14 +16,32 @@ import {
   X,
   Calendar,
   Car,
-  Clock
+  Clock,
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Booking } from '../../types';
 
+const getDeterministicCNIC = (name: string = 'User', id: string = 'id') => {
+  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) + id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const part1 = 35201 + (hash % 1000);
+  const part2 = 1000000 + (hash * 17) % 8999999;
+  const part3 = hash % 9;
+  return `${part1}-${part2}-${part3}`;
+};
+
+const getDeterministicDOB = (name: string = 'User') => {
+  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const day = 1 + (hash % 28);
+  const month = 1 + (hash % 12);
+  const year = 1980 + (hash % 20);
+  return `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+};
+
 const Customers: React.FC = () => {
-  const { allUsers, allBookings, vehicles } = useStore();
+  const { allUsers, allBookings, vehicles, verifyUserCNIC } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'loyalty'>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<User | null>(null);
@@ -114,6 +132,17 @@ const Customers: React.FC = () => {
                         className="w-full h-full object-cover"
                       />
                     </div>
+                    {customer.cnicVerified ? (
+                      <span className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-200 shadow-xs">
+                        <ShieldCheck size={12} className="text-emerald-700" />
+                        Verified CNIC
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-200/50">
+                        <ShieldAlert size={12} className="text-amber-600" />
+                        Unverified
+                      </span>
+                    )}
                   </div>
 
                   <h3 className="text-xl font-black text-slate-900 mb-1 group-hover:text-blue-600 transition-colors">{customer.name}</h3>
@@ -159,55 +188,216 @@ const Customers: React.FC = () => {
 
       {/* Customer Details Modal */}
       <AnimatePresence>
-        {selectedCustomer && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedCustomer(null)}
-              className="absolute inset-0 bg-white/60 backdrop-blur-md"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-3xl bg-white rounded-[48px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
-            >
-              <div className="p-10 overflow-y-auto">
-                <div className="flex justify-between items-start mb-8">
-                  <div className="flex items-center gap-6">
-                    <div className="size-20 rounded-[32px] bg-slate-50 overflow-hidden border border-slate-100">
-                      <img 
-                        src={selectedCustomer.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedCustomer.email}`} 
-                        alt={selectedCustomer.name} 
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div>
-                      <h2 className="text-3xl font-black text-slate-900 tracking-tight">{selectedCustomer.name}</h2>
-                      <p className="text-slate-500 font-medium">{selectedCustomer.email}</p>
-                      <div className="flex items-center gap-4 mt-2">
-                        <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
-                          <Phone size={14} className="text-blue-600" />
-                          {selectedCustomer.phone || 'N/A'}
-                        </span>
-                        <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
-                          <CreditCard size={14} className="text-blue-600" />
-                          {selectedCustomer.rewardPoints} Points
-                        </span>
+        {selectedCustomer && (() => {
+          const currentCustomer = allUsers.find(u => u.id === selectedCustomer.id) || selectedCustomer;
+          return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setSelectedCustomer(null)}
+                className="absolute inset-0 bg-white/60 backdrop-blur-md"
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="relative w-full max-w-3xl bg-white rounded-[48px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              >
+                <div className="p-10 overflow-y-auto space-y-8">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-6">
+                      <div className="size-20 rounded-[32px] bg-slate-50 overflow-hidden border border-slate-100">
+                        <img 
+                          src={currentCustomer.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentCustomer.email}`} 
+                          alt={currentCustomer.name} 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <h2 className="text-3xl font-black text-slate-900 tracking-tight">{currentCustomer.name}</h2>
+                        <p className="text-slate-500 font-medium">{currentCustomer.email}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
+                            <Phone size={14} className="text-blue-600" />
+                            {currentCustomer.phone || 'N/A'}
+                          </span>
+                          <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
+                            <CreditCard size={14} className="text-blue-600" />
+                            {currentCustomer.rewardPoints || 0} Points
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    <button 
+                      onClick={() => setSelectedCustomer(null)}
+                      className="p-3 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-2xl transition-all"
+                    >
+                      <X size={24} />
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => setSelectedCustomer(null)}
-                    className="p-3 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-2xl transition-all"
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
 
-                <div className="space-y-8">
+                  {/* Documents & Verification Section */}
+                  <div className="p-8 bg-slate-50 rounded-[32px] border border-slate-100/80 space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/60 pb-5">
+                      <div className="space-y-1">
+                        <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2">
+                          <ShieldCheck size={18} className="text-blue-600" />
+                          Identity & Documents Verification
+                        </h3>
+                        <p className="text-xs text-slate-500 font-medium">
+                          Verify customer national identity records to enable premium features and booking check-ins.
+                        </p>
+                      </div>
+                      <div>
+                        {currentCustomer.cnicVerified ? (
+                          <div className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm shadow-emerald-500/10">
+                            <ShieldCheck size={14} />
+                            CNIC Verified
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm shadow-amber-500/10 scale-95 duration-700 animate-pulse">
+                            <ShieldAlert size={14} />
+                            Pending Verification
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Document Previews Container Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      
+                      {/* CNIC Front Preview */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CNIC Front Side</p>
+                          {currentCustomer.cnicFront && (
+                            <span className="text-[8px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">Uploaded</span>
+                          )}
+                        </div>
+                        <div className="aspect-[1.58/1] w-full rounded-2xl overflow-hidden border border-slate-200 bg-white relative group shadow-sm flex items-center justify-center">
+                          {currentCustomer.cnicFront ? (
+                            <img src={currentCustomer.cnicFront} alt="CNIC Front" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-linear-to-br from-slate-50 via-blue-50/10 to-emerald-50/5 p-4 flex flex-col justify-between select-none relative overflow-hidden font-mono">
+                              <div className="absolute top-2 right-2 w-12 h-12 bg-emerald-500/5 rounded-full blur-xl" />
+                              <div className="absolute bottom-4 left-4 w-16 h-16 bg-blue-500/5 rounded-full blur-xl" />
+                              
+                              <div className="flex items-start justify-between relative z-10">
+                                <div className="space-y-0.5">
+                                  <div className="text-[9px] font-black text-emerald-800 uppercase tracking-tight">Government of Pakistan</div>
+                                  <div className="text-[6px] text-slate-400 font-bold uppercase tracking-wider">National Identity Card</div>
+                                </div>
+                                <span className="text-[6px] text-emerald-700/80 bg-emerald-50 border border-emerald-500/25 px-1.5 py-0.5 rounded-sm font-black uppercase">Sample Doc</span>
+                              </div>
+                              
+                              <div className="flex items-center gap-4 relative z-10 my-1">
+                                <div className="size-11 rounded-xl bg-slate-100 overflow-hidden border border-slate-200/80 shrink-0">
+                                  <img 
+                                    src={currentCustomer.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentCustomer.email}`} 
+                                    alt="CNIC Avatar" 
+                                    className="w-full h-full object-cover grayscale"
+                                  />
+                                </div>
+                                <div className="space-y-1 font-sans">
+                                  <div className="text-[11px] font-black text-slate-900 leading-none">{currentCustomer.name}</div>
+                                  <div className="text-[7px] text-slate-400 font-bold">Holder Identity Profile</div>
+                                  <div className="text-[7px] font-mono font-bold text-slate-650">ID: {getDeterministicCNIC(currentCustomer.name, currentCustomer.id)}</div>
+                                </div>
+                              </div>
+                              
+                              <div className="flex justify-between items-end border-t border-slate-100 pt-1 text-[6px] text-slate-400 font-sans relative z-10">
+                                <div>
+                                  <span className="font-bold">DOB:</span> <span className="font-mono text-slate-600">{getDeterministicDOB(currentCustomer.name)}</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="font-bold">COUNTRY:</span> <span className="font-bold text-slate-650 uppercase">Pakistan</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* CNIC Back Side Preview */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CNIC Back Side</p>
+                          {currentCustomer.cnicBack && (
+                            <span className="text-[8px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">Uploaded</span>
+                          )}
+                        </div>
+                        <div className="aspect-[1.58/1] w-full rounded-2xl overflow-hidden border border-slate-200 bg-white relative group shadow-sm flex items-center justify-center">
+                          {currentCustomer.cnicBack ? (
+                            <img src={currentCustomer.cnicBack} alt="CNIC Back" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-linear-to-br from-slate-50 via-slate-100/30 to-slate-200/20 p-4 flex flex-col justify-between select-none relative overflow-hidden font-mono">
+                              <div className="absolute inset-0 bg-radial-at-c from-transparent via-slate-500/5 to-transparent pointer-events-none" />
+                              <div className="w-full h-3 bg-slate-300 rounded mb-1" />
+                              
+                              <div className="space-y-1 my-1 text-[6px] text-slate-500 font-sans relative z-10">
+                                <div className="bg-slate-100/80 p-2 rounded border border-slate-200/60 space-y-0.5">
+                                  <div><span className="font-bold">REGISTRY DISTRICT:</span> Lahore, Cantt</div>
+                                  <div><span className="font-bold">ISSUED DATE:</span> 14.11.2023</div>
+                                  <div><span className="font-bold">EXPIRY DATE:</span> 14.11.2033</div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between border-t border-slate-200 pt-2 relative z-10 font-mono text-[7px] text-slate-400">
+                                <div className="flex items-center gap-1.5 font-sans">
+                                  <div className="size-5 bg-slate-200 border border-slate-300 rounded flex items-center justify-center font-bold text-[5px]">FPS</div>
+                                  <span className="font-bold tracking-widest font-mono text-[6px]">INDEX-CARD-P189</span>
+                                </div>
+                                <div className="text-right font-bold text-slate-350 tracking-wider text-[6px]">PAK-REG-202</div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Driving License Image if present */}
+                    {currentCustomer.license && (
+                      <div className="space-y-2 border-t border-slate-200/50 pt-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Driving License Scan</p>
+                          <span className="text-[8px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">Uploaded</span>
+                        </div>
+                        <div className="max-w-md aspect-[1.58/1] w-full rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-xs animate-in fade-in slide-in-from-bottom-2 duration-300">
+                          <img src={currentCustomer.license} alt="Driving License" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* CNIC verification Button Trigger Action */}
+                    <div className="pt-2 flex items-center gap-3">
+                      {!currentCustomer.cnicVerified ? (
+                        <button
+                          onClick={async () => {
+                            await verifyUserCNIC(currentCustomer.id, true);
+                          }}
+                          className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/10 hover:shadow-emerald-700/20 active:scale-[0.98]"
+                        >
+                          <ShieldCheck size={16} />
+                          Verify CNIC
+                        </button>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            await verifyUserCNIC(currentCustomer.id, false);
+                          }}
+                          className="px-6 py-3.5 bg-red-50 hover:bg-red-105 text-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-[0.98]"
+                        >
+                          <X size={16} />
+                          Revoke Verification Status
+                        </button>
+                      )}
+                    </div>
+
+                  </div>
+
                   <div>
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
                       <History size={18} className="text-blue-600" />
@@ -215,8 +405,8 @@ const Customers: React.FC = () => {
                     </h3>
                     
                     <div className="space-y-4">
-                      {getCustomerBookings(selectedCustomer.id).length > 0 ? (
-                        getCustomerBookings(selectedCustomer.id).map((booking) => {
+                      {getCustomerBookings(currentCustomer.id).length > 0 ? (
+                        getCustomerBookings(currentCustomer.id).map((booking) => {
                           const vehicle = vehicles.find(v => v.id === booking.vehicleId);
                           return (
                             <div key={booking.id} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex items-center justify-between gap-4">
@@ -256,10 +446,10 @@ const Customers: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
     </div>
   );

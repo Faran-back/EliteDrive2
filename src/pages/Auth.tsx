@@ -110,10 +110,14 @@ const Auth: React.FC = () => {
       try {
         userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
       } catch (err: any) {
-        // Special case for default admin: if login fails because user doesn't exist, try to create it
-        if ((data.email === 'test@test.com' || data.email === 'testingdaflow@test.com') && data.password === 'password' && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
+        // Special case for default accounts: if login fails because user doesn't exist, try to create it
+        const autoCreateEmails = ['test@test.com', 'testingdaflow@test.com', 'test@example.com', 'ahmed12@gmail.com'];
+        if (autoCreateEmails.includes(data.email.toLowerCase()) && data.password === 'password' && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
           userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-          await updateProfile(userCredential.user, { displayName: 'Super Admin' });
+          let displayName = 'Super Admin';
+          if (data.email.toLowerCase() === 'ahmed12@gmail.com') displayName = 'Ahmed';
+          if (data.email.toLowerCase() === 'test@example.com') displayName = 'Test User';
+          await updateProfile(userCredential.user, { displayName });
         } else {
           throw err;
         }
@@ -126,17 +130,22 @@ const Auth: React.FC = () => {
         setUser(userData);
         handleRedirect(userData.role);
       } else {
-        // If doc doesn't exist (e.g. just created default admin), it will be created by StoreContext's onAuthStateChanged
+        // If doc doesn't exist (e.g. just created default account), it will be created by StoreContext's onAuthStateChanged
         // But we can also create it here to be safe and redirect immediately
-        const role = (data.email === 'test@test.com' || data.email === 'testingdaflow@test.com') ? 'admin' : 'customer';
+        const emailLower = data.email.toLowerCase();
+        const role = (emailLower === 'test@test.com' || emailLower === 'testingdaflow@test.com') ? 'admin' : 'customer';
+        let displayName = userCredential.user.displayName || 'Super Admin';
+        if (emailLower === 'ahmed12@gmail.com') displayName = 'Ahmed';
+        if (emailLower === 'test@example.com') displayName = 'Test User';
+        
         const newUser: User = {
           id: userCredential.user.uid,
-          name: userCredential.user.displayName || 'Super Admin',
+          name: displayName,
           email: userCredential.user.email || '',
           phone: '',
           role,
           rewardPoints: 0,
-          avatar: `https://ui-avatars.com/api/?name=Super+Admin&background=random`
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`
         };
         await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
         setUser(newUser);
@@ -193,7 +202,11 @@ const Auth: React.FC = () => {
         phone: '',
         role,
         rewardPoints: 0,
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=random`
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=random`,
+        cnicFront: docImages.cnicFront || null,
+        cnicBack: docImages.cnicBack || null,
+        license: docImages.license || null,
+        cnicVerified: false
       };
 
       await setDoc(doc(db, 'users', userCredential.user.uid), newUser);

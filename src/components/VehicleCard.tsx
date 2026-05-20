@@ -168,9 +168,15 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
           </div>
           <Link 
             to={canEdit ? `/edit-vehicle/${vehicle.id}` : `/vehicle/${vehicle.id}?days=${rentalDays}`}
-            className="px-8 py-3 bg-[#2563EB] text-white rounded-xl font-black text-sm shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all text-center"
+            className={`px-8 py-3 rounded-xl font-black text-sm text-center transition-all ${
+              canEdit 
+                ? 'bg-[#2563EB] text-white hover:bg-blue-700 shadow-lg shadow-blue-100' 
+                : vehicle.status === 'available'
+                  ? 'bg-[#2563EB] text-white hover:bg-blue-700 shadow-lg shadow-blue-100'
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+            }`}
           >
-            {canEdit ? 'Edit Details' : 'Rent Now'}
+            {canEdit ? 'Edit Details' : vehicle.status === 'booked' ? 'Booked' : vehicle.status === 'rented' ? 'Rented' : vehicle.status === 'maintenance' ? 'Maintenance' : 'Rent Now'}
           </Link>
         </div>
       </div>

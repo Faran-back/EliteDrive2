@@ -11,6 +11,10 @@ export interface User {
   lastUpdatedAt?: string;
   emailVerified?: boolean;
   phoneVerified?: boolean;
+  cnicFront?: string | null;
+  cnicBack?: string | null;
+  license?: string | null;
+  cnicVerified?: boolean;
   createdAt?: string;
   pendingInvitation?: {
     role: 'admin' | 'manager';
@@ -44,7 +48,7 @@ export interface Vehicle {
   available?: boolean;
   location: string;
   features: string[];
-  status: 'available' | 'rented' | 'maintenance';
+  status: 'available' | 'rented' | 'booked' | 'maintenance';
   description?: string;
 }
 

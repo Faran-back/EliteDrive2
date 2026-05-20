@@ -19,7 +19,8 @@ import {
   BarChart3,
   FileText,
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  ShieldAlert
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
@@ -34,12 +35,24 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
-  const isManagementRoute = location.pathname.includes('admin') || 
-                           location.pathname.includes('manager') || 
-                           location.pathname === '/add-vehicle' || 
-                           location.pathname.startsWith('/edit-vehicle');
-  
-  const isVerticalNav = (user?.role === 'admin' || user?.role === 'manager') && isManagementRoute;
+  const isVerticalNav = user?.role === 'admin' || user?.role === 'manager';
+
+  const getHeaderTitle = () => {
+    const queryParams = new URLSearchParams(location.search);
+    const view = queryParams.get('view');
+    if (location.pathname === '/admin-dashboard') {
+      if (view === 'fraud-alerts') return 'Monitor Fraud Alerts';
+      return 'Admin Dashboard';
+    }
+    if (location.pathname === '/manager-dashboard') return 'Manager Dashboard';
+    if (location.pathname === '/rules-policies') return 'Rules & Policies';
+    if (location.pathname === '/penalty-charges') return 'Penalty & Charges';
+    if (location.pathname === '/report-incident') return 'Report Incident';
+    if (location.pathname === '/profile') return 'My Profile';
+    if (location.pathname === '/add-vehicle') return 'Add New Vehicle';
+    if (location.pathname.startsWith('/edit-vehicle')) return 'Edit Vehicle';
+    return user?.role === 'admin' ? 'Admin Panel' : 'Manager Panel';
+  };
 
   const pendingBookingsCount = allBookings.filter(b => b.status === 'pending').length;
   const pendingRoleRequestsCount = roleRequests.filter(r => r.status === 'pending').length;
@@ -54,7 +67,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { icon: ShieldCheck, label: 'Rules & Policies', path: '/rules-policies' },
     { icon: AlertCircle, label: 'Penalty & Charges', path: '/penalty-charges' },
     { icon: AlertTriangle, label: 'Report Incident', path: '/report-incident' },
-    { icon: HelpCircle, label: 'About App', path: '/about' },
   ];
 
   const adminNavItems = [
@@ -67,7 +79,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { icon: ShieldCheck, label: 'Rules & Policies', path: '/rules-policies' },
     { icon: AlertCircle, label: 'Penalty & Charges', path: '/penalty-charges' },
     { icon: AlertTriangle, label: 'Report Incident', path: '/report-incident' },
-    { icon: HelpCircle, label: 'About App', path: '/about' },
   ];
 
   const managerNavItems = [
@@ -78,12 +89,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { icon: ShieldCheck, label: 'Rules & Policies', path: '/rules-policies' },
     { icon: AlertCircle, label: 'Penalty & Charges', path: '/penalty-charges' },
     { icon: AlertTriangle, label: 'Report Incident', path: '/report-incident' },
-    { icon: HelpCircle, label: 'About App', path: '/about' },
   ];
 
   const managementNavItems = [
     { icon: Users, label: 'Customers', path: (user?.role === 'admin' ? '/admin-dashboard' : '/manager-dashboard') + '?view=customers' },
     { icon: BarChart3, label: 'Performance', path: (user?.role === 'admin' ? '/admin-dashboard' : '/manager-dashboard') + '?view=performance' },
+    ...(user?.role === 'admin' ? [{ icon: ShieldAlert, label: 'Monitor Fraud Alerts', path: '/admin-dashboard?view=fraud-alerts' }] : []),
   ];
 
   const settingsNavItems = [
@@ -266,7 +277,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             {/* Title for Admin/Manager */}
             {isVerticalNav && (
               <h2 className="text-lg font-semibold text-slate-900">
-                {user?.role === 'admin' ? 'Admin Dashboard' : 'Manager Dashboard'}
+                {getHeaderTitle()}
               </h2>
             )}
 

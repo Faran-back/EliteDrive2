@@ -3,6 +3,8 @@ import { User, Vehicle, Booking, Notification, INITIAL_VEHICLES, Invitation, Rol
 import { auth, db } from '../firebase';
 import { onAuthStateChanged, signOut, sendEmailVerification, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import Toast from '../components/Toast';
+import { safeStringify } from '../utils/logging';
+
 import { 
   collection, 
   onSnapshot, 
@@ -44,24 +46,6 @@ interface FirestoreErrorInfo {
   }
 }
 
-function safeStringify(obj: any): string {
-  const cache = new WeakSet();
-  return JSON.stringify(obj, (key, value) => {
-    if (typeof value === 'object' && value !== null) {
-      if (cache.has(value)) {
-        return '[Circular]';
-      }
-      cache.add(value);
-      
-      // Handle objects with toJSON that might cause issues if they return circularity
-      // or if they are complex Firebase objects.
-      if (value.constructor && (value.constructor.name === 'Y2' || value.constructor.name === 'Ka')) {
-        return `[FirebaseObject: ${value.constructor.name}]`;
-      }
-    }
-    return value;
-  });
-}
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errorMessage = error instanceof Error ? error.message : String(error);
@@ -124,6 +108,7 @@ interface StoreContextType {
   declineInvitation: (invitationId: string) => Promise<void>;
   searchUsers: (query: string) => Promise<User[]>;
   updateUserRole: (userId: string, role: 'admin' | 'manager' | 'customer') => Promise<void>;
+  verifyUserCNIC: (userId: string, isVerified?: boolean) => Promise<void>;
   bulkUpdateUserRoles: (userIds: string[], role: 'admin' | 'manager' | 'customer') => Promise<void>;
   createRoleRequest: (requestedRole: 'admin' | 'manager', userData?: User) => Promise<void>;
   approveRoleRequest: (requestId: string) => Promise<void>;
@@ -182,19 +167,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 userData.role = 'admin';
                 await updateDoc(userDocRef, { role: 'admin' });
               }
+              // VERIFICATION BYPASS: Auto-verify ahmed12@gmail.com and test@example.com
+              const bypassedEmails = ['ahmed12@gmail.com', 'test@example.com'];
+              if (firebaseUser.email && bypassedEmails.includes(firebaseUser.email.toLowerCase())) {
+                if (!userData.emailVerified || !userData.phoneVerified) {
+                  userData.emailVerified = true;
+                  userData.phoneVerified = true;
+                  await updateDoc(userDocRef, { emailVerified: true, phoneVerified: true });
+                }
+              }
               setUser(userData);
             } else {
               // Create a new user profile if it doesn't exist
               const adminEmails = ['test@test.com', 'inotfarhan@gmail.com', 'testingdaflow@test.com'];
+              const bypassedEmails = ['ahmed12@gmail.com', 'test@example.com'];
+              const isBypassed = firebaseUser.email && bypassedEmails.includes(firebaseUser.email.toLowerCase());
               const newUser: User = {
                 id: firebaseUser.uid,
-                name: firebaseUser.displayName || 'New User',
+                name: firebaseUser.displayName || (isBypassed ? (firebaseUser.email.toLowerCase() === 'ahmed12@gmail.com' ? 'Ahmed' : 'Test User') : 'New User'),
                 email: firebaseUser.email || '',
-                phone: firebaseUser.phoneNumber || '',
+                phone: firebaseUser.phoneNumber || (isBypassed ? '+923001234567' : ''),
                 role: firebaseUser.email && adminEmails.includes(firebaseUser.email) ? 'admin' : 'customer',
                 rewardPoints: 0,
                 avatar: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100',
-                emailVerified: firebaseUser.emailVerified,
+                emailVerified: isBypassed ? true : firebaseUser.emailVerified,
+                phoneVerified: isBypassed ? true : undefined,
                 createdAt: new Date().toISOString()
               };
 
@@ -395,7 +392,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       await updateDoc(doc(db, 'bookings', id), { status: 'active' });
       
-      const booking = allBookings.find(b => b.id === id);
+      const bookingDoc = await getDoc(doc(db, 'bookings', id));
+      if (bookingDoc.exists()) {
+        const bookingData = bookingDoc.data() as Booking;
+        await updateDoc(doc(db, 'vehicles', bookingData.vehicleId), { status: 'rented' });
+      }
+
+      const booking = allBookings.find(b => b.id === id) || bookings.find(b => b.id === id);
       if (booking) {
         const vehicle = vehicles.find(v => v.id === booking.vehicleId);
         await addNotification({
@@ -416,6 +419,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateBooking = async (id: string, updates: Partial<Booking>) => {
     try {
       await updateDoc(doc(db, 'bookings', id), updates);
+
+      if (updates.status === 'completed' || updates.status === 'cancelled') {
+        const bookingDoc = await getDoc(doc(db, 'bookings', id));
+        if (bookingDoc.exists()) {
+          const bookingData = bookingDoc.data() as Booking;
+          await updateDoc(doc(db, 'vehicles', bookingData.vehicleId), { status: 'available' });
+        }
+      } else if (updates.status === 'active') {
+        const bookingDoc = await getDoc(doc(db, 'bookings', id));
+        if (bookingDoc.exists()) {
+          const bookingData = bookingDoc.data() as Booking;
+          await updateDoc(doc(db, 'vehicles', bookingData.vehicleId), { status: 'rented' });
+        }
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `bookings/${id}`);
     }
@@ -425,7 +442,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       await updateDoc(doc(db, 'bookings', id), { status: 'cancelled' });
       
-      const booking = allBookings.find(b => b.id === id);
+      const bookingDoc = await getDoc(doc(db, 'bookings', id));
+      if (bookingDoc.exists()) {
+        const bookingData = bookingDoc.data() as Booking;
+        await updateDoc(doc(db, 'vehicles', bookingData.vehicleId), { status: 'available' });
+      }
+
+      const booking = allBookings.find(b => b.id === id) || bookings.find(b => b.id === id);
       if (booking) {
         const vehicle = vehicles.find(v => v.id === booking.vehicleId);
         await addNotification({
@@ -622,6 +645,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
       await updateDoc(doc(db, 'users', userId), updates);
       showToast(`Role updated to ${role} successfully`, 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
+    }
+  };
+
+  const verifyUserCNIC = async (userId: string, isVerified: boolean = true) => {
+    try {
+      const updates = { 
+        cnicVerified: isVerified,
+        lastUpdatedBy: user?.name || user?.email || 'System',
+        lastUpdatedAt: new Date().toISOString()
+      };
+      await updateDoc(doc(db, 'users', userId), updates);
+      showToast(isVerified ? 'CNIC verified successfully' : 'CNIC verification revoked', 'success');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
     }
@@ -945,6 +982,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       declineInvitation,
       searchUsers,
       updateUserRole,
+      verifyUserCNIC,
       bulkUpdateUserRoles,
       createRoleRequest,
       approveRoleRequest,

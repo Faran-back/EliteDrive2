@@ -25,7 +25,7 @@ const Payment: React.FC = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { vehicles, addBooking, user, showToast } = useStore();
+  const { vehicles, addBooking, user, showToast, updateVehicle } = useStore();
   const vehicle = vehicles.find(v => v.id === id);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'easypaisa' | 'jazzcash' | 'card' | 'transfer'>('jazzcash');
@@ -138,6 +138,7 @@ const Payment: React.FC = () => {
       };
       
       await addBooking(newBooking);
+      await updateVehicle(vehicle.id, { status: 'booked' });
       showToast('Booking confirmed successfully!', 'success');
       navigate('/booking-confirmed');
     } catch (error) {

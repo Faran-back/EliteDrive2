@@ -31,6 +31,7 @@ import Bookings from '../components/dashboard/Bookings';
 import RoleAssignment from '../components/dashboard/RoleAssignment';
 import RoleRequests from '../components/dashboard/RoleRequests';
 import FleetInventory from '../components/dashboard/FleetInventory';
+import FraudAlerts from '../components/dashboard/FraudAlerts';
 
 const AdminDashboard: React.FC = () => {
   const { allBookings, vehicles, allUsers } = useStore();
@@ -252,6 +253,7 @@ const AdminDashboard: React.FC = () => {
       {currentView === 'role-assignment' && <RoleAssignment />}
       {currentView === 'role-requests' && <RoleRequests />}
       {currentView === 'inventory' && <FleetInventory />}
+      {currentView === 'fraud-alerts' && <FraudAlerts />}
     </div>
   );
 };

@@ -37,7 +37,7 @@ export interface Invitation {
 export interface Vehicle {
   id: string;
   name: string;
-  type: 'Sedan' | 'SUV' | 'Hatchback' | 'Luxury';
+  type: 'Sedan' | 'SUV' | 'Hatchback' | 'Luxury' | 'Economy' | 'Pickup';
   pricePerDay: number;
   image: string;
   transmission: 'Automatic' | 'Manual';

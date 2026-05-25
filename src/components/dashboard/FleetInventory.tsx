@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { 
   Pencil, 
@@ -10,7 +10,8 @@ import {
   ChevronRight,
   MoreVertical,
   Trash2,
-  MapPin
+  MapPin,
+  ChevronDown
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { Vehicle } from '../../types';
@@ -19,13 +20,27 @@ const FleetInventory: React.FC = () => {
   const { vehicles, deleteVehicle, showToast } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const categories = ['All', 'Sedan', 'SUV', 'Luxury', 'Economy', 'Pickup'];
+  const categories = ['All', 'Sedan', 'SUV', 'Luxury', 'Economy', 'Hatchback', 'Pickup'];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const filteredVehicles = vehicles.filter(v => {
     const matchesSearch = v.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          v.location.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === 'All' || v.type === categoryFilter;
+    const matchesCategory = categoryFilter === 'All' || v.type.toLowerCase() === categoryFilter.toLowerCase();
     return matchesSearch && matchesCategory;
   });
 
@@ -64,16 +79,57 @@ const FleetInventory: React.FC = () => {
           />
         </div>
         <div className="flex gap-2">
-          <select 
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="pl-4 pr-10 py-3 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600/10 focus:bg-white transition-all text-xs font-black uppercase tracking-widest text-slate-600 outline-none appearance-none"
-            style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2364748b\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', backgroundSize: '1rem' }}
-          >
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
+          <div className="relative" ref={dropdownRef}>
+            <button 
+              type="button"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className={`flex items-center justify-between gap-3 px-5 py-3.5 bg-slate-50 rounded-2xl border-none text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100 transition-all outline-none select-none min-w-[140px] h-full ${
+                isDropdownOpen ? 'ring-2 ring-blue-600/10 bg-white shadow-sm' : ''
+              }`}
+            >
+              <span>{categoryFilter}</span>
+              <ChevronDown 
+                size={14} 
+                className={`text-slate-400 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180 text-blue-600' : ''}`} 
+              />
+            </button>
+
+            <AnimatePresence>
+              {isDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                  className="absolute left-0 z-50 mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl shadow-slate-900/10 overflow-hidden py-1.5"
+                >
+                  <div className="max-h-60 overflow-y-auto">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => {
+                          setCategoryFilter(cat);
+                          setIsDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-5 py-2.5 text-xs font-black uppercase tracking-widest transition-all duration-150 flex items-center justify-between ${
+                          cat === categoryFilter
+                            ? 'bg-blue-50 text-blue-600 font-black'
+                            : 'text-slate-600 hover:bg-slate-50 hover:text-blue-600'
+                        }`}
+                      >
+                        {cat}
+                        {cat === categoryFilter && (
+                          <div className="size-1.5 rounded-full bg-blue-600"></div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           <button className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-slate-100 transition-all border-none">
             <Filter size={18} />
           </button>

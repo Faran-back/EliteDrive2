@@ -20,7 +20,7 @@ import ModifyBookingModal from '../components/ModifyBookingModal';
 import { Booking } from '../types';
 
 const MyBookings: React.FC = () => {
-  const { bookings, vehicles, cancelBooking, updateBooking } = useStore();
+  const { user, bookings, vehicles, cancelBooking, updateBooking, showToast } = useStore();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isModifyModalOpen, setIsModifyModalOpen] = React.useState(false);
   const [bookingToCancel, setBookingToCancel] = React.useState<string | null>(null);
@@ -29,6 +29,78 @@ const MyBookings: React.FC = () => {
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
+  };
+
+  const handleDownloadReceiptClick = (e: React.MouseEvent, booking: Booking, vehicle: any) => {
+    e.stopPropagation();
+    if (!vehicle) return;
+    try {
+      const baseRate = booking.totalPrice * 0.85;
+      const surcharge = booking.totalPrice * 0.07;
+      const taxes = booking.totalPrice * 0.08;
+
+      const formattedDate = new Date(booking.bookingDate || Date.now()).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      const receiptContent = `=====================================================
+                      ELITE DRIVE CAR RENTALS
+                     Premium Transportation Services
+=====================================================
+RECEIPT NUMBER  : ELITE-${booking.id.substring(0, 8).toUpperCase()}
+BOOKING ID      : ${booking.id.toUpperCase()}
+DATE OF ISSUE   : ${formattedDate}
+CUSTOMER NAME   : ${user?.name || 'Customer'}
+CUSTOMER EMAIL  : ${user?.email || 'N/A'}
+CUSTOMER PHONE  : ${user?.phone || 'N/A'}
+=====================================================
+VEHICLE DETAIL INFORMATION
+=====================================================
+Vehicle Model   : ${vehicle.name}
+Category Type   : ${vehicle.type}
+Transmission    : ${vehicle.transmission}
+Fuel Type       : ${vehicle.fuel}
+Seats           : ${vehicle.seats} Seater
+Pickup/Return   : ${vehicle.location}
+=====================================================
+JOURNEY SCHEDULE INFO
+=====================================================
+Trip Destination: ${booking.destination || `${vehicle.location} Airport`}
+Start Date      : ${booking.startDate}
+End Date        : ${booking.endDate}
+=====================================================
+FARE BREAKDOWN & CHARGES
+=====================================================
+Base Booking Rate (${vehicle.type}) : PKR ${Math.round(baseRate).toLocaleString()}
+Airport Surcharge          : PKR ${Math.round(surcharge).toLocaleString()}
+Taxes & Service Fee         : PKR ${Math.round(taxes).toLocaleString()}
+-----------------------------------------------------
+TOTAL AMOUNT CHARGED        : PKR ${booking.totalPrice.toLocaleString()}
+PAYMENT METHOD              : Secured Digital Transaction
+PAYMENT STATUS              : PAID (Processed Successfully)
+=====================================================
+Thank you for booking with EliteDrive!
+For 24/7 client support, call: +92 (300) 123-4567
+Email Support: support@elitedrive.com
+Wishing you a safe & premium travel experience!
+=====================================================`;
+
+      const blob = new Blob([receiptContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `elitedrive-receipt-${booking.id.substring(0, 8)}.txt`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showToast?.('Receipt downloaded successfully!', 'success');
+    } catch (err) {
+      console.error('Download receipt error:', err);
+      showToast?.('Failed to download receipt', 'error');
+    }
   };
 
   const handleCancelClick = (e: React.MouseEvent, id: string) => {
@@ -219,7 +291,10 @@ const MyBookings: React.FC = () => {
                               Modify Journey
                             </button>
                           )}
-                          <button className="flex-1 border border-[#E2E8F0] text-[#1E293B] py-4 rounded-2xl font-black text-sm hover:bg-gray-50 transition-all">
+                          <button 
+                            onClick={(e) => handleDownloadReceiptClick(e, booking, vehicle)}
+                            className="flex-1 border border-[#E2E8F0] text-[#1E293B] py-4 rounded-2xl font-black text-sm hover:bg-gray-50 transition-all active:scale-[0.98]"
+                          >
                             Download Receipt
                           </button>
                         </div>

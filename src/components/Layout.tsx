@@ -268,15 +268,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="flex items-center gap-4 md:gap-8 flex-1">
             {/* Logo for Horizontal Nav */}
             {!isVerticalNav && (
-              <Link to="/customer-dashboard" className="flex items-center gap-2">
+              <Link to="/" className="flex items-center gap-2">
                 <Car className="text-primary size-7 md:size-8" strokeWidth={2.5} />
-                <span className="text-xl md:text-2xl font-black tracking-tighter text-slate-900 italic">ELITE<span className="text-primary">DRIVE</span></span>
+                <span className="text-xl md:text-2xl font-black tracking-tighter text-slate-900 italic font-display">ELITE<span className="text-primary">DRIVE</span></span>
               </Link>
             )}
 
             {/* Title for Admin/Manager */}
             {isVerticalNav && (
-              <h2 className="text-lg font-semibold text-slate-900">
+              <h2 className="text-lg font-semibold text-slate-900 font-display">
                 {getHeaderTitle()}
               </h2>
             )}
@@ -284,45 +284,68 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             {/* Horizontal Navigation Links (Customer only) */}
             {!isVerticalNav && (
               <nav className="hidden lg:flex items-center gap-1">
-                {customerNavItems.map(item => <NavLink key={item.path} item={item} horizontal />)}
+                {(!user ? [
+                  { icon: Compass, label: 'Explore Fleet', path: '/fleet' },
+                  { icon: ShieldCheck, label: 'Rules & Policies', path: '/rules-policies' },
+                  { icon: AlertCircle, label: 'Penalty & Charges', path: '/penalty-charges' },
+                ] : customerNavItems).map(item => <NavLink key={item.path} item={item} horizontal />)}
               </nav>
             )}
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Notifications */}
-            <div className="relative">
-              <NotificationDropdown />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </div>
-
-            <div className="h-8 w-px bg-slate-200 mx-2 hidden sm:block"></div>
-
-            <button 
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 text-rose-600 font-bold text-sm hover:bg-rose-50 rounded-xl transition-all"
-            >
-              <LogOut size={18} />
-              <span className="hidden sm:inline">Sign Out</span>
-            </button>
-
-            {/* Profile for Customer */}
-            {!isVerticalNav && (
+            {user ? (
               <>
-                <Link to="/profile" className="flex items-center gap-3 group">
-                  <div className="hidden sm:block text-right">
-                    <p className="text-xs font-black text-slate-900 leading-none group-hover:text-blue-600 transition-colors">{user?.name}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">{user?.role}</p>
-                  </div>
-                  <div className="size-10 rounded-xl bg-slate-100 overflow-hidden border-2 border-white shadow-sm ring-1 ring-slate-100 group-hover:ring-blue-600/20 transition-all">
-                    <img 
-                      src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`} 
-                      alt="Profile" 
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </Link>
+                {/* Notifications */}
+                <div className="relative">
+                  <NotificationDropdown />
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                </div>
+
+                <div className="h-8 w-px bg-slate-200 mx-2 hidden sm:block"></div>
+
+                <button 
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-4 py-2 text-rose-600 font-bold text-sm hover:bg-rose-50 rounded-xl transition-all"
+                >
+                  <LogOut size={18} />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </button>
+
+                {/* Profile for Customer */}
+                {!isVerticalNav && (
+                  <>
+                    <Link to="/profile" className="flex items-center gap-3 group">
+                      <div className="hidden sm:block text-right">
+                        <p className="text-xs font-black text-slate-900 leading-none group-hover:text-blue-600 transition-colors">{user?.name}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">{user?.role}</p>
+                      </div>
+                      <div className="size-10 rounded-xl bg-slate-100 overflow-hidden border-2 border-white shadow-sm ring-1 ring-slate-100 group-hover:ring-blue-600/20 transition-all">
+                        <img 
+                          src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`} 
+                          alt="Profile" 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </Link>
+                  </>
+                )}
               </>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Link 
+                  to="/auth?tab=login" 
+                  className="text-slate-600 hover:text-blue-600 text-sm font-black uppercase tracking-wider px-3 py-2 transition-colors font-display"
+                >
+                  Sign In
+                </Link>
+                <Link 
+                  to="/auth?tab=signup" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all shadow-md shadow-blue-500/10 font-display"
+                >
+                  Register
+                </Link>
+              </div>
             )}
           </div>
         </header>
@@ -338,7 +361,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 className="lg:hidden absolute top-20 left-0 right-0 bg-white border-b border-slate-200 z-30 p-6 shadow-xl"
               >
                 <div className="space-y-2">
-                  {customerNavItems.map(item => (
+                  {(!user ? [
+                    { icon: Compass, label: 'Explore Fleet', path: '/fleet' },
+                    { icon: ShieldCheck, label: 'Rules & Policies', path: '/rules-policies' },
+                    { icon: AlertCircle, label: 'Penalty & Charges', path: '/penalty-charges' },
+                  ] : customerNavItems).map(item => (
                     <Link
                       key={item.path}
                       to={item.path}
@@ -349,15 +376,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       {item.label}
                     </Link>
                   ))}
-                  <div className="pt-4 border-t border-slate-100">
-                    <button 
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 p-4 rounded-2xl text-rose-600 font-bold hover:bg-rose-50 transition-all"
-                    >
-                      <LogOut size={20} />
-                      Sign Out
-                    </button>
-                  </div>
+                  {user && (
+                    <div className="pt-4 border-t border-slate-100">
+                      <button 
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 p-4 rounded-2xl text-rose-600 font-bold hover:bg-rose-50 transition-all"
+                      >
+                        <LogOut size={20} />
+                        Sign Out
+                      </button>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}

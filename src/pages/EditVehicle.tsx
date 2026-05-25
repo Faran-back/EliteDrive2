@@ -266,6 +266,8 @@ const EditVehicle: React.FC = () => {
                   { value: 'SUV', label: 'SUV' },
                   { value: 'Hatchback', label: 'Hatchback' },
                   { value: 'Luxury', label: 'Luxury' },
+                  { value: 'Economy', label: 'Economy' },
+                  { value: 'Pickup', label: 'Pickup' },
                 ]}
                 icon={<Car size={18} />}
               />

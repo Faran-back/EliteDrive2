@@ -12,6 +12,7 @@ interface CustomCalendarProps {
   minDate?: Date;
   className?: string;
   showTimeSelect?: boolean;
+  disabled?: boolean;
 }
 
 const CustomCalendar: React.FC<CustomCalendarProps> = ({
@@ -22,7 +23,8 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   error,
   minDate,
   className = '',
-  showTimeSelect = false
+  showTimeSelect = false,
+  disabled = false
 }) => {
   return (
     <div className={`space-y-2 ${className}`}>
@@ -43,9 +45,10 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
           timeIntervals={15}
           timeCaption="Time"
           dateFormat={showTimeSelect ? "MMM d, yyyy h:mm aa" : "MMM d, yyyy"}
+          disabled={disabled}
           className={`w-full pl-6 pr-6 py-4 bg-slate-50 rounded-[20px] border-2 border-slate-50 transition-all text-slate-900 font-bold placeholder:text-slate-400 outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 focus:bg-white ${
             error ? 'border-red-500 bg-red-50' : ''
-          }`}
+          } ${disabled ? 'opacity-60 cursor-not-allowed bg-slate-100/55' : ''}`}
           calendarClassName="premium-calendar"
           renderCustomHeader={({
             date,

@@ -305,7 +305,10 @@ const Dashboard: React.FC = () => {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {vehicles.slice(0, 3).map((vehicle, idx) => (
+          {vehicles
+            .filter((v) => v.status === 'available')
+            .slice(0, 3)
+            .map((vehicle, idx) => (
             <motion.div
               key={vehicle.id}
               initial={{ opacity: 0, y: 20 }}

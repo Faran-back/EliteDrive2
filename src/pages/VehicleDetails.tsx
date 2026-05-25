@@ -197,7 +197,20 @@ const VehicleDetails: React.FC = () => {
                 </div>
               </div>
 
-              {!isVerified && (
+              {!user ? (
+                <div className="bg-blue-50 p-5 rounded-[20px] border border-blue-100 flex items-start gap-3">
+                  <AlertCircle className="text-blue-500 shrink-0 mt-0.5" size={18} />
+                  <div className="space-y-1">
+                    <p className="text-xs font-black text-blue-600 uppercase tracking-wider">Sign-in Required</p>
+                    <p className="text-[11px] font-bold text-blue-500 leading-relaxed">
+                      Please register or log in to secure this vehicle and complete your reservation.
+                    </p>
+                    <Link to="/auth?tab=login" className="text-[11px] font-black text-blue-600 underline uppercase tracking-wider block pt-1">
+                      Sign In Now
+                    </Link>
+                  </div>
+                </div>
+              ) : !isVerified ? (
                 <div className="bg-rose-50 p-5 rounded-[20px] border border-rose-100 flex items-start gap-3">
                   <AlertCircle className="text-rose-500 shrink-0 mt-0.5" size={18} />
                   <div className="space-y-1">
@@ -210,14 +223,19 @@ const VehicleDetails: React.FC = () => {
                     </Link>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               <Link 
-                to={isVerified && vehicle.status === 'available' ? `/payment/${vehicle.id}?days=${rentalDays}` : '#'}
+                to={!user ? '/auth?tab=login' : (isVerified && vehicle.status === 'available' ? `/payment/${vehicle.id}?days=${rentalDays}` : '#')}
                 onClick={(e) => {
                   if (vehicle.status !== 'available') {
                     e.preventDefault();
                     showToast(`This vehicle is currently booked by another user and is not available.`, 'error');
+                    return;
+                  }
+                  if (!user) {
+                    localStorage.setItem('elitedrive_redirect', `/payment/${vehicle.id}?days=${rentalDays}`);
+                    showToast('Welcome to EliteDrive! Please register or log in to secure this vehicle.', 'info');
                     return;
                   }
                   if (!isVerified) {
@@ -226,13 +244,13 @@ const VehicleDetails: React.FC = () => {
                   }
                 }}
                 className={`w-full ${
-                  isVerified && vehicle.status === 'available' 
+                  (!user || isVerified) && vehicle.status === 'available' 
                     ? 'bg-[#2563EB] hover:bg-blue-700 shadow-xl shadow-blue-100' 
                     : 'bg-gray-100 border border-gray-200 cursor-not-allowed text-gray-400'
                 } text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]`}
               >
                 {vehicle.status === 'available' 
-                  ? 'Proceed to Booking' 
+                  ? (!user ? 'Sign In to Book' : 'Proceed to Booking')
                   : vehicle.status === 'booked' 
                     ? 'Currently Booked' 
                     : vehicle.status === 'rented' 

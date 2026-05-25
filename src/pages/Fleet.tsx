@@ -18,11 +18,12 @@ import {
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 
 const Fleet: React.FC = () => {
   const { vehicles, user } = useStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Search/Filter State
   const [pickupLocation, setPickupLocation] = useState('Lahore, Pakistan');
@@ -35,11 +36,35 @@ const Fleet: React.FC = () => {
     const saved = localStorage.getItem('elitedrive_return_date');
     return saved ? new Date(saved) : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
   });
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [transmission, setTransmission] = useState('Any');
+  const [selectedCategory, setSelectedCategory] = useState(() => {
+    return searchParams.get('category') || 'All';
+  });
+  const [transmission, setTransmission] = useState(() => {
+    const trans = searchParams.get('transmission');
+    if (trans === 'Automatic') return 'Auto';
+    if (trans === 'Manual') return 'Manual';
+    return 'Any';
+  });
   const [fuelType, setFuelType] = useState('Any');
   const [seating, setSeating] = useState('Any');
-  const [priceRange, setPriceRange] = useState([8000, 35000]);
+  const [priceRange, setPriceRange] = useState([0, 200000]);
+
+  useEffect(() => {
+    const categoryParam = searchParams.get('category');
+    if (categoryParam) {
+      setSelectedCategory(categoryParam);
+    }
+    const transmissionParam = searchParams.get('transmission');
+    if (transmissionParam) {
+      if (transmissionParam === 'Automatic') {
+        setTransmission('Auto');
+      } else if (transmissionParam === 'Manual') {
+        setTransmission('Manual');
+      } else {
+        setTransmission(transmissionParam);
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (pickupDate) {
@@ -53,13 +78,16 @@ const Fleet: React.FC = () => {
     }
   }, [returnDate]);
 
-  const categories = ['All', 'Sedan', 'SUV', 'Luxury', 'Economy', 'Pickup'];
+  const categories = ['All', 'Sedan', 'SUV', 'Luxury', 'Economy', 'Hatchback', 'Pickup'];
   const transmissions = ['Auto', 'Manual', 'Any'];
   const fuels = ['Petrol', 'Diesel', 'Hybrid', 'Any'];
   const seats = ['4', '5', '7+', 'Any'];
 
   const filteredVehicles = vehicles.filter(v => {
-    const matchesCategory = selectedCategory === 'All' || v.type === selectedCategory;
+    const matchesAvailability = v.status === 'available';
+    const matchesCategory = selectedCategory === 'All' || 
+      v.type.toLowerCase() === selectedCategory.toLowerCase() ||
+      (selectedCategory === 'Economy' && v.pricePerDay < 8000);
     const matchesTransmission = transmission === 'Any' || 
       (transmission === 'Auto' && v.transmission === 'Automatic') ||
       (transmission === 'Manual' && v.transmission === 'Manual');
@@ -70,7 +98,7 @@ const Fleet: React.FC = () => {
       (seating === '7+' && v.seats >= 7);
     const matchesPrice = v.pricePerDay >= priceRange[0] && v.pricePerDay <= priceRange[1];
 
-    return matchesCategory && matchesTransmission && matchesFuel && matchesSeating && matchesPrice;
+    return matchesAvailability && matchesCategory && matchesTransmission && matchesFuel && matchesSeating && matchesPrice;
   });
 
   return (
@@ -328,8 +356,8 @@ const Fleet: React.FC = () => {
         )}
       </section>
 
-      {/* Admin Quick Action */}
-      {user?.role === 'admin' && (
+      {/* Admin/Manager Quick Action */}
+      {(user?.role === 'admin' || user?.role === 'manager') && (
         <div className="fixed bottom-10 right-10 z-50">
           <Link 
             to="/add-vehicle"

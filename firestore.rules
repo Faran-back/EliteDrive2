@@ -152,7 +152,7 @@ service cloud.firestore {
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.type is string &&
              data.pricePerDay is number && data.pricePerDay > 0 &&
-             data.image is string && data.image.size() < 500 &&
+             data.image is string && data.image.size() < 2000000 &&
              (!('status' in data) || data.status in ['available', 'rented', 'booked', 'maintenance']) &&
              (!('transmission' in data) || data.transmission is string) &&
              (!('fuel' in data) || data.fuel is string) &&
@@ -227,7 +227,7 @@ service cloud.firestore {
     match /bookings/{bookingId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isManager());
       allow create: if isVerified() && isOwner(request.resource.data.userId) && isValidBooking(request.resource.data);
-      allow update: if isManager() && isValidBooking(request.resource.data);
+      allow update: if (isManager() || (isOwner(resource.data.userId) && request.resource.data.userId == resource.data.userId)) && isValidBooking(request.resource.data);
       allow delete: if isAdmin();
     }
 

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { 
   Check, 
@@ -19,7 +19,11 @@ import {
 import { useStore } from '../context/StoreContext';
 
 const BookingConfirmed: React.FC = () => {
-  const { bookings, vehicles, setIsChatOpen } = useStore();
+  const { user, bookings, vehicles, setIsChatOpen, cancelBooking, showToast } = useStore();
+  const navigate = useNavigate();
+  
+  const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   
   // Get the latest booking
   const latestBooking = bookings.length > 0 ? bookings[bookings.length - 1] : null;
@@ -41,6 +45,138 @@ const BookingConfirmed: React.FC = () => {
 
   // Map URL based on location
   const mapQuery = encodeURIComponent(`${latestBooking.destination || vehicle.location}, Pakistan`);
+
+  const downloadReceipt = () => {
+    try {
+      const formattedDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      const receiptContent = `=====================================================
+                      ELITE DRIVE CAR RENTALS
+                     Premium Transportation Services
+=====================================================
+RECEIPT NUMBER  : ELITE-${latestBooking.id.substring(0, 8).toUpperCase()}
+BOOKING ID      : ${latestBooking.id.toUpperCase()}
+DATE OF ISSUE   : ${formattedDate}
+CUSTOMER NAME   : ${user?.name || 'Customer'}
+CUSTOMER EMAIL  : ${user?.email || 'N/A'}
+CUSTOMER PHONE  : ${user?.phone || 'N/A'}
+=====================================================
+VEHICLE DETAIL INFORMATION
+=====================================================
+Vehicle Model   : ${vehicle.name}
+Category Type   : ${vehicle.type}
+Transmission    : ${vehicle.transmission}
+Fuel Type       : ${vehicle.fuel}
+Seats           : ${vehicle.seats} Seater
+Pickup/Return   : ${vehicle.location}
+=====================================================
+JOURNEY SCHEDULE INFO
+=====================================================
+Trip Destination: ${latestBooking.destination || `${vehicle.location} Airport`}
+Journey Duration: Daily Unit
+Start Date      : ${latestBooking.startDate}
+End Date        : ${latestBooking.endDate}
+=====================================================
+FARE BREAKDOWN & CHARGES
+=====================================================
+Base Booking Rate (${vehicle.type}) : PKR ${Math.round(baseRate).toLocaleString()}
+Airport Surcharge          : PKR ${Math.round(surcharge).toLocaleString()}
+Taxes & Service Fee         : PKR ${Math.round(taxes).toLocaleString()}
+-----------------------------------------------------
+TOTAL AMOUNT CHARGED        : PKR ${latestBooking.totalPrice.toLocaleString()}
+PAYMENT METHOD              : Secured Digital Transaction
+PAYMENT STATUS              : PAID (Processed Successfully)
+=====================================================
+Thank you for booking with EliteDrive!
+For 24/7 client support, call: +92 (300) 123-4567
+Email Support: support@elitedrive.com
+Wishing you a safe & premium travel experience!
+=====================================================`;
+
+      const blob = new Blob([receiptContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `elitedrive-receipt-${latestBooking.id.substring(0, 8)}.txt`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showToast?.('Receipt downloaded successfully!', 'success');
+    } catch (err) {
+      console.error('Download receipt error:', err);
+      showToast?.('Failed to download receipt', 'error');
+    }
+  };
+
+  const addToCalendar = () => {
+    try {
+      const title = `EliteDrive Rental: ${vehicle.name}`;
+      const description = `Car Rental Reservation with EliteDrive. Booking ID: ${latestBooking.id.toUpperCase()}`;
+      const location = latestBooking.destination || vehicle.location;
+      
+      // Create simple dates in ICS format: YYYYMMDDTHHmmSSZ
+      const startDateFormatted = latestBooking.startDate.replace(/-/g, '') + 'T100000Z';
+      const endDateFormatted = latestBooking.endDate.replace(/-/g, '') + 'T180000Z';
+      
+      const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//EliteDrive//Car Rental App//EN
+BEGIN:VEVENT
+UID:${latestBooking.id}
+DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z
+DTSTART:${startDateFormatted}
+DTEND:${endDateFormatted}
+SUMMARY:${title}
+DESCRIPTION:${description}
+LOCATION:${location}
+END:VEVENT
+END:VCALENDAR`;
+
+      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `elitedrive-booking-${latestBooking.id.substring(0, 8)}.ics`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showToast?.('Added to calendar! ICS file downloaded.', 'success');
+    } catch (err) {
+      console.error('Calendar error:', err);
+      showToast?.('Failed to handle add to calendar', 'error');
+    }
+  };
+
+  const handleCallDriver = () => {
+    showToast?.('Connecting your secure encrypted call to the EliteDrive driver... Daily driver name: Ali Khan', 'info');
+  };
+
+  const handleMessageDriver = () => {
+    setIsChatOpen(true);
+    showToast?.('Connecting secure private driver chat dispatcher...', 'info');
+  };
+
+  const handleCancelTrip = async () => {
+    try {
+      setIsCancelling(true);
+      await cancelBooking(latestBooking.id);
+      showToast?.('Booking reservation cancelled successfully! Processed full refund.', 'success');
+      navigate('/my-bookings');
+    } catch (err: any) {
+      showToast?.(err.message || 'Error executing trip cancellation', 'error');
+    } finally {
+      setIsCancelling(false);
+      setIsCancelConfirmOpen(false);
+    }
+  };
   
   return (
     <main className="flex-1 flex flex-col items-center justify-start py-8 px-10 md:px-20 font-display">
@@ -135,10 +271,16 @@ const BookingConfirmed: React.FC = () => {
               </div>
             </div>
             <div className="flex gap-2 pt-2">
-              <button className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-[#2463eb]/10 text-slate-700 font-bold py-2.5 rounded-lg border border-slate-200 transition-colors text-xs">
+              <button 
+                onClick={handleCallDriver}
+                className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-[#2463eb]/10 text-slate-700 font-bold py-2.5 rounded-lg border border-slate-200 transition-colors text-xs active:scale-95"
+              >
                 <Phone size={16} /> Call Driver
               </button>
-              <button className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-[#2463eb]/10 text-slate-700 font-bold py-2.5 rounded-lg border border-slate-200 transition-colors text-xs">
+              <button 
+                onClick={handleMessageDriver}
+                className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-[#2463eb]/10 text-slate-700 font-bold py-2.5 rounded-lg border border-slate-200 transition-colors text-xs active:scale-95"
+              >
                 <MessageSquare size={16} /> Message
               </button>
             </div>
@@ -161,8 +303,23 @@ const BookingConfirmed: React.FC = () => {
             <div className="pt-4 mt-4 border-t border-slate-100">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Primary Actions</p>
               <div className="grid grid-cols-2 gap-3">
-                <button className="bg-[#2463eb]/10 text-[#2463eb] font-bold py-2 px-3 rounded-lg text-[11px] hover:bg-[#2463eb]/20 transition-colors">Modify Trip</button>
-                <button className="bg-slate-100 text-slate-900 font-bold py-2 px-3 rounded-lg text-[11px] hover:bg-slate-200 transition-colors">Add to Cal</button>
+                <button 
+                  onClick={() => {
+                    showToast?.('Redirecting you to the Journey Management desk inside My Bookings...', 'info');
+                    setTimeout(() => {
+                      navigate('/my-bookings');
+                    }, 1200);
+                  }}
+                  className="bg-[#2463eb]/10 text-[#2463eb] font-bold py-2 px-3 rounded-lg text-[11px] hover:bg-[#2463eb]/20 transition-colors text-center"
+                >
+                  Modify Trip
+                </button>
+                <button 
+                  onClick={addToCalendar}
+                  className="bg-slate-100 text-slate-900 font-bold py-2 px-3 rounded-lg text-[11px] hover:bg-slate-200 transition-colors text-center"
+                >
+                  Add to Cal
+                </button>
               </div>
             </div>
           </div>
@@ -173,7 +330,10 @@ const BookingConfirmed: React.FC = () => {
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-black text-slate-900 uppercase tracking-wider text-xs">Fare Breakdown</h3>
-              <button className="text-[#2463eb] text-[10px] font-bold hover:underline flex items-center gap-1">
+              <button 
+                onClick={downloadReceipt}
+                className="text-[#2463eb] text-[10px] font-bold hover:underline flex items-center gap-1 active:scale-95 transition-transform"
+              >
                 <Receipt size={14} /> View Full Receipt
               </button>
             </div>
@@ -201,18 +361,27 @@ const BookingConfirmed: React.FC = () => {
         {/* Secondary Actions */}
         <div className="flex flex-col gap-6">
           <div className="flex flex-col sm:flex-row gap-3">
-            <button className="flex-1 bg-[#2463eb] text-white font-bold py-4 px-6 rounded-xl hover:bg-[#2463eb]/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#2463eb]/20">
+            <button 
+              onClick={downloadReceipt}
+              className="flex-1 bg-[#2463eb] text-white font-bold py-4 px-6 rounded-xl hover:bg-[#2463eb]/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#2463eb]/20 active:scale-[0.98]"
+            >
               <Download size={20} />
               Download Receipt
             </button>
             <button 
-              onClick={() => setIsChatOpen(true)}
-              className="flex-1 bg-white text-slate-900 font-bold py-4 px-6 rounded-xl border border-slate-200 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+              onClick={() => {
+                setIsChatOpen(true);
+                showToast?.('EliteDrive AI Support Agent connected live!', 'success');
+              }}
+              className="flex-1 bg-white text-slate-900 font-bold py-4 px-6 rounded-xl border border-slate-200 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
             >
               <Headphones size={20} />
               Contact Support
             </button>
-            <button className="flex-1 bg-white text-red-500 font-bold py-4 px-6 rounded-xl border border-slate-200 hover:bg-red-50 transition-all flex items-center justify-center gap-2">
+            <button 
+              onClick={() => setIsCancelConfirmOpen(true)}
+              className="flex-1 bg-white text-red-500 font-bold py-4 px-6 rounded-xl border border-slate-200 hover:bg-red-50 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+            >
               <XCircle size={20} />
               Cancel Trip
             </button>
@@ -225,6 +394,44 @@ const BookingConfirmed: React.FC = () => {
           </div>
         </div>
       </motion.div>
+
+      {/* Cancel Confirmation Modal */}
+      {isCancelConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 border border-slate-105 flex flex-col gap-6 relative">
+            <div className="flex items-start gap-4">
+              <div className="size-12 rounded-2xl bg-red-50 flex items-center justify-center shrink-0">
+                <XCircle className="text-red-500 size-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-black text-slate-900 tracking-tight uppercase">Cancel Reservation?</h3>
+                <p className="text-xs font-semibold text-slate-500 leading-relaxed mt-2">
+                  You are about to cancel your premium vehicle booking for <strong className="text-slate-900 font-bold">{vehicle.name}</strong>.
+                </p>
+                <p className="text-xs text-slate-400 mt-2">
+                  Completed within 15 minutes of booking makes cancellation 100% free of charge and triggers immediate base refund. This action is irreversible.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end pt-2">
+              <button 
+                disabled={isCancelling}
+                onClick={() => setIsCancelConfirmOpen(false)}
+                className="px-5 py-3 rounded-xl hover:bg-slate-50 text-slate-500 font-bold text-xs uppercase duration-200 disabled:opacity-50"
+              >
+                No, Keep Trip
+              </button>
+              <button 
+                disabled={isCancelling}
+                onClick={handleCancelTrip}
+                className="px-6 py-3 rounded-xl bg-red-500 text-white font-black text-xs uppercase hover:bg-red-600 shadow-md shadow-red-200 duration-200 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isCancelling ? 'Processing...' : 'Yes, Cancel Reservation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="py-10 px-6 flex flex-col items-center gap-4 mt-8">

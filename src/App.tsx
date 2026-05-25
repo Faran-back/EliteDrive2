@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 
 // Pages
 import Auth from './pages/Auth';
+import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Fleet from './pages/Fleet';
 import VehicleDetails from './pages/VehicleDetails';
@@ -78,14 +79,14 @@ const AppContent: React.FC = () => {
         <Route path="/auth" element={<Auth />} />
         <Route path="/login" element={<Navigate to="/auth" />} />
         <Route path="/signup" element={<Navigate to="/auth" />} />
-        <Route path="/" element={<ProtectedRoute><Layout><RootRedirect /></Layout></ProtectedRoute>} />
+        <Route path="/" element={<Layout><Landing /></Layout>} />
         <Route path="/customer-dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
         <Route path="/dashboard" element={<Navigate to="/customer-dashboard" />} />
-        <Route path="/fleet" element={<ProtectedRoute><Layout><Fleet /></Layout></ProtectedRoute>} />
+        <Route path="/fleet" element={<Layout><Fleet /></Layout>} />
         <Route path="/rules-policies" element={<ProtectedRoute><Layout><RulesPolicies /></Layout></ProtectedRoute>} />
         <Route path="/penalty-charges" element={<ProtectedRoute><Layout><PenaltyCharges /></Layout></ProtectedRoute>} />
         <Route path="/report-incident" element={<ProtectedRoute><Layout><ReportIncident /></Layout></ProtectedRoute>} />
-        <Route path="/vehicle/:id" element={<ProtectedRoute><Layout><VehicleDetails /></Layout></ProtectedRoute>} />
+        <Route path="/vehicle/:id" element={<Layout><VehicleDetails /></Layout>} />
         <Route path="/payment/:id" element={<ProtectedRoute><Layout><Payment /></Layout></ProtectedRoute>} />
         <Route path="/booking-confirmed" element={<ProtectedRoute><Layout><BookingConfirmed /></Layout></ProtectedRoute>} />
         <Route path="/my-bookings" element={<ProtectedRoute><Layout><MyBookings /></Layout></ProtectedRoute>} />
@@ -94,7 +95,7 @@ const AppContent: React.FC = () => {
         <Route path="/admin-dashboard" element={<ProtectedRoute allowedRoles={['admin']}><Layout><AdminDashboard /></Layout></ProtectedRoute>} />
         <Route path="/manager-dashboard" element={<ProtectedRoute allowedRoles={['manager']}><Layout><ManagerDashboard /></Layout></ProtectedRoute>} />
         <Route path="/edit-vehicle/:id" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><Layout><EditVehicle /></Layout></ProtectedRoute>} />
-        <Route path="/add-vehicle" element={<ProtectedRoute allowedRoles={['admin']}><Layout><AddVehicle /></Layout></ProtectedRoute>} />
+        <Route path="/add-vehicle" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><Layout><AddVehicle /></Layout></ProtectedRoute>} />
         <Route path="/admin" element={<Navigate to="/admin-dashboard" />} />
         <Route path="/manager" element={<Navigate to="/manager-dashboard" />} />
       </Routes>

@@ -63,7 +63,7 @@ const AddVehicle: React.FC = () => {
       };
       await addVehicle(vehicleData);
       showToast('Vehicle added successfully!', 'success');
-      navigate('/fleet');
+      navigate(-1);
     } catch (error) {
       console.error('Error adding vehicle:', error);
       showToast('Failed to add vehicle', 'error');
@@ -206,6 +206,8 @@ const AddVehicle: React.FC = () => {
                   { value: 'SUV', label: 'SUV' },
                   { value: 'Hatchback', label: 'Hatchback' },
                   { value: 'Luxury', label: 'Luxury' },
+                  { value: 'Economy', label: 'Economy' },
+                  { value: 'Pickup', label: 'Pickup' },
                 ]}
                 icon={<Car size={18} />}
               />

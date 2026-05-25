@@ -31,9 +31,15 @@ const Auth: React.FC = () => {
     if (token) {
       setInvitationToken(token);
       setMode('signup');
+      return;
     }
 
-    if (location.pathname === '/signup') {
+    const tab = params.get('tab');
+    if (tab === 'signup' || tab === 'register') {
+      setMode('signup');
+    } else if (tab === 'login' || tab === 'signin') {
+      setMode('signin');
+    } else if (location.pathname === '/signup') {
       setMode('signup');
     } else if (location.pathname === '/signin' || location.pathname === '/auth') {
       setMode('signin');
@@ -89,6 +95,13 @@ const Auth: React.FC = () => {
   };
 
   const handleRedirect = (userRole: string) => {
+    const storedRedirect = localStorage.getItem('elitedrive_redirect');
+    if (storedRedirect && userRole === 'customer') {
+      localStorage.removeItem('elitedrive_redirect');
+      navigate(storedRedirect);
+      return;
+    }
+    
     switch (userRole) {
       case 'admin':
         navigate('/admin-dashboard');

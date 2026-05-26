@@ -50,6 +50,7 @@ export interface Vehicle {
   features: string[];
   status: 'available' | 'rented' | 'booked' | 'maintenance';
   description?: string;
+  createdAt?: string;
 }
 
 export interface Booking {

@@ -345,6 +345,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setVehicles(INITIAL_VEHICLES);
       } else {
         const vehiclesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vehicle));
+        vehiclesData.sort((a, b) => {
+          if (a.createdAt && b.createdAt) {
+            return b.createdAt.localeCompare(a.createdAt);
+          }
+          if (a.createdAt) return -1;
+          if (b.createdAt) return 1;
+          return 0;
+        });
         setVehicles(vehiclesData);
       }
     }, (error) => {
@@ -801,7 +809,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const addVehicle = async (vehicleData: Omit<Vehicle, 'id'>) => {
     try {
       const newId = generateVehicleId();
-      const newVehicle = { ...vehicleData, id: newId };
+      const newVehicle = { 
+        ...vehicleData, 
+        id: newId,
+        createdAt: new Date().toISOString()
+      };
       await setDoc(doc(db, 'vehicles', newId), newVehicle);
       showToast('Vehicle added successfully', 'success');
     } catch (error) {

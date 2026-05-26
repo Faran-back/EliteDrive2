@@ -42,6 +42,13 @@ const FleetInventory: React.FC = () => {
                          v.location.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'All' || v.type.toLowerCase() === categoryFilter.toLowerCase();
     return matchesSearch && matchesCategory;
+  }).sort((a, b) => {
+    if (a.createdAt && b.createdAt) {
+      return b.createdAt.localeCompare(a.createdAt);
+    }
+    if (a.createdAt) return -1;
+    if (b.createdAt) return 1;
+    return 0;
   });
 
   const handleDelete = (id: string) => {

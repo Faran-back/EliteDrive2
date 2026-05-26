@@ -37,6 +37,7 @@ const Payment: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'easypaisa' | 'jazzcash' | 'card' | 'transfer'>('jazzcash');
   const [rentalType, setRentalType] = useState<'hourly' | 'daily' | 'weekly'>('daily');
   const [insuranceType, setInsuranceType] = useState<'none' | 'basic' | 'premium'>('basic');
+  const [chauffeurSelected, setChauffeurSelected] = useState(false);
   
   // Dates logic
   const [startDate, setStartDate] = useState<Date | null>(() => {
@@ -91,7 +92,7 @@ const Payment: React.FC = () => {
 
   // Price calculations - Adjusted for real-world PKR pricing limits
   const prices = useMemo(() => {
-    if (!vehicle) return { base: 0, insurance: 0, discount: 0, total: 0 };
+    if (!vehicle) return { base: 0, insurance: 0, chauffeurCost: 0, discount: 0, total: 0 };
     
     let rate = vehicle.pricePerDay;
     if (rentalType === 'hourly') rate = vehicle.pricePerDay / 12; // Realistic 1/12th fraction in Pakistan
@@ -122,11 +123,12 @@ const Payment: React.FC = () => {
       insurance = rentalType === 'hourly' ? 1000 : Math.min(850 * rentalDuration, 3800);
     }
     
+    const chauffeurCost = chauffeurSelected ? 2500 * Math.max(1, rentalDuration) : 0;
     const discountAmount = isCouponApplied ? Math.min(base * 0.1, 8000) : 0;
-    const total = base + insurance - discountAmount;
+    const total = base + insurance + chauffeurCost - discountAmount;
     
-    return { base, insurance, discount: discountAmount, total };
-  }, [vehicle, rentalDuration, rentalType, isCouponApplied, insuranceType]);
+    return { base, insurance, chauffeurCost, discount: discountAmount, total };
+  }, [vehicle, rentalDuration, rentalType, isCouponApplied, insuranceType, chauffeurSelected]);
 
   const isVerified = true;
 
@@ -162,7 +164,7 @@ const Payment: React.FC = () => {
       // Simulate secure payment delay
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      const newBooking = {
+      const newBooking: any = {
         id: 'b' + Date.now(),
         vehicleId: vehicle.id,
         userId: user?.id || 'u1',
@@ -172,8 +174,14 @@ const Payment: React.FC = () => {
         status: 'pending' as const,
         paymentStatus: 'paid' as const,
         bookingDate: new Date().toISOString().split('T')[0],
-        destination: data.destination
+        destination: data.destination || '',
+        chauffeurSelected: chauffeurSelected
       };
+
+      if (chauffeurSelected) {
+        newBooking.driverName = "Muhammad Ali";
+        newBooking.driverPhone = "+92 (300) 876-5432";
+      }
       
       await addBooking(newBooking);
       await updateVehicle(vehicle.id, { status: 'booked' });
@@ -340,6 +348,13 @@ const Payment: React.FC = () => {
                         </span>
                       </div>
                       
+                      {chauffeurSelected && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-500 text-xs">Professional Chauffeur Service (PKR 2,500/day)</span>
+                          <span className="font-extrabold text-slate-900">PKR {prices.chauffeurCost.toLocaleString()}</span>
+                        </div>
+                      )}
+                      
                       {/* Coupon Code lock status inline */}
                       {isCouponApplied && (
                         <div className="flex justify-between text-sm text-green-700 font-medium">
@@ -429,6 +444,29 @@ const Payment: React.FC = () => {
                               Opt-out of any EliteDrive supplementary protections. Renter assumes 100% replacement and diagnostic liability for any accidental damage or towing.
                             </p>
                           </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Interactive Chauffeur Toggle */}
+                    <div className="space-y-4 pt-6 border-t border-slate-100">
+                      <p className="text-xs uppercase font-black tracking-widest text-slate-400">Add Professional Chauffeur</p>
+                      
+                      <div 
+                        onClick={() => setChauffeurSelected(!chauffeurSelected)}
+                        className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-4 ${chauffeurSelected ? 'border-[#2563EB] bg-blue-50/5' : 'border-slate-100 hover:border-slate-200 bg-slate-50/30'}`}
+                      >
+                        <div className={`p-2 rounded-xl mt-0.5 ${chauffeurSelected ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                          <CheckCircle size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex justify-between items-center">
+                            <h4 className="font-bold text-slate-900 text-sm">Include Elite Chauffeur Service</h4>
+                            <span className="text-xs font-black text-blue-600">PKR 2,500 / day</span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                            Upgrade to a professional, English-speaking uniform chauffeur who handles vehicle maintenance, route navigation, and security clearance perfectly. Enjoy a VIP state of commuting.
+                          </p>
                         </div>
                       </div>
                     </div>

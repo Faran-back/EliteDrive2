@@ -63,6 +63,9 @@ export interface Booking {
   paymentStatus: 'paid' | 'pending';
   bookingDate: string;
   destination?: string;
+  chauffeurSelected?: boolean;
+  driverName?: string;
+  driverPhone?: string;
 }
 
 export interface RoleRequest {

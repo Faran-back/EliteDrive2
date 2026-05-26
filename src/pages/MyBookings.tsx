@@ -14,6 +14,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
+import { downloadReceiptPDF } from '../utils/receiptGenerator';
 import { motion } from 'motion/react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import ModifyBookingModal from '../components/ModifyBookingModal';
@@ -35,67 +36,7 @@ const MyBookings: React.FC = () => {
     e.stopPropagation();
     if (!vehicle) return;
     try {
-      const baseRate = booking.totalPrice * 0.85;
-      const surcharge = booking.totalPrice * 0.07;
-      const taxes = booking.totalPrice * 0.08;
-
-      const formattedDate = new Date(booking.bookingDate || Date.now()).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-
-      const receiptContent = `=====================================================
-                      ELITE DRIVE CAR RENTALS
-                     Premium Transportation Services
-=====================================================
-RECEIPT NUMBER  : ELITE-${booking.id.substring(0, 8).toUpperCase()}
-BOOKING ID      : ${booking.id.toUpperCase()}
-DATE OF ISSUE   : ${formattedDate}
-CUSTOMER NAME   : ${user?.name || 'Customer'}
-CUSTOMER EMAIL  : ${user?.email || 'N/A'}
-CUSTOMER PHONE  : ${user?.phone || 'N/A'}
-=====================================================
-VEHICLE DETAIL INFORMATION
-=====================================================
-Vehicle Model   : ${vehicle.name}
-Category Type   : ${vehicle.type}
-Transmission    : ${vehicle.transmission}
-Fuel Type       : ${vehicle.fuel}
-Seats           : ${vehicle.seats} Seater
-Pickup/Return   : ${vehicle.location}
-=====================================================
-JOURNEY SCHEDULE INFO
-=====================================================
-Trip Destination: ${booking.destination || `${vehicle.location} Airport`}
-Start Date      : ${booking.startDate}
-End Date        : ${booking.endDate}
-=====================================================
-FARE BREAKDOWN & CHARGES
-=====================================================
-Base Booking Rate (${vehicle.type}) : PKR ${Math.round(baseRate).toLocaleString()}
-Airport Surcharge          : PKR ${Math.round(surcharge).toLocaleString()}
-Taxes & Service Fee         : PKR ${Math.round(taxes).toLocaleString()}
------------------------------------------------------
-TOTAL AMOUNT CHARGED        : PKR ${booking.totalPrice.toLocaleString()}
-PAYMENT METHOD              : Secured Digital Transaction
-PAYMENT STATUS              : PAID (Processed Successfully)
-=====================================================
-Thank you for booking with EliteDrive!
-For 24/7 client support, call: +92 (300) 123-4567
-Email Support: support@elitedrive.com
-Wishing you a safe & premium travel experience!
-=====================================================`;
-
-      const blob = new Blob([receiptContent], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `elitedrive-receipt-${booking.id.substring(0, 8)}.txt`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
+      downloadReceiptPDF(booking, vehicle, user);
       showToast?.('Receipt downloaded successfully!', 'success');
     } catch (err) {
       console.error('Download receipt error:', err);

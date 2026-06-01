@@ -24,20 +24,13 @@ const formatBookingDate = (dateStr: string) => {
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    const hasTime = dateStr.includes('T') && !dateStr.endsWith('T00:00:00.000Z') && !dateStr.endsWith('T00:00:00Z');
-    if (hasTime) {
-      return d.toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    }
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
     });
   } catch (e) {
     return dateStr;
@@ -275,7 +268,7 @@ const MyBookings: React.FC = () => {
                               </div>
                               <div>
                                 <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Pickup Date & Time</p>
-                                <p className="font-black text-[#1E293B]">{booking.startDate} at 10:00 AM</p>
+                                <p className="font-black text-[#1E293B]">{formatBookingDate(booking.startDate)}</p>
                               </div>
                             </div>
                             <div className="bg-[#F8FAFC] p-6 rounded-2xl flex items-center gap-4 border border-gray-50">
@@ -284,7 +277,7 @@ const MyBookings: React.FC = () => {
                               </div>
                               <div>
                                 <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Return Date & Time</p>
-                                <p className="font-black text-[#1E293B]">{booking.endDate} at 06:00 PM</p>
+                                <p className="font-black text-[#1E293B]">{formatBookingDate(booking.endDate)}</p>
                               </div>
                             </div>
                           </div>

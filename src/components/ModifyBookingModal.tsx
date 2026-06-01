@@ -66,7 +66,7 @@ const ModifyBookingModal: React.FC<ModifyBookingModalProps> = ({
       endObj.setHours(0, 0, 0, 0);
       const dTime = Math.abs(endObj.getTime() - startObj.getTime());
       const dDays = Math.round(dTime / (1000 * 60 * 60 * 24));
-      const calendarDays = Math.max(1, dDays + 1);
+      const calendarDays = Math.max(1, dDays);
       setCalculatedPrice(calculateBaseFare(vehicle, calendarDays, 'daily'));
     }
   }, [watchedVehicleId, watchedStartDate, watchedEndDate, vehicles]);

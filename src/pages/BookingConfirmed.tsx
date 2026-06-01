@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { downloadReceiptPDF } from '../utils/receiptGenerator';
+import { calculateBaseFare, getVehicleFareConfig } from '../utils/pricing';
 
 const BookingConfirmed: React.FC = () => {
   const { user, bookings, vehicles, setIsChatOpen, cancelBooking, showToast } = useStore();
@@ -39,10 +40,74 @@ const BookingConfirmed: React.FC = () => {
     );
   }
 
-  // Calculate breakdown
-  const baseRate = latestBooking.totalPrice * 0.85;
-  const surcharge = latestBooking.totalPrice * 0.07;
-  const taxes = latestBooking.totalPrice * 0.08;
+  // Get pricing configuration
+  const config = getVehicleFareConfig(vehicle);
+
+  // Fallbacks for older bookings or manual bookings without meta fields
+  const rentalType = latestBooking.rentalType || 'daily';
+  
+  // Calculate calendar days
+  const startObj = new Date(latestBooking.startDate);
+  startObj.setHours(0, 0, 0, 0);
+  const endObj = new Date(latestBooking.endDate);
+  endObj.setHours(0, 0, 0, 0);
+  const diffTime = Math.abs(endObj.getTime() - startObj.getTime());
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+  const calendarDays = latestBooking.calendarDays || Math.max(1, diffDays);
+
+  const rentalDuration = latestBooking.rentalDuration || (
+    rentalType === 'hourly' 
+      ? 4 
+      : rentalType === 'weekly' 
+        ? Math.max(1, Math.round(calendarDays / 7)) 
+        : calendarDays
+  );
+
+  const basePrice = latestBooking.basePrice !== undefined 
+    ? latestBooking.basePrice 
+    : calculateBaseFare(vehicle, rentalDuration, rentalType);
+
+  const insurancePrice = latestBooking.insurancePrice !== undefined 
+    ? latestBooking.insurancePrice 
+    : 0;
+
+  const chauffeurPrice = latestBooking.chauffeurPrice !== undefined 
+    ? latestBooking.chauffeurPrice 
+    : (latestBooking.chauffeurSelected ? (rentalType === 'hourly' ? 2500 : 2500 * calendarDays) : 0);
+
+  const discountPrice = latestBooking.discountPrice !== undefined 
+    ? latestBooking.discountPrice 
+    : 0;
+
+  const insuranceType = latestBooking.insuranceType || (insurancePrice > 0 ? 'basic' : 'none');
+
+  const unitLabel = rentalType === 'hourly'
+    ? (rentalDuration === 1 ? 'Hour' : 'Hours')
+    : rentalType === 'weekly'
+      ? (rentalDuration === 1 ? 'Week' : 'Weeks')
+      : (rentalDuration === 1 ? 'Day' : 'Days');
+
+  // Dates formatting
+  const startDateObj = new Date(latestBooking.startDate);
+  const endDateObj = new Date(latestBooking.endDate);
+  const isHourly = rentalType === 'hourly';
+
+  const formatOptions: Intl.DateTimeFormatOptions = {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  };
+
+  const pickupStr = startDateObj.toLocaleString('en-US', formatOptions);
+  const returnStr = endDateObj.toLocaleString('en-US', formatOptions);
+
+  // Check if pickup contains "Airport" (case insensitive) to decide if we should display Airport Toll/Surcharge
+  const isAirportPickup = (latestBooking.destination || '').toLowerCase().includes('airport') || 
+                           (vehicle.location || '').toLowerCase().includes('airport');
 
   // Map URL based on location
   const mapQuery = encodeURIComponent(`${latestBooking.destination || vehicle.location}, Pakistan`);
@@ -232,20 +297,37 @@ END:VCALENDAR`;
             </div>
           </div>
 
-          {/* Pickup Schedule */}
+          {/* Pickup & Return Schedule */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
-            <div className="flex items-start gap-4">
-              <div className="size-12 rounded-xl bg-[#2463eb]/10 flex items-center justify-center flex-shrink-0">
-                <CalendarCheck className="text-[#2463eb] size-6" />
+            <div className="flex flex-col gap-4">
+              <div className="flex items-start gap-4">
+                <div className="size-12 rounded-xl bg-[#2463eb]/10 flex items-center justify-center flex-shrink-0">
+                  <CalendarCheck className="text-[#2463eb] size-6" />
+                </div>
+                <div className="flex flex-col">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Rental Duration Info</p>
+                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">{rentalDuration} {unitLabel}</h3>
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+                    {rentalType.charAt(0).toUpperCase() + rentalType.slice(1)} Booking
+                  </p>
+                </div>
               </div>
-              <div className="flex flex-col">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Pickup Information</p>
-                <h3 className="text-lg font-bold text-slate-900">{latestBooking.destination || `${vehicle.location} Airport`}</h3>
-                <p className="text-sm font-semibold text-[#2463eb]">
-                  Today, 10:00 AM
-                </p>
+
+              {/* Schedule Details (Pickup vs Return Grid) */}
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100/50">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Pickup Date</span>
+                  <span className="text-xs font-black text-slate-950">{pickupStr}</span>
+                  <span className="text-[10px] text-slate-500 font-bold">Scheduled Pick-up Time</span>
+                </div>
+                <div className="flex flex-col gap-0.5 border-l border-slate-200 pl-4">
+                  <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Return Date</span>
+                  <span className="text-xs font-black text-slate-950">{returnStr}</span>
+                  <span className="text-[10px] text-amber-600 font-black uppercase tracking-wider">Late fees apply after this time</span>
+                </div>
               </div>
             </div>
+
             <div className="pt-4 mt-4 border-t border-slate-100">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Primary Actions</p>
               <div className="grid grid-cols-2 gap-3">
@@ -283,22 +365,74 @@ END:VCALENDAR`;
                 <Receipt size={14} /> View Full Receipt
               </button>
             </div>
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm text-slate-500">
-                <span>Base Rate ({vehicle.type})</span>
-                <span className="font-medium text-slate-700">PKR {Math.round(baseRate).toLocaleString()}</span>
+            <div className="space-y-4">
+              {/* Base Rate */}
+              <div className="flex justify-between items-start text-sm">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-slate-900 font-bold">Base Rent ({rentalType.charAt(0).toUpperCase() + rentalType.slice(1)})</span>
+                  <span className="text-xs text-slate-400 font-medium">
+                    {rentalType === 'weekly' && `• Base Rate: PKR ${config.weeklyPackagePrice.toLocaleString()} / week × ${rentalDuration} ${unitLabel}`}
+                    {rentalType === 'daily' && `• Daily Rate: PKR ${config.pricePerDay.toLocaleString()} / day × ${rentalDuration} ${unitLabel}`}
+                    {rentalType === 'hourly' && `• Minimum Base (first ${config.hourlyMinHrs} hrs): PKR ${config.hourlyBasePrice.toLocaleString()}`}
+                    {rentalType === 'hourly' && rentalDuration > config.hourlyMinHrs && ` + PKR ${config.hourlySubsequentRate.toLocaleString()} / subsequent hr`}
+                  </span>
+                </div>
+                <span className="font-extrabold text-slate-900">PKR {basePrice.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-sm text-slate-500">
-                <span>Airport Surcharge</span>
-                <span className="font-medium text-slate-700">PKR {Math.round(surcharge).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-sm text-slate-500">
-                <span>Taxes & Service Fee</span>
-                <span className="font-medium text-slate-700">PKR {Math.round(taxes).toLocaleString()}</span>
-              </div>
-              <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
-                <span className="font-bold text-slate-900">Total Amount</span>
-                <span className="text-xl font-black text-[#2463eb]">PKR {latestBooking.totalPrice.toLocaleString()}</span>
+
+              {/* Insurance */}
+              {insurancePrice > 0 && (
+                <div className="flex justify-between items-start text-sm pt-2 border-t border-slate-100">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-slate-900 font-bold">
+                      Insurance Coverage ({insuranceType === 'premium' ? 'Zero-Deductible' : 'Basic LCW'})
+                    </span>
+                    <span className="text-xs text-slate-400 font-medium">
+                      • {insuranceType === 'premium' ? 'PKR 850 / day' : 'PKR 400 / day'} × {calendarDays} days
+                    </span>
+                  </div>
+                  <span className="font-extrabold text-slate-900">PKR {insurancePrice.toLocaleString()}</span>
+                </div>
+              )}
+
+              {/* Chauffeur */}
+              {chauffeurPrice > 0 && (
+                <div className="flex justify-between items-start text-sm pt-2 border-t border-slate-100">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-slate-900 font-bold">Uniformed Chauffeur Service</span>
+                    <span className="text-xs text-slate-400 font-medium">• PKR 2,500 / day × {calendarDays} days</span>
+                  </div>
+                  <span className="font-extrabold text-slate-900">PKR {chauffeurPrice.toLocaleString()}</span>
+                </div>
+              )}
+
+              {/* Airport Surcharge - Display ONLY if location is actually an airport */}
+              {isAirportPickup && (
+                <div className="flex justify-between items-start text-sm pt-2 border-t border-slate-100">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-slate-900 font-bold">Airport Pick-up Surcharge</span>
+                    <span className="text-xs text-slate-400 font-medium">✓ Included in base rate (No additional dispatch fees)</span>
+                  </div>
+                  <span className="font-extrabold text-[#2463eb] text-xs">Included</span>
+                </div>
+              )}
+
+
+              {/* Promo Coupon Discount */}
+              {discountPrice > 0 && (
+                <div className="flex justify-between items-start text-sm pt-2 border-t border-slate-100 text-green-700">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-bold">Promo Coupon Discount Applied</span>
+                    <span className="text-xs text-green-600 font-medium">• 10% Off Base Booking Rate</span>
+                  </div>
+                  <span className="font-extrabold font-sans">- PKR {discountPrice.toLocaleString()}</span>
+                </div>
+              )}
+
+              {/* Total Price */}
+              <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
+                <span className="text-base font-black uppercase text-slate-950">Total Paid Amount</span>
+                <span className="text-2xl font-black text-[#2463eb]">PKR {latestBooking.totalPrice.toLocaleString()}</span>
               </div>
             </div>
           </div>

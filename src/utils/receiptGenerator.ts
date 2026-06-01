@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { Booking, Vehicle, User } from '../types';
+import { getVehicleFareConfig } from './pricing';
 
 function drawSleekQRCode(doc: jsPDF, x: number, y: number, size: number, text: string) {
   // Draw outer subtle boundary border
@@ -65,11 +66,49 @@ export function downloadReceiptPDF(booking: Booking, vehicle: Vehicle, user: Use
     format: 'a4'
   });
 
-  // Calculate high-fidelity charges breakdown
+  // Calculate high-fidelity charges breakdown using stored variables if available, and falling back gracefully
   const isChauffeur = !!booking.chauffeurSelected;
-  const rawBase = booking.totalPrice * 0.85;
-  const surcharge = booking.totalPrice * 0.07;
-  const taxes = booking.totalPrice * 0.08;
+  const rentalType = booking.rentalType || 'daily';
+  
+  // Calculate calendar days
+  const startObj = new Date(booking.startDate);
+  startObj.setHours(0, 0, 0, 0);
+  const endObj = new Date(booking.endDate);
+  endObj.setHours(0, 0, 0, 0);
+  const diffTime = Math.abs(endObj.getTime() - startObj.getTime());
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+  const calendarDays = booking.calendarDays || Math.max(1, diffDays);
+
+  const rentalDuration = booking.rentalDuration || (
+    rentalType === 'hourly' 
+      ? 4 
+      : rentalType === 'weekly' 
+        ? Math.max(1, Math.round(calendarDays / 7)) 
+        : calendarDays
+  );
+
+  const config = getVehicleFareConfig(vehicle);
+
+  // Re-calculate or fetch values
+  const basePrice = booking.basePrice !== undefined 
+    ? booking.basePrice 
+    : (rentalType === 'hourly' 
+        ? config.hourlyBasePrice 
+        : (rentalType === 'weekly' 
+            ? config.weeklyPackagePrice * rentalDuration 
+            : config.pricePerDay * rentalDuration));
+
+  const insurancePrice = booking.insurancePrice !== undefined 
+    ? booking.insurancePrice 
+    : 0;
+
+  const chauffeurPrice = booking.chauffeurPrice !== undefined 
+    ? booking.chauffeurPrice 
+    : (booking.chauffeurSelected ? (rentalType === 'hourly' ? 2500 : 2500 * calendarDays) : 0);
+
+  const discountPrice = booking.discountPrice !== undefined 
+    ? booking.discountPrice 
+    : 0;
 
   const formattedDate = new Date(booking.bookingDate || Date.now()).toLocaleDateString('en-US', {
     year: 'numeric',
@@ -202,10 +241,21 @@ export function downloadReceiptPDF(booking: Booking, vehicle: Vehicle, user: Use
   doc.setFont('helvetica', 'bold');
   doc.text(booking.destination || vehicle.location, itineraryValX, y + 6);
 
+  const pdfDateFormatOptions: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  };
+  const startFormatted = new Date(booking.startDate).toLocaleString('en-US', pdfDateFormatOptions);
+  const endFormatted = new Date(booking.endDate).toLocaleString('en-US', pdfDateFormatOptions);
+
   doc.setFont('helvetica', 'normal');
   doc.text('Rental Dates', itineraryLabelX, y + 12);
   doc.setFont('helvetica', 'bold');
-  doc.text(`${booking.startDate} to ${booking.endDate}`, itineraryValX, y + 12);
+  doc.text(`${startFormatted} to ${endFormatted}`, itineraryValX, y + 12);
 
   y += 18;
   doc.line(15, y, 195, y);
@@ -290,39 +340,98 @@ export function downloadReceiptPDF(booking: Booking, vehicle: Vehicle, user: Use
 
   y += 8;
 
-  // Dynamic box wrapper for receipt breakdown
+  const rows: { label: string; value: string; isNegative?: boolean; isIncluded?: boolean }[] = [];
+
+  const unitLabel = rentalType === 'hourly'
+    ? (rentalDuration === 1 ? 'Hour' : 'Hours')
+    : rentalType === 'weekly'
+      ? (rentalDuration === 1 ? 'Week' : 'Weeks')
+      : (rentalDuration === 1 ? 'Day' : 'Days');
+
+  rows.push({
+    label: `Base Rent (${rentalType.charAt(0).toUpperCase() + rentalType.slice(1)} - ${rentalDuration} ${unitLabel}):`,
+    value: `PKR ${basePrice.toLocaleString()}`
+  });
+
+  if (insurancePrice > 0) {
+    const insTypeStr = booking.insuranceType === 'premium' ? 'Zero-Deductible' : 'Basic LCW';
+    rows.push({
+      label: `Insurance Coverage (${insTypeStr}):`,
+      value: `PKR ${insurancePrice.toLocaleString()}`
+    });
+  }
+
+  if (chauffeurPrice > 0) {
+    rows.push({
+      label: `Chauffeur Protocol Service (${calendarDays} Days):`,
+      value: `PKR ${chauffeurPrice.toLocaleString()}`
+    });
+  }
+
+  const isAirportPickup = (booking.destination || '').toLowerCase().includes('airport') || 
+                           (vehicle.location || '').toLowerCase().includes('airport');
+  if (isAirportPickup) {
+    rows.push({
+      label: 'Airport Pick-up Surcharge:',
+      value: 'Included',
+      isIncluded: true
+    });
+  }
+
+
+  if (discountPrice > 0) {
+    rows.push({
+      label: 'Promo Coupon Code Discount Applied:',
+      value: `- PKR ${discountPrice.toLocaleString()}`,
+      isNegative: true
+    });
+  }
+
+  const rowCount = rows.length;
+  const lineHeight = 6;
+  const boxHeight = (rowCount * lineHeight) + 20;
+
   doc.setFillColor(250, 250, 250); // Apple-like subtle light background #FAFAFA
-  doc.roundedRect(15, y, 180, 48, 1.5, 1.5, 'F');
+  doc.roundedRect(15, y, 180, boxHeight, 1.5, 1.5, 'F');
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(8.5);
 
-  doc.text('Core Vehicle Reservation Rate:', 25, y + 8);
-  doc.text('Local Surcharge & Operational Fee:', 25, y + 15);
-  doc.text('Utility Sales Tax & Government Levies (13%):', 25, y + 22);
+  let currentY = y + 7;
+  rows.forEach((row) => {
+    doc.setTextColor(100, 116, 139);
+    doc.text(row.label, 25, currentY);
 
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(29, 29, 31);
-  doc.text(`PKR ${Math.round(rawBase).toLocaleString()}`, 185, y + 8, { align: 'right' });
-  doc.text(`PKR ${Math.round(surcharge).toLocaleString()}`, 185, y + 15, { align: 'right' });
-  doc.text(`PKR ${Math.round(taxes).toLocaleString()}`, 185, y + 22, { align: 'right' });
+    if (row.isNegative) {
+      doc.setTextColor(52, 199, 89); // Green text color for discount
+    } else if (row.isIncluded) {
+      doc.setTextColor(52, 199, 89); // Green text for Included items
+    } else {
+      doc.setTextColor(29, 29, 31);
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.text(row.value, 185, currentY, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+
+    currentY += lineHeight;
+  });
 
   // Divider line inside list box
   doc.setDrawColor(229, 229, 234);
-  doc.line(25, y + 28, 185, y + 28);
+  doc.line(25, currentY + 1, 185, currentY + 1);
 
   // Total Summary bottom row
+  currentY += 9;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
   doc.setTextColor(29, 29, 31);
-  doc.text('GRAND TOTAL AMOUNT PAID:', 25, y + 38);
+  doc.text('GRAND TOTAL AMOUNT PAID:', 25, currentY);
   
   doc.setFontSize(13);
   doc.setTextColor(0, 102, 204); // Genuine Apple premium blue link style #0066CC
-  doc.text(`PKR ${booking.totalPrice.toLocaleString()}`, 185, y + 38, { align: 'right' });
+  doc.text(`PKR ${booking.totalPrice.toLocaleString()}`, 185, currentY, { align: 'right' });
 
-  y += 58;
+  y += boxHeight + 10;
 
   // ==========================================
   // BRANDS GUARANTEE VERIFICATION BOX

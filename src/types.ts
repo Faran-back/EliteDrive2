@@ -67,6 +67,14 @@ export interface Booking {
   chauffeurSelected?: boolean;
   driverName?: string;
   driverPhone?: string;
+  rentalType?: 'hourly' | 'daily' | 'weekly';
+  rentalDuration?: number;
+  calendarDays?: number;
+  basePrice?: number;
+  insurancePrice?: number;
+  chauffeurPrice?: number;
+  discountPrice?: number;
+  insuranceType?: 'none' | 'basic' | 'premium';
 }
 
 export interface RoleRequest {

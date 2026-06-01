@@ -52,7 +52,7 @@ const VehicleDetails: React.FC = () => {
     endObj.setHours(0, 0, 0, 0);
     const dTime = Math.abs(endObj.getTime() - startObj.getTime());
     const dDays = Math.round(dTime / (1000 * 60 * 60 * 24));
-    return Math.max(1, dDays + 1);
+    return Math.max(1, dDays);
   })();
 
   const formatDate = (date: Date) => {

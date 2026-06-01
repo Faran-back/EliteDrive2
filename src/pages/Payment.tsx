@@ -18,7 +18,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { calculateBaseFare } from '../utils/pricing';
+import { calculateBaseFare, getVehicleFareConfig } from '../utils/pricing';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { paymentSchema, PaymentFormData } from '../schemas/payment';
@@ -56,9 +56,9 @@ const Payment: React.FC = () => {
         return parsed;
       }
     }
-    const initialStartDate = new Date();
-    initialStartDate.setDate(initialStartDate.getDate() + 1);
-    return initialStartDate;
+    const d = new Date();
+    d.setHours(10, 0, 0, 0); // Defaults to standard 10:00 AM for pickup
+    return d;
   });
 
   const [endDate, setEndDate] = useState<Date | null>(() => {
@@ -69,9 +69,10 @@ const Payment: React.FC = () => {
         return parsed;
       }
     }
-    const startObj = startDate || new Date();
+    const startObj = new Date();
     const initialEndDate = new Date(startObj);
-    initialEndDate.setDate(initialEndDate.getDate() + 3);
+    initialEndDate.setDate(initialEndDate.getDate() + 1); // Defaults to tomorrow
+    initialEndDate.setHours(10, 0, 0, 0); // Defaults to standard 10:00 AM for return
     return initialEndDate;
   });
 
@@ -80,6 +81,10 @@ const Payment: React.FC = () => {
     if (rentalType === 'hourly' && date) {
       const calculatedEnd = new Date(date.getTime() + selectedHours * 60 * 60 * 1000);
       setEndDate(calculatedEnd);
+    } else if (rentalType === 'weekly' && date) {
+      const nextEnd = new Date(date);
+      nextEnd.setDate(nextEnd.getDate() + 7); // Exactly one week later
+      setEndDate(nextEnd);
     } else if (date && endDate && date >= endDate) {
       const nextEnd = new Date(date);
       nextEnd.setDate(nextEnd.getDate() + 1);
@@ -87,13 +92,41 @@ const Payment: React.FC = () => {
     }
   };
 
-  // Sync end date automatically whenever pickup date or hours change for hourly rentals
+  const minEndDate = useMemo(() => {
+    if (!startDate) return todayStart;
+    if (rentalType === 'weekly') {
+      const minWeekly = new Date(startDate);
+      minWeekly.setDate(startDate.getDate() + 7); // At least one week later
+      return minWeekly;
+    }
+    return startDate;
+  }, [startDate, rentalType, todayStart]);
+
+  // Adjust dates when rental type changes to Weekly or Hourly to prevent inconsistent short/long durations
   useEffect(() => {
-    if (rentalType === 'hourly' && startDate) {
+    if (!startDate) return;
+
+    if (rentalType === 'weekly') {
+      // Ensure the end date is at least 7 calendar days (startDate + 7 days)
+      const startObj = new Date(startDate);
+      startObj.setHours(0, 0, 0, 0);
+      
+      const checkEnd = endDate ? new Date(endDate) : null;
+      if (checkEnd) {
+        checkEnd.setHours(0, 0, 0, 0);
+      }
+
+      if (!checkEnd || !endDate || Math.round((checkEnd.getTime() - startObj.getTime()) / (1000 * 60 * 60 * 24)) < 7) {
+        const newEndDate = new Date(startDate);
+        newEndDate.setDate(newEndDate.getDate() + 7);
+        setEndDate(newEndDate);
+      }
+    } else if (rentalType === 'hourly') {
+      // For hourly, always sync to selectedHours offset from startDate
       const calculatedEnd = new Date(startDate.getTime() + selectedHours * 60 * 60 * 1000);
       setEndDate(calculatedEnd);
     }
-  }, [startDate, selectedHours, rentalType]);
+  }, [rentalType, startDate, selectedHours]);
   
   const [coupon, setCoupon] = useState('WELCOME');
   const [isCouponApplied, setIsCouponApplied] = useState(true);
@@ -123,7 +156,7 @@ const Payment: React.FC = () => {
 
   // Calculate calendar days
   const calendarDays = useMemo(() => {
-    if (!startDate || !endDate) return 0;
+    if (!startDate || !endDate) return 1;
     
     // Normalize both dates to midnights of their respective days to avoid timezone and time-of-day offsets
     const startObj = new Date(startDate);
@@ -134,9 +167,8 @@ const Payment: React.FC = () => {
     const diffTime = Math.abs(endObj.getTime() - startObj.getTime());
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
     
-    // 29 June to 29 June = 1 day (same-day standard minimum)
-    // 29 June to 30 June = 2 days
-    return Math.max(1, diffDays + 1);
+    // Standard 24h cycle: June 2 to June 3 is 1 day. June 2 to June 9 is exactly 7 days!
+    return Math.max(1, diffDays);
   }, [startDate, endDate]);
 
   // Calculate rental duration
@@ -145,7 +177,8 @@ const Payment: React.FC = () => {
       return selectedHours;
     }
     if (rentalType === 'weekly') {
-      return Math.max(1, Math.ceil(calendarDays / 7));
+      // A weekly rental duration is duration in weeks (7 days = 1 week, 14 days = 2 weeks)
+      return Math.max(1, Math.round(calendarDays / 7));
     }
     return calendarDays;
   }, [calendarDays, rentalType, selectedHours]);
@@ -176,6 +209,16 @@ const Payment: React.FC = () => {
     
     return { base, insurance, chauffeurCost, discount: discountAmount, total };
   }, [vehicle, rentalDuration, rentalType, isCouponApplied, insuranceType, chauffeurSelected, calendarDays]);
+
+  const unitLabel = useMemo(() => {
+    if (rentalType === 'hourly') {
+      return rentalDuration === 1 ? 'Hour' : 'Hours';
+    } else if (rentalType === 'weekly') {
+      return rentalDuration === 1 ? 'Week' : 'Weeks';
+    } else {
+      return rentalDuration === 1 ? 'Day' : 'Days';
+    }
+  }, [rentalType, rentalDuration]);
 
   const isVerified = true;
 
@@ -240,7 +283,15 @@ const Payment: React.FC = () => {
         paymentStatus: 'paid' as const,
         bookingDate: new Date().toISOString().split('T')[0],
         destination: data.destination || '',
-        chauffeurSelected: chauffeurSelected
+        chauffeurSelected: chauffeurSelected,
+        rentalType: rentalType,
+        rentalDuration: rentalDuration,
+        calendarDays: calendarDays,
+        basePrice: prices.base,
+        insurancePrice: prices.insurance,
+        chauffeurPrice: prices.chauffeurCost,
+        discountPrice: prices.discount,
+        insuranceType: insuranceType
       };
 
       if (chauffeurSelected) {
@@ -326,7 +377,13 @@ const Payment: React.FC = () => {
                       <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200">
                         <button 
                           disabled={step === 'payment'}
-                          onClick={() => setRentalType('hourly')}
+                          onClick={() => {
+                            setRentalType('hourly');
+                            const today = new Date();
+                            const calculatedEnd = new Date(today.getTime() + selectedHours * 60 * 60 * 1000);
+                            setStartDate(today);
+                            setEndDate(calculatedEnd);
+                          }}
                           className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${rentalType === 'hourly' ? 'bg-white shadow-sm text-[#2563EB]' : 'text-slate-500 hover:text-slate-700 disabled:opacity-60'}`} 
                           type="button"
                         >
@@ -334,7 +391,14 @@ const Payment: React.FC = () => {
                         </button>
                         <button 
                           disabled={step === 'payment'}
-                          onClick={() => setRentalType('daily')}
+                          onClick={() => {
+                            setRentalType('daily');
+                            const today = new Date();
+                            const tomorrow = new Date(today);
+                            tomorrow.setDate(tomorrow.getDate() + 1);
+                            setStartDate(today);
+                            setEndDate(tomorrow);
+                          }}
                           className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${rentalType === 'daily' ? 'bg-white shadow-sm text-[#2563EB]' : 'text-slate-500 hover:text-slate-700 disabled:opacity-60'}`} 
                           type="button"
                         >
@@ -342,7 +406,14 @@ const Payment: React.FC = () => {
                         </button>
                         <button 
                           disabled={step === 'payment'}
-                          onClick={() => setRentalType('weekly')}
+                          onClick={() => {
+                            setRentalType('weekly');
+                            const today = new Date();
+                            const nextWeek = new Date(today);
+                            nextWeek.setDate(nextWeek.getDate() + 7);
+                            setStartDate(today);
+                            setEndDate(nextWeek);
+                          }}
                           className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${rentalType === 'weekly' ? 'bg-white shadow-sm text-[#2563EB]' : 'text-slate-500 hover:text-slate-700 disabled:opacity-60'}`} 
                           type="button"
                         >
@@ -370,7 +441,7 @@ const Payment: React.FC = () => {
                               selected={startDate}
                               onChange={handleStartDateChange}
                               minDate={todayStart}
-                              showTimeSelect={rentalType === 'hourly'}
+                              showTimeSelect={true}
                             />
                           </div>
 
@@ -397,14 +468,15 @@ const Payment: React.FC = () => {
                               </div>
                             </>
                           ) : (
-                            <div className="space-y-1">
+                            <div className="space-y-1 font-sans">
                               <span className="text-[10px] uppercase font-black text-slate-400 font-sans">Return</span>
                               <CustomCalendar
                                 disabled={step === 'payment'}
                                 placeholder="End Date"
                                 selected={endDate}
                                 onChange={(date) => setEndDate(date)}
-                                minDate={startDate || todayStart}
+                                minDate={minEndDate}
+                                showTimeSelect={true}
                               />
                             </div>
                           )}
@@ -427,36 +499,91 @@ const Payment: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="space-y-3 pt-6 border-t border-slate-100">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">{rentalType.charAt(0).toUpperCase() + rentalType.slice(1)} Rental ({rentalDuration} units)</span>
-                        <span className="font-extrabold text-slate-900">PKR {prices.base.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500 text-xs">
-                          Optional Insurance Coverage ({insuranceType === 'none' ? 'Declined' : insuranceType === 'basic' ? 'Basic' : 'Premium Unlimited'})
-                        </span>
-                        <span className="font-extrabold text-slate-900">
-                          {prices.insurance === 0 ? 'Rs. 0' : `PKR ${prices.insurance.toLocaleString()}`}
-                        </span>
-                      </div>
-                      
-                      {chauffeurSelected && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-500 text-xs">Professional Chauffeur Service (PKR 2,500/day)</span>
-                          <span className="font-extrabold text-slate-900">PKR {prices.chauffeurCost.toLocaleString()}</span>
+                    {/* Detailed Pricing breakdown & Transparency Card */}
+                    <div className="space-y-4 pt-6 border-t border-slate-200 font-sans">
+                      <h4 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Fare Breakdown</h4>
+
+                      {/* Base Rate */}
+                      <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-100 flex flex-col gap-1 text-xs">
+                        <div className="flex justify-between font-bold text-slate-900 font-sans">
+                          <span>{rentalType.charAt(0).toUpperCase() + rentalType.slice(1)} Rental Base Fare</span>
+                          <span>PKR {prices.base.toLocaleString()}</span>
                         </div>
-                      )}
-                      
-                      {/* Coupon Code lock status inline */}
-                      {isCouponApplied && (
-                        <div className="flex justify-between text-sm text-green-700 font-medium">
-                          <span>Promo Coupon Applied (10% off)</span>
-                          <span>- PKR {prices.discount.toLocaleString()}</span>
+                        <div className="text-slate-400 font-medium text-[11px] flex flex-col gap-0.5">
+                          {rentalType === 'weekly' && (
+                            <>
+                              <span>• Base Pack Rate: PKR {getVehicleFareConfig(vehicle).weeklyPackagePrice.toLocaleString()} / week</span>
+                              <span>• Duration: {rentalDuration} {unitLabel} ({calendarDays} days total)</span>
+                              {rentalDuration >= 4 && (
+                                <span className="text-green-600 font-bold">• Included monthly 10% discount!</span>
+                              )}
+                            </>
+                          )}
+                          {rentalType === 'daily' && (
+                            <>
+                              <span>• Daily Rate: PKR {getVehicleFareConfig(vehicle).pricePerDay.toLocaleString()} / day</span>
+                              <span>• Duration: {rentalDuration} {unitLabel}</span>
+                            </>
+                          )}
+                          {rentalType === 'hourly' && (
+                            <>
+                              <span>• Minimum Base (first {getVehicleFareConfig(vehicle).hourlyMinHrs} hrs): PKR {getVehicleFareConfig(vehicle).hourlyBasePrice.toLocaleString()}</span>
+                              {rentalDuration > getVehicleFareConfig(vehicle).hourlyMinHrs ? (
+                                <>
+                                  <span>• Subsequent Rate: PKR {getVehicleFareConfig(vehicle).hourlySubsequentRate.toLocaleString()} / hour</span>
+                                  <span>• Subsequent Duration: {rentalDuration - getVehicleFareConfig(vehicle).hourlyMinHrs} subsequent hours</span>
+                                </>
+                              ) : (
+                                <span>• Duration: {rentalDuration} Hours</span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Insurance Cover */}
+                      <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-100 flex flex-col gap-1 text-xs">
+                        <div className="flex justify-between font-bold text-slate-900 font-sans">
+                          <span>Insurance Protection Coverage</span>
+                          <span>{prices.insurance === 0 ? 'Rs. 0' : `PKR ${prices.insurance.toLocaleString()}`}</span>
+                        </div>
+                        <div className="text-slate-400 font-medium text-[11px] flex flex-col gap-0.5">
+                          {insuranceType === 'none' ? (
+                            <span>• Supplemental Protection (Declined)</span>
+                          ) : insuranceType === 'basic' ? (
+                            <span>• LCW Basic Coverage Applied</span>
+                          ) : (
+                            <span>• Full Zero-Deductible Cover Applied</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Chauffeur Service */}
+                      {chauffeurSelected && (
+                        <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-100 flex flex-col gap-1 text-xs">
+                          <div className="flex justify-between font-bold text-slate-900 font-sans">
+                            <span>Uniformed Chauffeur Service</span>
+                            <span>PKR {prices.chauffeurCost.toLocaleString()}</span>
+                          </div>
+                          <div className="text-slate-400 font-medium text-[11px]">
+                            <span>• Active Duration: {calendarDays} days total</span>
+                          </div>
                         </div>
                       )}
 
-                      <div className="flex justify-between items-center pt-6 border-t border-slate-200 mt-4">
+                      {/* Promo Coupon discount */}
+                      {isCouponApplied && (
+                        <div className="flex justify-between items-center text-xs text-green-700 font-bold bg-green-50/50 p-3 rounded-xl border border-green-100 px-3.5">
+                          <div className="flex flex-col">
+                            <span>Promo Discount Applied (10% off Base)</span>
+                            <span className="text-[10px] text-green-600/80 font-medium">Coupon code: {coupon}</span>
+                          </div>
+                          <span className="font-extrabold font-sans">- PKR {prices.discount.toLocaleString()}</span>
+                        </div>
+                      )}
+
+                      {/* Total Amount rendering */}
+                      <div className="flex justify-between items-center pt-6 border-t border-slate-200 mt-4 font-sans font-sans">
                         <span className="text-lg font-black uppercase text-slate-950">Total Amount</span>
                         <span className="text-2xl font-black text-[#2563EB]">PKR {prices.total.toLocaleString()}</span>
                       </div>

@@ -91,11 +91,5 @@ export const calculateBaseFare = (
 
   // Daily rental
   const days = duration;
-  let base = config.pricePerDay * days;
-  if (days >= 7) {
-    base = base * 0.85; // 15% discount for 7+ days (essentially shifting closer to weekly rates)
-  } else if (days >= 3) {
-    base = base * 0.90; // 10% discount for 3+ days
-  }
-  return Math.round(base);
+  return config.pricePerDay * days;
 };

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { motion } from 'motion/react';
+import { calculateBaseFare } from '../utils/pricing';
 
 const VehicleDetails: React.FC = () => {
   const { id } = useParams();
@@ -180,8 +181,18 @@ const VehicleDetails: React.FC = () => {
             <div className="flex justify-between items-end">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Total Price</p>
-                <h2 className="text-3xl font-black text-[#1E293B]">PKR {(vehicle.pricePerDay * rentalDays).toLocaleString()}</h2>
-                <p className="text-[#64748B] font-bold text-xs">PKR {vehicle.pricePerDay.toLocaleString()} / Day • {rentalDays} {rentalDays === 1 ? 'Day' : 'Days'}</p>
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <h2 className="text-3xl font-black text-[#1E293B]">PKR {calculateBaseFare(vehicle, rentalDays, 'daily').toLocaleString()}</h2>
+                  {calculateBaseFare(vehicle, rentalDays, 'daily') < (vehicle.pricePerDay * rentalDays) && (
+                    <span className="text-sm font-bold text-slate-400 line-through">PKR {(vehicle.pricePerDay * rentalDays).toLocaleString()}</span>
+                  )}
+                </div>
+                <p className="text-[#64748B] font-bold text-xs">
+                  PKR {vehicle.pricePerDay.toLocaleString()} / Day • {rentalDays} {rentalDays === 1 ? 'Day' : 'Days'}
+                  {calculateBaseFare(vehicle, rentalDays, 'daily') < (vehicle.pricePerDay * rentalDays) && (
+                    <span className="text-emerald-600 font-extrabold ml-2 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider inline-block">Discount Included</span>
+                  )}
+                </p>
               </div>
               <div className="text-right">
                 {vehicle.status === 'booked' ? (

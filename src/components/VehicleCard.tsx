@@ -4,6 +4,7 @@ import { Heart, Star, Users, Zap, Fuel } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Vehicle } from '../types';
 import { useStore } from '../context/StoreContext';
+import { calculateBaseFare } from '../utils/pricing';
 
 interface VehicleCardProps {
   vehicle: Vehicle;
@@ -164,7 +165,12 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
         <div className="flex justify-between items-center mt-auto relative z-20">
           <div>
             <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Total ({rentalDays} {rentalDays === 1 ? 'day' : 'days'})</p>
-            <p className="text-lg font-black text-[#1E293B]">PKR {(vehicle.pricePerDay * rentalDays).toLocaleString()}</p>
+            <div className="flex items-baseline gap-1.5 flex-wrap">
+              <p className="text-lg font-black text-[#1E293B]">PKR {calculateBaseFare(vehicle, rentalDays, 'daily').toLocaleString()}</p>
+              {calculateBaseFare(vehicle, rentalDays, 'daily') < (vehicle.pricePerDay * rentalDays) && (
+                <span className="text-[10px] font-bold text-slate-400 line-through">PKR {(vehicle.pricePerDay * rentalDays).toLocaleString()}</span>
+              )}
+            </div>
           </div>
           <Link 
             to={canEdit ? `/edit-vehicle/${vehicle.id}` : `/vehicle/${vehicle.id}?days=${rentalDays}`}

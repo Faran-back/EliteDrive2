@@ -121,13 +121,9 @@ const Payment: React.FC = () => {
     }
   });
 
-  // Calculate rental duration
-  const rentalDuration = useMemo(() => {
+  // Calculate calendar days
+  const calendarDays = useMemo(() => {
     if (!startDate || !endDate) return 0;
-    
-    if (rentalType === 'hourly') {
-      return selectedHours;
-    }
     
     // Normalize both dates to midnights of their respective days to avoid timezone and time-of-day offsets
     const startObj = new Date(startDate);
@@ -140,14 +136,19 @@ const Payment: React.FC = () => {
     
     // 29 June to 29 June = 1 day (same-day standard minimum)
     // 29 June to 30 June = 2 days
-    const calendarDays = diffDays + 1;
-    
+    return Math.max(1, diffDays + 1);
+  }, [startDate, endDate]);
+
+  // Calculate rental duration
+  const rentalDuration = useMemo(() => {
+    if (rentalType === 'hourly') {
+      return selectedHours;
+    }
     if (rentalType === 'weekly') {
       return Math.max(1, Math.ceil(calendarDays / 7));
     }
-    
-    return Math.max(1, calendarDays);
-  }, [startDate, endDate, rentalType, selectedHours]);
+    return calendarDays;
+  }, [calendarDays, rentalType, selectedHours]);
 
   // Price calculations - Adjusted for real-world PKR pricing limits using professional Pakistani Car Rental tariffs
   const prices = useMemo(() => {
@@ -158,21 +159,23 @@ const Payment: React.FC = () => {
     
     // Dynamic Insurance Selector Math:
     // none: 0
-    // basic: 1000 flat, or caps out at 2000
-    // premium: 2500 flat, or caps out at 5000
+    // basic: 400 * calendarDays
+    // premium: 850 * calendarDays
     let insurance = 0;
     if (insuranceType === 'basic') {
-      insurance = rentalType === 'hourly' ? 500 : Math.min(400 * rentalDuration, 1800);
+      insurance = rentalType === 'hourly' ? 500 : 400 * calendarDays;
     } else if (insuranceType === 'premium') {
-      insurance = rentalType === 'hourly' ? 1000 : Math.min(850 * rentalDuration, 3800);
+      insurance = rentalType === 'hourly' ? 1000 : 850 * calendarDays;
     }
     
-    const chauffeurCost = chauffeurSelected ? 2500 * Math.max(1, rentalDuration) : 0;
+    const chauffeurCost = chauffeurSelected 
+      ? (rentalType === 'hourly' ? 2500 : 2500 * calendarDays) 
+      : 0;
     const discountAmount = isCouponApplied ? Math.min(base * 0.1, 8000) : 0;
     const total = base + insurance + chauffeurCost - discountAmount;
     
     return { base, insurance, chauffeurCost, discount: discountAmount, total };
-  }, [vehicle, rentalDuration, rentalType, isCouponApplied, insuranceType, chauffeurSelected]);
+  }, [vehicle, rentalDuration, rentalType, isCouponApplied, insuranceType, chauffeurSelected, calendarDays]);
 
   const isVerified = true;
 

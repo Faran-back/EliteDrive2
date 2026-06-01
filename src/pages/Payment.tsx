@@ -29,7 +29,7 @@ const Payment: React.FC = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { vehicles, addBooking, user, showToast, updateVehicle } = useStore();
+  const { vehicles, addBooking, user, showToast, updateVehicle, bookings } = useStore();
   const vehicle = vehicles.find(v => v.id === id);
   
   // States
@@ -98,6 +98,13 @@ const Payment: React.FC = () => {
   const [coupon, setCoupon] = useState('WELCOME');
   const [isCouponApplied, setIsCouponApplied] = useState(true);
   const [agreedToTerms, setAgreedToTerms] = useState(true);
+
+  // If the WELCOME coupon is applied but the user has previous bookings, auto-disable it.
+  useEffect(() => {
+    if (isCouponApplied && coupon.toUpperCase() === 'WELCOME' && bookings && bookings.length > 0) {
+      setIsCouponApplied(false);
+    }
+  }, [bookings, isCouponApplied, coupon]);
 
   const {
     register,
@@ -190,6 +197,11 @@ const Payment: React.FC = () => {
 
   const handleApplyCoupon = () => {
     if (coupon.toUpperCase() === 'WELCOME') {
+      if (bookings && bookings.length > 0) {
+        setIsCouponApplied(false);
+        showToast('This promo code is only available for new users.', 'error');
+        return;
+      }
       setIsCouponApplied(true);
       showToast('Promo code applied successfully!', 'success');
     } else {

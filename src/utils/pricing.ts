@@ -71,12 +71,15 @@ export const calculateBaseFare = (
 
   if (rentalType === 'hourly') {
     const hours = duration;
+    let hourlyPrice = 0;
     if (hours <= config.hourlyMinHrs) {
-      return config.hourlyBasePrice;
+      hourlyPrice = config.hourlyBasePrice;
     } else {
       const subsequentHrs = hours - config.hourlyMinHrs;
-      return config.hourlyBasePrice + (subsequentHrs * config.hourlySubsequentRate);
+      hourlyPrice = config.hourlyBasePrice + (subsequentHrs * config.hourlySubsequentRate);
     }
+    const dailyCap = Math.ceil(hours / 24) * config.pricePerDay;
+    return Math.min(hourlyPrice, dailyCap);
   }
 
   if (rentalType === 'weekly') {

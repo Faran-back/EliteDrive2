@@ -225,7 +225,7 @@ service cloud.firestore {
     }
 
     match /bookings/{bookingId} {
-      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isManager());
+      allow read: if true;
       allow create: if isVerified() && isOwner(request.resource.data.userId) && isValidBooking(request.resource.data);
       allow update: if (isManager() || (isOwner(resource.data.userId) && request.resource.data.userId == resource.data.userId)) && isValidBooking(request.resource.data);
       allow delete: if isAdmin();

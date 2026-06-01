@@ -23,8 +23,12 @@ const VehicleDetails: React.FC = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { vehicles, user, showToast } = useStore();
+  const { vehicles, user, showToast, allBookings } = useStore();
   const vehicle = vehicles.find(v => v.id === id);
+
+  const activeBooking = vehicle ? allBookings.find(b => b.vehicleId === vehicle.id && (b.status === 'active' || b.status === 'pending')) : null;
+  const isPastReturn = activeBooking && new Date() >= new Date(activeBooking.endDate);
+  const effectiveStatus = vehicle ? (((vehicle.status === 'booked' || vehicle.status === 'rented') && isPastReturn) ? 'available' : vehicle.status) : 'available';
   const isVerified = (user?.emailVerified && user?.phoneVerified) || 
                       (user?.email && ['ahmed12@gmail.com', 'test@example.com'].includes(user.email.toLowerCase()));
 
@@ -245,15 +249,15 @@ const VehicleDetails: React.FC = () => {
               ) : null}
 
               <Link 
-                to={!user ? '/auth?tab=login' : (isVerified && vehicle.status === 'available' ? `/payment/${vehicle.id}?days=${rentalDays}` : '#')}
+                to={!user ? '/auth?tab=login' : (isVerified && effectiveStatus === 'available' ? `/payment/${vehicle?.id}?days=${rentalDays}` : '#')}
                 onClick={(e) => {
-                  if (vehicle.status !== 'available') {
+                  if (effectiveStatus !== 'available') {
                     e.preventDefault();
                     showToast(`This vehicle is currently booked by another user and is not available.`, 'error');
                     return;
                   }
                   if (!user) {
-                    localStorage.setItem('elitedrive_redirect', `/payment/${vehicle.id}?days=${rentalDays}`);
+                    localStorage.setItem('elitedrive_redirect', `/payment/${vehicle?.id}?days=${rentalDays}`);
                     showToast('Welcome to EliteDrive! Please register or log in to secure this vehicle.', 'info');
                     return;
                   }
@@ -263,16 +267,16 @@ const VehicleDetails: React.FC = () => {
                   }
                 }}
                 className={`w-full ${
-                  (!user || isVerified) && vehicle.status === 'available' 
+                  (!user || isVerified) && effectiveStatus === 'available' 
                     ? 'bg-[#2563EB] hover:bg-blue-700 shadow-xl shadow-blue-100' 
                     : 'bg-gray-100 border border-gray-200 cursor-not-allowed text-gray-400'
                 } text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]`}
               >
-                {vehicle.status === 'available' 
+                {effectiveStatus === 'available' 
                   ? (!user ? 'Sign In to Book' : 'Proceed to Booking')
-                  : vehicle.status === 'booked' 
+                  : effectiveStatus === 'booked' 
                     ? 'Currently Booked' 
-                    : vehicle.status === 'rented' 
+                    : effectiveStatus === 'rented' 
                       ? 'Rented' 
                       : 'Unavailable'}
                 <ShieldCheck size={20} />

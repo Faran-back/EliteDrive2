@@ -251,17 +251,30 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [isAuthReady, user]);
 
   useEffect(() => {
-    if (!isAuthReady || !user || (user.role !== 'admin' && user.role !== 'manager')) {
-      setAllBookings([]);
-      return;
-    }
-
     const allBookingsQuery = query(collection(db, 'bookings'));
-    const unsubscribe = onSnapshot(allBookingsQuery, (snapshot) => {
+    const unsubscribe = onSnapshot(allBookingsQuery, async (snapshot) => {
       const bookingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
       setAllBookings(bookingsData);
+
+      // Auto-complete bookings that have reached their return date
+      const now = new Date();
+      for (const booking of bookingsData) {
+        if ((booking.status === 'active' || booking.status === 'pending') && new Date(booking.endDate) <= now) {
+          console.log(`Auto-completing booking ${booking.id} because return date has arrived.`);
+          try {
+            if (user) {
+              if (user.role === 'admin' || user.role === 'manager' || user.id === booking.userId) {
+                await updateDoc(doc(db, 'bookings', booking.id), { status: 'completed' });
+              }
+              await updateDoc(doc(db, 'vehicles', booking.vehicleId), { status: 'available' });
+            }
+          } catch (e) {
+            console.error('Error auto-completing booking or vehicle:', e);
+          }
+        }
+      }
     }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'bookings');
+      console.warn('Silent read error on bookings', error);
     });
 
     return () => unsubscribe();

@@ -24,7 +24,7 @@ import { useStore } from '../context/StoreContext';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
-  const { vehicles, user } = useStore();
+  const { vehicles, user, allBookings } = useStore();
   
   // Search Form State
   const [pickupLocation, setPickupLocation] = useState('Lahore, Pakistan');
@@ -91,7 +91,12 @@ const Landing: React.FC = () => {
 
   // Get a few featured available vehicles
   const featuredCars = vehicles
-    .filter(v => v.status === 'available')
+    .filter(v => {
+      const activeBooking = allBookings.find(b => b.vehicleId === v.id && (b.status === 'active' || b.status === 'pending'));
+      const isPastReturn = activeBooking && new Date() >= new Date(activeBooking.endDate);
+      const effectiveStatus = (v.status === 'booked' || v.status === 'rented') && isPastReturn ? 'available' : v.status;
+      return effectiveStatus === 'available';
+    })
     .slice(0, 3);
 
   return (

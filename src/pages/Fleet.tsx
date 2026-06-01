@@ -21,7 +21,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 
 const Fleet: React.FC = () => {
-  const { vehicles, user } = useStore();
+  const { vehicles, user, allBookings } = useStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -110,7 +110,10 @@ const Fleet: React.FC = () => {
   const seats = ['4', '5', '7+', 'Any'];
 
   const filteredVehicles = vehicles.filter(v => {
-    const matchesAvailability = v.status === 'available';
+    const activeBooking = allBookings.find(b => b.vehicleId === v.id && (b.status === 'active' || b.status === 'pending'));
+    const isPastReturn = activeBooking && new Date() >= new Date(activeBooking.endDate);
+    const effectiveStatus = (v.status === 'booked' || v.status === 'rented') && isPastReturn ? 'available' : v.status;
+    const matchesAvailability = effectiveStatus === 'available' || v.status === 'booked' || v.status === 'rented';
     const matchesCategory = selectedCategory === 'All' || 
       v.type.toLowerCase() === selectedCategory.toLowerCase() ||
       (selectedCategory === 'Economy' && v.pricePerDay < 8000);
@@ -309,58 +312,82 @@ const Fleet: React.FC = () => {
 
         {filteredVehicles.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {filteredVehicles.map((vehicle, idx) => (
-              <motion.div
-                key={vehicle.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="group bg-white rounded-[40px] overflow-hidden border border-slate-100 hover:border-primary/20 shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer"
-                onClick={() => navigate(`/vehicle/${vehicle.id}`)}
-              >
-                <div className="relative h-64 overflow-hidden">
-                  <div className="absolute top-6 left-6 z-10">
-                    <span className="px-5 py-2 bg-white/80 backdrop-blur-md text-primary text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-white">
-                      Available
-                    </span>
+            {filteredVehicles.map((vehicle, idx) => {
+              const activeBooking = allBookings.find(b => b.vehicleId === vehicle.id && (b.status === 'active' || b.status === 'pending'));
+              const isPastReturn = activeBooking && new Date() >= new Date(activeBooking.endDate);
+              const isCurrentlyBooked = (vehicle.status === 'booked' || vehicle.status === 'rented') && !isPastReturn;
+
+              return (
+                <motion.div
+                  key={vehicle.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="group bg-white rounded-[40px] overflow-hidden border border-slate-100 hover:border-primary/20 shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer"
+                  onClick={() => navigate(`/vehicle/${vehicle.id}`)}
+                >
+                  <div className="relative h-64 overflow-hidden">
+                    <div className="absolute top-6 left-6 z-10">
+                      {isCurrentlyBooked ? (
+                        <span className="px-5 py-2 bg-amber-500 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-amber-400 shadow-md">
+                          Booked
+                        </span>
+                      ) : (
+                        <span className="px-5 py-2 bg-white/80 backdrop-blur-md text-primary text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-white">
+                          Available
+                        </span>
+                      )}
+                    </div>
+                    <img 
+                      src={vehicle.image} 
+                      alt={vehicle.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    />
                   </div>
-                  <img 
-                    src={vehicle.image} 
-                    alt={vehicle.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                  />
-                </div>
-                <div className="p-10">
-                  <div className="flex justify-between items-start mb-6">
-                    <div>
-                      <h3 className="text-2xl font-black text-slate-900 group-hover:text-primary transition-colors">{vehicle.name}</h3>
-                      <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">{vehicle.type} • {vehicle.transmission}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-black text-primary leading-none">PKR {vehicle.pricePerDay.toLocaleString()}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Per Day</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-6 border-t border-slate-50 pt-8 mt-4">
-                    <div className="flex items-center gap-2.5">
-                      <Users className="text-slate-400" size={18} />
-                      <span className="text-xs font-black text-slate-600">{vehicle.seats} Seats</span>
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                      <Settings className="text-slate-400" size={18} />
-                      <span className="text-xs font-black text-slate-600">{vehicle.transmission}</span>
-                    </div>
-                    {vehicle.fuel === 'Hybrid' && (
-                      <div className="flex items-center gap-2.5">
-                        <Zap className="text-emerald-500" size={18} />
-                        <span className="text-xs font-black text-emerald-600">Hybrid</span>
+                  <div className="p-10">
+                    <div className="flex justify-between items-start mb-6">
+                      <div>
+                        <h3 className="text-2xl font-black text-slate-900 group-hover:text-primary transition-colors">{vehicle.name}</h3>
+                        <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">{vehicle.type} • {vehicle.transmission}</p>
+                        {isCurrentlyBooked && activeBooking && (
+                          <p className="text-amber-600 font-black text-xs mt-3 bg-amber-50/80 px-4 py-2 border border-amber-100 rounded-2xl inline-block leading-relaxed tracking-wide">
+                            {vehicle.name} will be available by {new Date(activeBooking.endDate).toLocaleString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
+                          </p>
+                        )}
                       </div>
-                    )}
+                      <div className="text-right">
+                        <p className="text-2xl font-black text-primary leading-none">PKR {vehicle.pricePerDay.toLocaleString()}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Per Day</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-6 border-t border-slate-50 pt-8 mt-4">
+                      <div className="flex items-center gap-2.5">
+                        <Users className="text-slate-400" size={18} />
+                        <span className="text-xs font-black text-slate-600">{vehicle.seats} Seats</span>
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <Settings className="text-slate-400" size={18} />
+                        <span className="text-xs font-black text-slate-600">{vehicle.transmission}</span>
+                      </div>
+                      {vehicle.fuel === 'Hybrid' && (
+                        <div className="flex items-center gap-2.5">
+                          <Zap className="text-emerald-500" size={18} />
+                          <span className="text-xs font-black text-emerald-600">Hybrid</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-32 bg-white rounded-[40px] border border-dashed border-slate-200">

@@ -20,7 +20,7 @@ import { useStore } from '../context/StoreContext';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { vehicles } = useStore();
+  const { vehicles, allBookings } = useStore();
   
   // Form State
   const [pickupLocation, setPickupLocation] = useState('Lahore, Pakistan');
@@ -333,7 +333,12 @@ const Dashboard: React.FC = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {vehicles
-            .filter((v) => v.status === 'available')
+            .filter((v) => {
+              const activeBooking = allBookings.find(b => b.vehicleId === v.id && (b.status === 'active' || b.status === 'pending'));
+              const isPastReturn = activeBooking && new Date() >= new Date(activeBooking.endDate);
+              const effectiveStatus = (v.status === 'booked' || v.status === 'rented') && isPastReturn ? 'available' : v.status;
+              return effectiveStatus === 'available';
+            })
             .slice(0, 3)
             .map((vehicle, idx) => (
             <motion.div

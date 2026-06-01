@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { modifyBookingSchema, ModifyBookingFormData } from '../schemas/booking';
 import { Booking, Vehicle } from '../types';
 import { useStore } from '../context/StoreContext';
+import { calculateBaseFare } from '../utils/pricing';
 import CustomSelect from './ui/CustomSelect';
 
 interface ModifyBookingModalProps {
@@ -59,11 +60,14 @@ const ModifyBookingModal: React.FC<ModifyBookingModalProps> = ({
     setSelectedVehicle(vehicle || null);
 
     if (vehicle && watchedStartDate && watchedEndDate) {
-      const start = new Date(watchedStartDate);
-      const end = new Date(watchedEndDate);
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
-      setCalculatedPrice(diffDays * vehicle.pricePerDay);
+      const startObj = new Date(watchedStartDate);
+      startObj.setHours(0, 0, 0, 0);
+      const endObj = new Date(watchedEndDate);
+      endObj.setHours(0, 0, 0, 0);
+      const dTime = Math.abs(endObj.getTime() - startObj.getTime());
+      const dDays = Math.round(dTime / (1000 * 60 * 60 * 24));
+      const calendarDays = Math.max(1, dDays + 1);
+      setCalculatedPrice(calculateBaseFare(vehicle, calendarDays, 'daily'));
     }
   }, [watchedVehicleId, watchedStartDate, watchedEndDate, vehicles]);
 

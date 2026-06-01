@@ -349,7 +349,7 @@ const Customers: React.FC = () => {
                                   <div className="size-5 bg-slate-200 border border-slate-300 rounded flex items-center justify-center font-bold text-[5px]">FPS</div>
                                   <span className="font-bold tracking-widest font-mono text-[6px]">INDEX-CARD-P189</span>
                                 </div>
-                                <div className="text-right font-bold text-slate-350 tracking-wider text-[6px]">PAK-REG-202</div>
+                                <div className="text-right font-bold text-slate-400 tracking-wider text-[6px]">PAK-REG-202</div>
                               </div>
                             </div>
                           )}

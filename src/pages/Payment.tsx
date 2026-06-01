@@ -18,6 +18,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
+import { calculateBaseFare } from '../utils/pricing';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { paymentSchema, PaymentFormData } from '../schemas/payment';
@@ -38,11 +39,23 @@ const Payment: React.FC = () => {
   const [rentalType, setRentalType] = useState<'hourly' | 'daily' | 'weekly'>('daily');
   const [insuranceType, setInsuranceType] = useState<'none' | 'basic' | 'premium'>('basic');
   const [chauffeurSelected, setChauffeurSelected] = useState(false);
+  const [selectedHours, setSelectedHours] = useState<number>(4);
   
   // Dates logic
+  const todayStart = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
   const [startDate, setStartDate] = useState<Date | null>(() => {
     const saved = localStorage.getItem('elitedrive_pickup_date');
-    if (saved) return new Date(saved);
+    if (saved) {
+      const parsed = new Date(saved);
+      if (parsed >= todayStart) {
+        return parsed;
+      }
+    }
     const initialStartDate = new Date();
     initialStartDate.setDate(initialStartDate.getDate() + 1);
     return initialStartDate;
@@ -50,13 +63,37 @@ const Payment: React.FC = () => {
 
   const [endDate, setEndDate] = useState<Date | null>(() => {
     const saved = localStorage.getItem('elitedrive_return_date');
-    if (saved) return new Date(saved);
-    const savedStart = localStorage.getItem('elitedrive_pickup_date');
-    const startObj = savedStart ? new Date(savedStart) : new Date();
+    if (saved) {
+      const parsed = new Date(saved);
+      if (parsed >= todayStart) {
+        return parsed;
+      }
+    }
+    const startObj = startDate || new Date();
     const initialEndDate = new Date(startObj);
     initialEndDate.setDate(initialEndDate.getDate() + 3);
     return initialEndDate;
   });
+
+  const handleStartDateChange = (date: Date | null) => {
+    setStartDate(date);
+    if (rentalType === 'hourly' && date) {
+      const calculatedEnd = new Date(date.getTime() + selectedHours * 60 * 60 * 1000);
+      setEndDate(calculatedEnd);
+    } else if (date && endDate && date >= endDate) {
+      const nextEnd = new Date(date);
+      nextEnd.setDate(nextEnd.getDate() + 1);
+      setEndDate(nextEnd);
+    }
+  };
+
+  // Sync end date automatically whenever pickup date or hours change for hourly rentals
+  useEffect(() => {
+    if (rentalType === 'hourly' && startDate) {
+      const calculatedEnd = new Date(startDate.getTime() + selectedHours * 60 * 60 * 1000);
+      setEndDate(calculatedEnd);
+    }
+  }, [startDate, selectedHours, rentalType]);
   
   const [coupon, setCoupon] = useState('WELCOME');
   const [isCouponApplied, setIsCouponApplied] = useState(true);
@@ -80,37 +117,37 @@ const Payment: React.FC = () => {
   // Calculate rental duration
   const rentalDuration = useMemo(() => {
     if (!startDate || !endDate) return 0;
-    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
     
     if (rentalType === 'hourly') {
-      return Math.ceil(diffTime / (1000 * 60 * 60));
-    } else if (rentalType === 'weekly') {
-      return Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
+      return selectedHours;
     }
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  }, [startDate, endDate, rentalType]);
+    
+    // Normalize both dates to midnights of their respective days to avoid timezone and time-of-day offsets
+    const startObj = new Date(startDate);
+    startObj.setHours(0, 0, 0, 0);
+    const endObj = new Date(endDate);
+    endObj.setHours(0, 0, 0, 0);
+    
+    const diffTime = Math.abs(endObj.getTime() - startObj.getTime());
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    
+    // 29 June to 29 June = 1 day (same-day standard minimum)
+    // 29 June to 30 June = 2 days
+    const calendarDays = diffDays + 1;
+    
+    if (rentalType === 'weekly') {
+      return Math.max(1, Math.ceil(calendarDays / 7));
+    }
+    
+    return Math.max(1, calendarDays);
+  }, [startDate, endDate, rentalType, selectedHours]);
 
-  // Price calculations - Adjusted for real-world PKR pricing limits
+  // Price calculations - Adjusted for real-world PKR pricing limits using professional Pakistani Car Rental tariffs
   const prices = useMemo(() => {
     if (!vehicle) return { base: 0, insurance: 0, chauffeurCost: 0, discount: 0, total: 0 };
     
-    let rate = vehicle.pricePerDay;
-    if (rentalType === 'hourly') rate = vehicle.pricePerDay / 12; // Realistic 1/12th fraction in Pakistan
-    if (rentalType === 'weekly') rate = vehicle.pricePerDay * 4.2; // Realistic weekly price discount (4.2x daily rate per week)
-    
-    // Auto discount on daily rates for longer periods (keeps prices completely realistic!)
-    let base = rate * Math.max(1, rentalDuration);
-    if (rentalType === 'daily') {
-      if (rentalDuration >= 7) {
-        base = base * 0.70; // 30% discount for 7+ days
-      } else if (rentalDuration >= 3) {
-        base = base * 0.85; // 15% discount for 3+ days
-      }
-    } else if (rentalType === 'weekly') {
-      if (rentalDuration >= 4) {
-        base = base * 0.80; // Extra 20% discount on monthly (4+ weeks) stays
-      }
-    }
+    // Calculates base dynamically with realistic Pakistani car rental minimums & multipliers
+    const base = calculateBaseFare(vehicle, rentalDuration, rentalType);
     
     // Dynamic Insurance Selector Math:
     // none: 0
@@ -135,6 +172,19 @@ const Payment: React.FC = () => {
   useEffect(() => {
     setValue('paymentDetail', ''); 
   }, [paymentMethod, setValue]);
+
+  // Sync to localStorage
+  useEffect(() => {
+    if (startDate) {
+      localStorage.setItem('elitedrive_pickup_date', startDate.toISOString());
+    }
+  }, [startDate]);
+
+  useEffect(() => {
+    if (endDate) {
+      localStorage.setItem('elitedrive_return_date', endDate.toISOString());
+    }
+  }, [endDate]);
 
   if (!vehicle) return <div className="p-20 text-center font-black text-slate-400 uppercase tracking-widest">Vehicle not found</div>;
 
@@ -168,8 +218,8 @@ const Payment: React.FC = () => {
         id: 'b' + Date.now(),
         vehicleId: vehicle.id,
         userId: user?.id || 'u1',
-        startDate: startDate?.toISOString().split('T')[0] || new Date().toISOString(),
-        endDate: endDate?.toISOString().split('T')[0] || new Date().toISOString(),
+        startDate: startDate?.toISOString() || new Date().toISOString(),
+        endDate: endDate?.toISOString() || new Date().toISOString(),
         totalPrice: prices.total,
         status: 'pending' as const,
         paymentStatus: 'paid' as const,
@@ -295,26 +345,54 @@ const Payment: React.FC = () => {
                         </div>
                         <div className="space-y-3">
                           <div className="space-y-1">
-                            <span className="text-[10px] uppercase font-black text-slate-400">Pickup</span>
+                            <span className="text-[10px] uppercase font-black text-slate-400">
+                              {rentalType === 'hourly' ? 'Pickup Date & Time' : 'Pickup'}
+                            </span>
                             <CustomCalendar
                               disabled={step === 'payment'}
                               className="bg-transparent!"
                               placeholder="Start Date"
                               selected={startDate}
-                              onChange={(date) => setStartDate(date)}
-                              minDate={new Date()}
+                              onChange={handleStartDateChange}
+                              minDate={todayStart}
+                              showTimeSelect={rentalType === 'hourly'}
                             />
                           </div>
-                          <div className="space-y-1">
-                            <span className="text-[10px] uppercase font-black text-slate-400">Return</span>
-                            <CustomCalendar
-                              disabled={step === 'payment'}
-                              placeholder="End Date"
-                              selected={endDate}
-                              onChange={(date) => setEndDate(date)}
-                              minDate={startDate || new Date()}
-                            />
-                          </div>
+
+                          {rentalType === 'hourly' ? (
+                            <>
+                              <div className="space-y-1">
+                                <span className="text-[10px] uppercase font-black text-slate-400">Duration (Hours)</span>
+                                <select
+                                  disabled={step === 'payment'}
+                                  value={selectedHours}
+                                  onChange={(e) => setSelectedHours(parseInt(e.target.value, 10))}
+                                  className="w-full pl-6 pr-6 py-4 bg-slate-50 rounded-[24px] border-2 border-slate-100 transition-all text-slate-900 font-bold placeholder:text-slate-400 outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 focus:bg-white"
+                                >
+                                  {[1, 2, 3, 4, 5, 6, 8, 10, 12, 18, 24].map((h) => (
+                                    <option key={h} value={h}>{h} {h === 1 ? 'Hour' : 'Hours'}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="space-y-1">
+                                <span className="text-[10px] uppercase font-black text-slate-400">Calculated Return</span>
+                                <div className="w-full pl-6 pr-6 py-4 bg-slate-50 rounded-[20px] border-2 border-slate-100 text-slate-600 font-bold text-xs">
+                                  {endDate ? endDate.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="space-y-1">
+                              <span className="text-[10px] uppercase font-black text-slate-400 font-sans">Return</span>
+                              <CustomCalendar
+                                disabled={step === 'payment'}
+                                placeholder="End Date"
+                                selected={endDate}
+                                onChange={(date) => setEndDate(date)}
+                                minDate={startDate || todayStart}
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
 

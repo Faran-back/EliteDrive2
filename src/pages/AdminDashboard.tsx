@@ -32,6 +32,7 @@ import RoleAssignment from '../components/dashboard/RoleAssignment';
 import RoleRequests from '../components/dashboard/RoleRequests';
 import FleetInventory from '../components/dashboard/FleetInventory';
 import FraudAlerts from '../components/dashboard/FraudAlerts';
+import ReturnVerificationWidget from '../components/dashboard/ReturnVerificationWidget';
 
 const AdminDashboard: React.FC = () => {
   const { allBookings, vehicles, allUsers } = useStore();
@@ -101,6 +102,9 @@ const AdminDashboard: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {/* Return Verification Alert / Release Desk */}
+          <ReturnVerificationWidget />
 
           {/* Revenue Trend Chart */}
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">

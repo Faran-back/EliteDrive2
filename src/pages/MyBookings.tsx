@@ -20,6 +20,30 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import ModifyBookingModal from '../components/ModifyBookingModal';
 import { Booking } from '../types';
 
+const formatBookingDate = (dateStr: string) => {
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const hasTime = dateStr.includes('T') && !dateStr.endsWith('T00:00:00.000Z') && !dateStr.endsWith('T00:00:00Z');
+    if (hasTime) {
+      return d.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+    return d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 const MyBookings: React.FC = () => {
   const { user, bookings, vehicles, cancelBooking, updateBooking, showToast } = useStore();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -156,11 +180,11 @@ const MyBookings: React.FC = () => {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-gray-50">
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Pickup</p>
-                        <p className="font-black text-[#1E293B] text-sm">{booking.startDate}</p>
+                        <p className="font-black text-[#1E293B] text-sm">{formatBookingDate(booking.startDate)}</p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Return</p>
-                        <p className="font-black text-[#1E293B] text-sm">{booking.endDate}</p>
+                        <p className="font-black text-[#1E293B] text-sm">{formatBookingDate(booking.endDate)}</p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Total Price</p>

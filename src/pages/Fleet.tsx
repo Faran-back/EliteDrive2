@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import CustomCalendar from '../components/ui/CustomCalendar';
 import { 
   MapPin, 
@@ -28,14 +28,40 @@ const Fleet: React.FC = () => {
   // Search/Filter State
   const [pickupLocation, setPickupLocation] = useState('Lahore, Pakistan');
   const [dropoffLocation, setDropoffLocation] = useState('');
+  const todayStart = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
   const [pickupDate, setPickupDate] = useState<Date | null>(() => {
     const saved = localStorage.getItem('elitedrive_pickup_date');
-    return saved ? new Date(saved) : new Date();
+    if (saved) {
+      const parsed = new Date(saved);
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      if (parsed >= startOfToday) return parsed;
+    }
+    return new Date();
   });
   const [returnDate, setReturnDate] = useState<Date | null>(() => {
     const saved = localStorage.getItem('elitedrive_return_date');
-    return saved ? new Date(saved) : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    if (saved) {
+      const parsed = new Date(saved);
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      if (parsed >= startOfToday) return parsed;
+    }
+    const base = new Date();
+    return new Date(base.getTime() + 3 * 24 * 60 * 60 * 1000);
   });
+
+  const handlePickupDateChange = (date: Date | null) => {
+    setPickupDate(date);
+    if (date && returnDate && date >= returnDate) {
+      setReturnDate(new Date(date.getTime() + 1 * 24 * 60 * 60 * 1000));
+    }
+  };
   const [selectedCategory, setSelectedCategory] = useState(() => {
     return searchParams.get('category') || 'All';
   });
@@ -161,14 +187,15 @@ const Fleet: React.FC = () => {
               <CustomCalendar
                 label="Pickup Date & Time"
                 selected={pickupDate}
-                onChange={(date) => setPickupDate(date)}
+                onChange={handlePickupDateChange}
+                minDate={todayStart}
                 showTimeSelect
               />
               <CustomCalendar
                 label="Return Date & Time"
                 selected={returnDate}
                 onChange={(date) => setReturnDate(date)}
-                minDate={pickupDate || undefined}
+                minDate={pickupDate || todayStart}
                 showTimeSelect
               />
             </div>

@@ -344,7 +344,7 @@ END:VCALENDAR`;
       {/* Cancel Confirmation Modal */}
       {isCancelConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 border border-slate-105 flex flex-col gap-6 relative">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 border border-slate-200 flex flex-col gap-6 relative">
             <div className="flex items-start gap-4">
               <div className="size-12 rounded-2xl bg-red-50 flex items-center justify-center shrink-0">
                 <XCircle className="text-red-500 size-6" />

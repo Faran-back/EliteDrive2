@@ -43,8 +43,16 @@ const VehicleDetails: React.FC = () => {
     return d;
   })();
 
-  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-  const rentalDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  const rentalDays = (() => {
+    if (!startDate || !endDate) return 1;
+    const startObj = new Date(startDate);
+    startObj.setHours(0, 0, 0, 0);
+    const endObj = new Date(endDate);
+    endObj.setHours(0, 0, 0, 0);
+    const dTime = Math.abs(endObj.getTime() - startObj.getTime());
+    const dDays = Math.round(dTime / (1000 * 60 * 60 * 24));
+    return Math.max(1, dDays + 1);
+  })();
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });

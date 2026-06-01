@@ -40,6 +40,7 @@ import SystemConfig from '../components/dashboard/SystemConfig';
 import SupportCenter from '../components/dashboard/SupportCenter';
 import Bookings from '../components/dashboard/Bookings';
 import FleetInventory from '../components/dashboard/FleetInventory';
+import ReturnVerificationWidget from '../components/dashboard/ReturnVerificationWidget';
 
 const ManagerDashboard: React.FC = () => {
   const { vehicles, allBookings, allUsers, cancelBooking, showToast, user } = useStore();
@@ -157,6 +158,9 @@ const ManagerDashboard: React.FC = () => {
               </motion.div>
             ))}
           </div>
+
+          {/* Return Verification Alert / Release Desk */}
+          <ReturnVerificationWidget />
 
           {/* Main Layout Grid */}
           <div className="grid grid-cols-12 gap-8">

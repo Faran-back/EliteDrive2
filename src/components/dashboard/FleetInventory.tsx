@@ -20,6 +20,8 @@ const FleetInventory: React.FC = () => {
   const { vehicles, deleteVehicle, showToast } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +43,17 @@ const FleetInventory: React.FC = () => {
     const matchesSearch = v.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          v.location.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'All' || v.type.toLowerCase() === categoryFilter.toLowerCase();
-    return matchesSearch && matchesCategory;
+    
+    let matchesDate = true;
+    if (v.createdAt) {
+      const vDateStr = v.createdAt.split('T')[0];
+      if (startDateFilter && vDateStr < startDateFilter) matchesDate = false;
+      if (endDateFilter && vDateStr > endDateFilter) matchesDate = false;
+    } else if (startDateFilter || endDateFilter) {
+      matchesDate = false;
+    }
+
+    return matchesSearch && matchesCategory && matchesDate;
   }).sort((a, b) => {
     if (a.createdAt && b.createdAt) {
       return b.createdAt.localeCompare(a.createdAt);
@@ -74,72 +86,118 @@ const FleetInventory: React.FC = () => {
       </div>
 
       {/* Filters & Search */}
-      <div className="bg-white p-4 rounded-[32px] border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4">
-        <div className="flex-1 relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by name or location..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600/10 focus:bg-white transition-all text-sm font-bold text-slate-900 outline-none"
-          />
-        </div>
-        <div className="flex gap-2">
-          <div className="relative" ref={dropdownRef}>
+      <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm space-y-4">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={18} />
+            <input 
+              type="text" 
+              placeholder="Search by name or location..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600/10 focus:bg-white transition-all text-sm font-bold text-slate-900 outline-none"
+            />
+          </div>
+          <div className="flex gap-2">
+            <div className="relative" ref={dropdownRef}>
+              <button 
+                type="button"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className={`flex items-center justify-between gap-3 px-5 py-3.5 bg-slate-50 rounded-2xl border-none text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100 transition-all outline-none select-none min-w-[140px] h-full ${
+                  isDropdownOpen ? 'ring-2 ring-blue-600/10 bg-white shadow-sm' : ''
+                }`}
+              >
+                <span>{categoryFilter}</span>
+                <ChevronDown 
+                  size={14} 
+                  className={`text-slate-400 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180 text-blue-600' : ''}`} 
+                />
+              </button>
+
+              <AnimatePresence>
+                {isDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                    className="absolute right-0 z-50 mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl shadow-slate-900/10 overflow-hidden py-1.5"
+                  >
+                    <div className="max-h-60 overflow-y-auto">
+                      {categories.map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            setCategoryFilter(cat);
+                            setIsDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-5 py-2.5 text-xs font-black uppercase tracking-widest transition-all duration-150 flex items-center justify-between ${
+                            cat === categoryFilter
+                              ? 'bg-blue-50 text-blue-600 font-black'
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-blue-600'
+                          }`}
+                        >
+                          {cat}
+                          {cat === categoryFilter && (
+                            <div className="size-1.5 rounded-full bg-blue-600"></div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             <button 
               type="button"
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className={`flex items-center justify-between gap-3 px-5 py-3.5 bg-slate-50 rounded-2xl border-none text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100 transition-all outline-none select-none min-w-[140px] h-full ${
-                isDropdownOpen ? 'ring-2 ring-blue-600/10 bg-white shadow-sm' : ''
-              }`}
+              onClick={() => {
+                setSearchTerm('');
+                setCategoryFilter('All');
+                setStartDateFilter('');
+                setEndDateFilter('');
+              }}
+              className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-slate-100 hover:text-red-500 transition-all border-none"
+              title="Reset Filters"
             >
-              <span>{categoryFilter}</span>
-              <ChevronDown 
-                size={14} 
-                className={`text-slate-400 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180 text-blue-600' : ''}`} 
-              />
+              <Trash2 size={18} />
             </button>
-
-            <AnimatePresence>
-              {isDropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="absolute left-0 z-50 mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl shadow-slate-900/10 overflow-hidden py-1.5"
-                >
-                  <div className="max-h-60 overflow-y-auto">
-                    {categories.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => {
-                          setCategoryFilter(cat);
-                          setIsDropdownOpen(false);
-                        }}
-                        className={`w-full text-left px-5 py-2.5 text-xs font-black uppercase tracking-widest transition-all duration-150 flex items-center justify-between ${
-                          cat === categoryFilter
-                            ? 'bg-blue-50 text-blue-600 font-black'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-blue-600'
-                        }`}
-                      >
-                        {cat}
-                        {cat === categoryFilter && (
-                          <div className="size-1.5 rounded-full bg-blue-600"></div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
+        </div>
 
-          <button className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-slate-100 transition-all border-none">
-            <Filter size={18} />
-          </button>
+        {/* Date Filters Row */}
+        <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-slate-100">
+          <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 flex items-center gap-1.5">
+            <Filter size={12} /> Filter Date Created range:
+          </span>
+          <div className="flex items-center gap-2">
+            <input 
+              type="date" 
+              value={startDateFilter}
+              onChange={(e) => setStartDateFilter(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-150 text-xs font-bold text-slate-700 outline-none rounded-xl focus:ring-2 focus:ring-blue-600/10 focus:bg-white transition-all cursor-pointer"
+            />
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">to</span>
+            <input 
+              type="date" 
+              value={endDateFilter}
+              onChange={(e) => setEndDateFilter(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-150 text-xs font-bold text-slate-700 outline-none rounded-xl focus:ring-2 focus:ring-blue-600/10 focus:bg-white transition-all cursor-pointer"
+            />
+            {(startDateFilter || endDateFilter) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStartDateFilter('');
+                  setEndDateFilter('');
+                }}
+                className="text-[10px] font-black uppercase tracking-widest text-[#EF4444] hover:underline ml-2 bg-red-50 px-2.5 py-1 rounded-lg"
+              >
+                Clear Range
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

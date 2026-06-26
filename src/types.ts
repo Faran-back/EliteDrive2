@@ -16,6 +16,9 @@ export interface User {
   license?: string | null;
   cnicVerified?: boolean;
   createdAt?: string;
+  location?: string;
+  outstandingBalance?: number;
+  isBlacklisted?: boolean;
   pendingInvitation?: {
     role: 'admin' | 'manager';
     invitedBy: string;
@@ -40,6 +43,7 @@ export interface Vehicle {
   type: 'Sedan' | 'SUV' | 'Hatchback' | 'Luxury' | 'Economy' | 'Pickup';
   pricePerDay: number;
   image: string;
+  images?: string[]; // Multiple images uploaded for the car
   transmission: 'Automatic' | 'Manual';
   fuel: 'Petrol' | 'Diesel' | 'Electric' | 'Hybrid';
   seats: number;
@@ -51,6 +55,7 @@ export interface Vehicle {
   status: 'available' | 'rented' | 'booked' | 'maintenance';
   description?: string;
   createdAt?: string;
+  licensePlate?: string; // License plate number
 }
 
 export interface Booking {
@@ -63,7 +68,10 @@ export interface Booking {
   status: 'pending' | 'active' | 'completed' | 'cancelled';
   paymentStatus: 'paid' | 'pending';
   bookingDate: string;
+  createdAt?: string; // sorting and range filtering
   destination?: string;
+  pickupLocation?: string;
+  dropoffLocation?: string;
   chauffeurSelected?: boolean;
   driverName?: string;
   driverPhone?: string;
@@ -75,6 +83,89 @@ export interface Booking {
   chauffeurPrice?: number;
   discountPrice?: number;
   insuranceType?: 'none' | 'basic' | 'premium';
+  
+  // Payment enhancement features
+  paymentType?: 'full' | 'partial'; // Full vs 50% upfront
+  upfrontAmountPaid?: number;
+  remainingAmount?: number;
+  remainingPaymentStatus?: 'paid' | 'pending'; // 50% remaining payment status (collected in person)
+  paymentMethod?: 'credit_card' | 'bank_transfer' | 'card' | 'transfer';
+  receiptImage?: string; // bank transfer receipt image
+  bankReceiptApproved?: 'pending' | 'approved' | 'rejected';
+  bankReceiptRejectionReason?: string;
+  sendingBank?: string;
+  transactionRef?: string;
+  bankVerificationCode?: string;
+
+  // New Booking Fields
+  securityDepositAmount?: number;
+  securityDepositStatus?: 'pending' | 'collected' | 'refunded' | 'forfeited';
+  preRentalChecklist?: {
+    mileage: number;
+    fuelLevel: string;
+    existingDamage: string;
+    photos: string[];
+  };
+  isOutOfCity?: boolean;
+  outOfCityDetails?: {
+    destination: string;
+    guarantorName: string;
+    guarantorPhone: string;
+  };
+  refundAmount?: number;
+  refundStatus?: 'none' | 'pending_manual_bank_transfer' | 'processed';
+  penaltyAmount?: number;
+}
+
+export interface Incident {
+  id: string;
+  bookingId: string;
+  userId: string;
+  userName: string;
+  vehicleId: string;
+  vehicleName: string;
+  type: 'minor_accident' | 'major_accident' | 'theft' | 'breakdown' | 'flat_tire' | 'third_party_damage';
+  occurredAt: string;
+  submittedAt: string;
+  isLateReport: boolean;
+  location: string;
+  statement: string;
+  witnessName?: string;
+  witnessPhone?: string;
+  photos?: string[];
+  firNumber?: string;
+  status: 'filed' | 'under_review' | 'action_taken' | 'closed';
+  actionType?: 'charge' | 'approve' | 'reject' | 'none';
+  filedByAdmin?: boolean;
+  insuranceTier?: 'none' | 'basic' | 'premium';
+  insuranceCoverageDetails?: string;
+}
+
+export interface Dispute {
+  id: string;
+  userId: string;
+  userName: string;
+  bookingId?: string;
+  type: 'damage_charges' | 'late_return' | 'traffic_violation' | 'payment_issue' | 'document_issue';
+  title: string;
+  description: string;
+  status: 'pending' | 'under_review' | 'resolved' | 'rejected';
+  resolutionDetails?: string;
+  createdAt: string;
+}
+
+export interface EChallan {
+  id: string;
+  challanNumber: string;
+  date: string;
+  amount: number;
+  vehicleId: string;
+  matchedBookingId?: string;
+  matchedUserId?: string;
+  matchedUserName?: string;
+  status: 'pending' | 'finalized' | 'disputed';
+  disputedAt?: string;
+  createdAt: string;
 }
 
 export interface RoleRequest {

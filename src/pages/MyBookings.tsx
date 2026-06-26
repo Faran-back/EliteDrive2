@@ -11,8 +11,17 @@ import {
   XCircle,
   CheckCircle2,
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  Building2,
+  Lock,
+  ShieldCheck,
+  Upload,
+  FileText,
+  Check,
+  Eye,
+  Copy
 } from 'lucide-react';
+import { fileToBase64, validateImage } from '../lib/imageUtils';
 import { useStore } from '../context/StoreContext';
 import { downloadReceiptPDF } from '../utils/receiptGenerator';
 import { motion } from 'motion/react';
@@ -38,12 +47,201 @@ const formatBookingDate = (dateStr: string) => {
 };
 
 const MyBookings: React.FC = () => {
-  const { user, bookings, vehicles, cancelBooking, updateBooking, showToast } = useStore();
+  const { user, bookings, vehicles, cancelBooking, updateBooking, showToast, incidents, disputes, eChallans, disputeEChallan, createDispute } = useStore();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isModifyModalOpen, setIsModifyModalOpen] = React.useState(false);
   const [bookingToCancel, setBookingToCancel] = React.useState<string | null>(null);
   const [bookingToModify, setBookingToModify] = React.useState<Booking | null>(null);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
+
+  // Bank Receipt Re-upload State
+  const [reuploadSenderBank, setReuploadSenderBank] = React.useState('');
+  const [reuploadRef, setReuploadRef] = React.useState('');
+  const [reuploadImage, setReuploadImage] = React.useState('');
+  const [isReuploading, setIsReuploading] = React.useState(false);
+  const [copiedField, setCopiedField] = React.useState<string | null>(null);
+
+  const handleReuploadReceipt = async (bookingId: string) => {
+    if (!reuploadImage) {
+      showToast?.('Please upload a screenshot or copy of your receipt first.', 'error');
+      return;
+    }
+    if (!reuploadSenderBank.trim()) {
+      showToast?.('Please specify the sending bank.', 'error');
+      return;
+    }
+    if (!reuploadRef.trim()) {
+      showToast?.('Please enter your transaction reference number.', 'error');
+      return;
+    }
+
+    setIsReuploading(true);
+    try {
+      await updateBooking(bookingId, {
+        bankReceiptApproved: 'pending',
+        receiptImage: reuploadImage,
+        sendingBank: reuploadSenderBank,
+        transactionRef: reuploadRef,
+      });
+      showToast?.('Payment receipt re-uploaded successfully! Admin will verify shortly.', 'success');
+      // Clear state
+      setReuploadImage('');
+      setReuploadSenderBank('');
+      setReuploadRef('');
+    } catch (err: any) {
+      showToast?.(err.message || 'Failed to re-upload receipt.', 'error');
+    } finally {
+      setIsReuploading(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const validation = validateImage(file, 10); // Allow up to 10MB for receipts
+      if (!validation.isValid && validation.error) {
+        showToast?.(validation.error, 'error');
+        return;
+      }
+
+      showToast?.('Scanning and auditing receipt details...', 'info');
+      const base64 = await fileToBase64(file);
+
+      const token = localStorage.getItem('elitedrive_token');
+      const response = await fetch('/api/verify-receipt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ receiptImage: base64 })
+      });
+
+      if (!response.ok) {
+        throw new Error('Verification request failed.');
+      }
+
+      const result = await response.json();
+
+      if (!result.isValidReceipt) {
+        setReuploadImage('');
+        setReuploadSenderBank('');
+        setReuploadRef('');
+        showToast?.(result.rejectionReason || 'Uploaded image is not a valid transaction receipt.', 'error');
+        return;
+      }
+
+      setReuploadImage(base64);
+      if (result.sendingBank) setReuploadSenderBank(result.sendingBank);
+      if (result.transactionRef) setReuploadRef(result.transactionRef);
+
+      showToast?.(`Receipt verified successfully! Bank: ${result.sendingBank || 'Detected'}`, 'success');
+    } catch (err) {
+      console.error('File reading or verification error:', err);
+      showToast?.('Failed to verify receipt. Please try uploading a clearer image.', 'error');
+    }
+  };
+
+  const handleCopy = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    showToast?.(`${field} copied to clipboard!`, 'success');
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const getBookingBadge = (booking: Booking) => {
+    if (booking.paymentMethod === 'bank_transfer') {
+      if (booking.bankReceiptApproved === 'pending') {
+        return {
+          label: 'Payment Pending – Awaiting Verification',
+          classes: 'bg-amber-50 text-amber-700 border-amber-200',
+          icon: <Clock size={12} />
+        };
+      }
+      if (booking.bankReceiptApproved === 'rejected') {
+        return {
+          label: 'Receipt Rejected – Re-upload Required',
+          classes: 'bg-rose-50 text-rose-700 border-rose-200',
+          icon: <XCircle size={12} />
+        };
+      }
+      if (booking.bankReceiptApproved === 'approved') {
+        return {
+          label: 'Receipt Verified – Confirmed',
+          classes: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+          icon: <CheckCircle2 size={12} />
+        };
+      }
+    }
+    
+    switch (booking.status) {
+      case 'pending': 
+        return {
+          label: 'Pending Approval',
+          classes: 'bg-amber-50 text-amber-600 border-amber-100',
+          icon: <Clock size={12} />
+        };
+      case 'active': 
+        return {
+          label: 'Active Rental',
+          classes: 'bg-blue-50 text-[#2563EB] border-blue-100',
+          icon: <CheckCircle2 size={12} />
+        };
+      case 'completed': 
+        return {
+          label: 'Completed Journey',
+          classes: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+          icon: <CheckCircle2 size={12} />
+        };
+      case 'cancelled': 
+        return {
+          label: 'Cancelled',
+          classes: 'bg-red-50 text-red-600 border-red-100',
+          icon: <XCircle size={12} />
+        };
+      default: 
+        return {
+          label: booking.status,
+          classes: 'bg-gray-50 text-[#64748B] border-gray-100',
+          icon: <AlertCircle size={12} />
+        };
+    }
+  };
+
+  // Dispute Form State
+  const [isDisputeFormOpen, setIsDisputeFormOpen] = React.useState(false);
+  const [disputeBookingId, setDisputeBookingId] = React.useState('');
+  const [disputeTitle, setDisputeTitle] = React.useState('');
+  const [disputeDescription, setDisputeDescription] = React.useState('');
+  const [disputeType, setDisputeType] = React.useState('overcharge');
+  const [submittingDispute, setSubmittingDispute] = React.useState(false);
+
+  const handleDisputeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!disputeTitle.trim() || !disputeDescription.trim()) {
+      showToast?.('Please specify a title and description for your dispute.', 'error');
+      return;
+    }
+    setSubmittingDispute(true);
+    try {
+      await createDispute({
+        bookingId: disputeBookingId,
+        title: disputeTitle,
+        description: disputeDescription,
+        type: disputeType
+      });
+      setIsDisputeFormOpen(false);
+      setDisputeTitle('');
+      setDisputeDescription('');
+      showToast?.('Dispute lodged successfully. Support team will review this.', 'success');
+    } catch (err: any) {
+      showToast?.(err.message || 'Failed to submit dispute.', 'error');
+    } finally {
+      setSubmittingDispute(false);
+    }
+  };
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -164,10 +362,15 @@ const MyBookings: React.FC = () => {
                           {vehicle?.location}, Pakistan
                         </div>
                       </div>
-                      <div className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${getStatusColor(booking.status)}`}>
-                        {getStatusIcon(booking.status)}
-                        {booking.status}
-                      </div>
+                      {(() => {
+                        const badge = getBookingBadge(booking);
+                        return (
+                          <div className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${badge.classes}`}>
+                            {badge.icon}
+                            {badge.label}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-gray-50">
@@ -185,12 +388,39 @@ const MyBookings: React.FC = () => {
                       </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Payment</p>
-                        <p className="font-black text-emerald-500 text-sm">{(booking.paymentStatus || 'unpaid').toUpperCase()}</p>
+                        <p className="font-black text-sm">
+                          {(() => {
+                            const isPaid = booking.paymentStatus === 'paid' || booking.bankReceiptApproved === 'approved';
+                            const isApprovedOrActive = booking.status === 'active' || booking.status === 'completed';
+                            
+                            if (isApprovedOrActive || isPaid) {
+                              if (booking.paymentType === 'partial') {
+                                if (booking.remainingPaymentStatus === 'paid') {
+                                  return <span className="text-emerald-600">PAID</span>;
+                                } else {
+                                  return <span className="text-blue-600">50% PAID, 50% AT HANDOVER</span>;
+                                }
+                              } else {
+                                return <span className="text-emerald-600">PAID</span>;
+                              }
+                            }
+                            
+                            const currentStatus = (booking.paymentStatus || 'pending').toUpperCase();
+                            const statusColor = currentStatus === 'PAID' ? 'text-emerald-600' : 'text-amber-500';
+                            return <span className={statusColor}>{currentStatus}</span>;
+                          })()}
+                        </p>
                       </div>
-                      {booking.destination && (
+                      {booking.pickupLocation && (
                         <div className="space-y-1">
-                          <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Destination</p>
-                          <p className="font-black text-[#1E293B] text-sm">{booking.destination}</p>
+                          <p className="text-[10px] font-bold text-[#2563EB] uppercase tracking-widest">Pick-up</p>
+                          <p className="font-black text-[#1E293B] text-xs truncate max-w-[120px]" title={booking.pickupLocation}>{booking.pickupLocation}</p>
+                        </div>
+                      )}
+                      {(booking.dropoffLocation || booking.destination) && (
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold text-[#2563EB] uppercase tracking-widest">Drop-off</p>
+                          <p className="font-black text-[#1E293B] text-xs truncate max-w-[120px]" title={booking.dropoffLocation || booking.destination}>{booking.dropoffLocation || booking.destination}</p>
                         </div>
                       )}
                     </div>
@@ -280,6 +510,28 @@ const MyBookings: React.FC = () => {
                                 <p className="font-black text-[#1E293B]">{formatBookingDate(booking.endDate)}</p>
                               </div>
                             </div>
+                            {booking.pickupLocation && (
+                              <div className="bg-[#F8FAFC] p-6 rounded-2xl flex items-center gap-4 border border-gray-50">
+                                <div className="w-12 h-12 bg-blue-50/50 rounded-xl flex items-center justify-center text-blue-600">
+                                  <MapPin size={20} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Pick-up Location</p>
+                                  <p className="font-semibold text-slate-800 text-sm leading-snug">{booking.pickupLocation}</p>
+                                </div>
+                              </div>
+                            )}
+                            {(booking.dropoffLocation || booking.destination) && (
+                              <div className="bg-[#F8FAFC] p-6 rounded-2xl flex items-center gap-4 border border-gray-50">
+                                <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-500">
+                                  <MapPin size={20} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Drop-off Location</p>
+                                  <p className="font-semibold text-indigo-900 text-sm leading-snug">{booking.dropoffLocation || booking.destination}</p>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -295,6 +547,271 @@ const MyBookings: React.FC = () => {
                               <p className="font-black text-[#1E293B] text-sm">{booking.bookingDate || 'N/A'}</p>
                             </div>
                           </div>
+                        </div>
+
+                        {/* Bank Transfer details and re-upload */}
+                        {booking.paymentMethod === 'bank_transfer' && (
+                          <div className="space-y-4 p-6 bg-slate-50 rounded-3xl border border-slate-100" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <Building2 className="text-blue-600 w-5 h-5" />
+                              <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">Official Escrow Bank Details</h4>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold text-slate-700">
+                              <div className="bg-white p-3 rounded-xl border border-slate-100 flex justify-between items-center">
+                                <div>
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase">Bank Name</p>
+                                  <p className="text-[#1E293B]">Bank of Punjab (BOP)</p>
+                                </div>
+                                <button type="button" onClick={() => handleCopy('Bank of Punjab (BOP)', 'Bank Name')} className="p-1.5 hover:bg-slate-50 rounded-lg text-blue-600">
+                                  <Copy size={14} />
+                                </button>
+                              </div>
+
+                              <div className="bg-white p-3 rounded-xl border border-slate-100 flex justify-between items-center">
+                                <div>
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase">Account Title</p>
+                                  <p className="text-[#1E293B]">EliteDrive Rental Solutions</p>
+                                </div>
+                                <button type="button" onClick={() => handleCopy('EliteDrive Rental Solutions', 'Account Title')} className="p-1.5 hover:bg-slate-50 rounded-lg text-blue-600">
+                                  <Copy size={14} />
+                                </button>
+                              </div>
+
+                              <div className="bg-white p-3 rounded-xl border border-slate-100 flex justify-between items-center">
+                                <div>
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase">Account Number</p>
+                                  <p className="text-[#1E293B]">6580214539100012</p>
+                                </div>
+                                <button type="button" onClick={() => handleCopy('6580214539100012', 'Account Number')} className="p-1.5 hover:bg-slate-50 rounded-lg text-blue-600">
+                                  <Copy size={14} />
+                                </button>
+                              </div>
+
+                              <div className="bg-white p-3 rounded-xl border border-slate-100 flex justify-between items-center">
+                                <div>
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase">Mandatory Reference Memo</p>
+                                  <p className="text-blue-700 font-extrabold">{booking.bankVerificationCode || 'ED-TR-165351'}</p>
+                                </div>
+                                <button type="button" onClick={() => handleCopy(booking.bankVerificationCode || 'ED-TR-165351', 'Reference Memo')} className="p-1.5 hover:bg-slate-50 rounded-lg text-blue-600">
+                                  <Copy size={14} />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 pt-4 border-t border-slate-200">
+                              <h5 className="text-[10px] uppercase font-black tracking-widest text-slate-400 mb-2">Submitted Payment Receipt Details</h5>
+                              <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-600 mb-3">
+                                <div>
+                                  <span className="text-[9px] uppercase font-bold text-slate-400">Sending Bank:</span> {booking.sendingBank || 'N/A'}
+                                </div>
+                                <div>
+                                  <span className="text-[9px] uppercase font-bold text-slate-400">Reference/Memo ID:</span> {booking.transactionRef || 'N/A'}
+                                </div>
+                              </div>
+                              {booking.receiptImage && (
+                                <div className="mt-2">
+                                  <span className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Receipt Screenshot:</span>
+                                  <div className="relative size-32 rounded-xl overflow-hidden border border-slate-200 bg-black group/img">
+                                    <img src={booking.receiptImage} alt="Receipt" className="w-full h-full object-cover group-hover/img:opacity-70 transition-all" />
+                                    <button 
+                                      type="button" 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const w = window.open();
+                                        w?.document.write(`<img src="${booking.receiptImage}" style="max-width:100%; max-height:100vh; display:block; margin:auto;"/>`);
+                                      }}
+                                      className="absolute inset-0 m-auto size-10 bg-black/60 text-white rounded-full flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-all"
+                                      title="Zoom Receipt"
+                                    >
+                                      <Eye size={16} />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* If Rejected - show Re-upload options */}
+                            {booking.bankReceiptApproved === 'rejected' && (
+                              <div className="mt-4 p-5 bg-rose-50 rounded-2xl border border-rose-100 space-y-4">
+                                <div className="flex items-start gap-2.5">
+                                  <AlertCircle className="text-rose-600 w-5 h-5 shrink-0 mt-0.5" />
+                                  <div>
+                                    <h5 className="text-sm font-black text-rose-900 uppercase tracking-tight">Receipt Rejected by Verifier</h5>
+                                    <p className="text-xs text-rose-700 font-semibold mt-1">
+                                      Reason: <strong className="font-extrabold">{booking.bankReceiptRejectionReason || 'Receipt details do not match bank records.'}</strong>
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="pt-2 space-y-3" onClick={(e) => e.stopPropagation()}>
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Re-submit Transfer Receipt</p>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="block text-[9px] uppercase font-extrabold text-slate-450 mb-1">Sending Bank *</label>
+                                      <input 
+                                        type="text" 
+                                        placeholder="e.g. HBL, Alfalah, BOP"
+                                        value={reuploadSenderBank}
+                                        onChange={(e) => setReuploadSenderBank(e.target.value)}
+                                        className="w-full text-xs rounded-xl border border-slate-200 h-10 px-3 bg-white font-semibold text-slate-800"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[9px] uppercase font-extrabold text-slate-450 mb-1">Transaction Ref / Memo ID *</label>
+                                      <input 
+                                        type="text" 
+                                        placeholder="Enter the transfer reference"
+                                        value={reuploadRef}
+                                        onChange={(e) => setReuploadRef(e.target.value)}
+                                        className="w-full text-xs rounded-xl border border-slate-200 h-10 px-3 bg-white font-semibold text-slate-800"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <label className="block text-[9px] uppercase font-extrabold text-slate-450 mb-1">Upload Receipt Screenshot (Max 10MB) *</label>
+                                    <div className="flex items-center gap-4">
+                                      <label className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer hover:bg-slate-50 text-slate-700">
+                                        <Upload size={14} className="text-[#2563EB]" />
+                                        Choose File
+                                        <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                                      </label>
+                                      {reuploadImage && (
+                                        <div className="flex items-center gap-2">
+                                          <div className="size-10 rounded-lg overflow-hidden border border-slate-200">
+                                            <img src={reuploadImage} alt="Re-upload Preview" className="w-full h-full object-cover" />
+                                          </div>
+                                          <span className="text-[10px] text-emerald-600 font-black uppercase">File Verified safe</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    disabled={isReuploading}
+                                    onClick={() => handleReuploadReceipt(booking.id)}
+                                    className="w-full py-3 bg-[#2563EB] text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-blue-700 transition-all shadow-lg"
+                                  >
+                                    {isReuploading ? 'Transmitting New Receipt...' : 'Transmit Re-upload Verification'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Incidents, Disputes, and E-Challans section */}
+                        <div className="space-y-4 pt-4 border-t border-slate-100">
+                          <h4 className="text-xs font-black uppercase tracking-widest text-[#94A3B8]">Incidents, Fines & Disputes</h4>
+                          
+                          {(() => {
+                            const matchingChallans = eChallans.filter(ec => ec.matchedBookingId === booking.id);
+                            const matchingIncidents = incidents.filter(inc => inc.bookingId === booking.id);
+                            const matchingDisputes = disputes.filter(dsp => dsp.bookingId === booking.id);
+
+                            return (
+                              <div className="space-y-3">
+                                {matchingChallans.length === 0 && matchingIncidents.length === 0 && matchingDisputes.length === 0 && (
+                                  <p className="text-xs text-slate-400 italic">No logged safety reports, fines, or active disputes for this booking.</p>
+                                )}
+
+                                {/* E-Challans */}
+                                {matchingChallans.map(ec => {
+                                  const canDispute = ec.status === 'pending';
+
+                                  return (
+                                    <div key={ec.id} className="p-4 rounded-xl bg-orange-50/50 border border-orange-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                                      <div>
+                                        <span className="inline-flex px-2 py-0.5 rounded bg-orange-100 text-orange-850 font-black uppercase tracking-wide text-[9px] mb-1">E-Challan Fine Ticket</span>
+                                        <p className="font-bold text-slate-800">Violation Ticket No: {ec.challanNumber}</p>
+                                        <p className="text-slate-500 mt-0.5">Amount: <strong className="text-orange-700">PKR {ec.amount.toLocaleString()}</strong> | Logged: {new Date(ec.date).toLocaleDateString()}</p>
+                                        <p className="text-[10px] text-slate-400 mt-1 italic">Status: {ec.status?.toUpperCase()}</p>
+                                      </div>
+                                      {canDispute && (
+                                        <button
+                                          type="button"
+                                          onClick={async (e) => {
+                                            e.stopPropagation();
+                                            if (confirm('Lodge official dispute against this traffic violation ticket?')) {
+                                              try {
+                                                await disputeEChallan(ec.id);
+                                                showToast?.('Challan disputed. Verification in progress.', 'success');
+                                              } catch (err: any) {
+                                                showToast?.(err.message || 'Failed to dispute challan.', 'error');
+                                              }
+                                            }
+                                          }}
+                                          className="px-3 py-1.5 bg-white border border-orange-300 text-orange-700 hover:bg-orange-55/70 rounded-lg font-black uppercase text-[10px]"
+                                        >
+                                          Dispute Challan
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+
+                                {/* Incidents */}
+                                {matchingIncidents.map(inc => (
+                                  <div key={inc.id} className="p-4 rounded-xl bg-red-50/50 border border-red-100/85 text-xs text-slate-700">
+                                    <div className="flex justify-between items-center">
+                                      <span className="inline-flex px-2 py-0.5 rounded bg-red-100 text-red-800 font-black uppercase tracking-wide text-[9px] mb-1">Accident / Damage Incident</span>
+                                      <span className="text-[9px] font-black uppercase text-red-600">{inc.status?.replace('_', ' ')}</span>
+                                    </div>
+                                    <p className="font-bold text-slate-800 mt-1">Type: {inc.type?.replace('_', ' ').toUpperCase()}</p>
+                                    <p className="text-slate-500 mt-0.5 font-bold">Occurred: {new Date(inc.occurredAt).toLocaleString()} | Location: {inc.location}</p>
+                                    <p className="text-slate-600 mt-1.5 leading-relaxed font-medium">{inc.statement}</p>
+                                    {inc.firNumber && (
+                                      <p className="text-[10px] font-mono text-blue-700 bg-blue-50 py-1 px-2 rounded-md mt-2 w-fit">Police FIR Reference: {inc.firNumber}</p>
+                                    )}
+                                  </div>
+                                ))}
+
+                                {/* Disputes */}
+                                {matchingDisputes.map(dsp => (
+                                  <div key={dsp.id} className="p-4 rounded-xl bg-blue-50/50 border border-blue-100/80 text-xs text-slate-800">
+                                    <div className="flex justify-between items-center mb-1">
+                                      <span className="inline-flex px-2 py-0.5 rounded bg-blue-100 text-blue-850 font-black uppercase tracking-wide text-[9px]">LODGED DISPUTE</span>
+                                      <span className="text-[9px] font-black uppercase text-blue-600">{dsp.status?.toUpperCase()}</span>
+                                    </div>
+                                    <p className="font-bold text-slate-900">{dsp.title}</p>
+                                    <p className="text-slate-500 text-[10px] uppercase font-bold mt-0.5">Category: {dsp.type}</p>
+                                    <p className="text-slate-600 mt-1 leading-relaxed font-semibold">{dsp.description}</p>
+                                    {dsp.resolutionDetails && (
+                                      <div className="mt-2 p-2 bg-green-50 text-green-800 border border-green-150 rounded-lg">
+                                        <p className="font-black text-[9px] uppercase">RESOLUTION ANSWER:</p>
+                                        <p className="font-medium text-[11px] mt-0.5">{dsp.resolutionDetails}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+
+                                {/* Action to lodge brand new dispute */}
+                                <div className="pt-2 flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDisputeBookingId(booking.id);
+                                      setIsDisputeFormOpen(true);
+                                    }}
+                                    className="px-4 py-2 text-xs font-black uppercase text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"
+                                  >
+                                    Lodge New Service Dispute
+                                  </button>
+                                  
+                                  <Link
+                                    to={`/report-incident?bookingId=${booking.id}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="px-4 py-2 text-xs font-black uppercase text-red-600 bg-red-50 hover:bg-red-100 rounded-lg"
+                                  >
+                                    Report Accident / Incident
+                                  </Link>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -334,6 +851,81 @@ const MyBookings: React.FC = () => {
         vehicles={vehicles}
         onConfirm={handleConfirmModify}
       />
+
+      {isDisputeFormOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl border border-slate-100 p-8 max-w-lg w-full space-y-6 shadow-2xl">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-xl font-bold text-slate-950 uppercase tracking-tight">Lodge Booking Dispute</h3>
+                <p className="text-xs text-slate-400 mt-1">Submit your claim regarding billing errors or driver negligence.</p>
+              </div>
+              <button 
+                onClick={() => setIsDisputeFormOpen(false)}
+                className="text-slate-450 hover:text-slate-900 font-extrabold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleDisputeSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs uppercase font-extrabold text-slate-500 tracking-wider mb-1">Dispute Reason Category</label>
+                <select
+                  value={disputeType}
+                  onChange={(e) => setDisputeType(e.target.value)}
+                  className="w-full text-xs rounded-xl border border-slate-200 h-11 px-4 font-bold text-slate-800 bg-white"
+                >
+                  <option value="overcharge">Billing Overcharge / Payment dispute</option>
+                  <option value="damage_charge">Condition / Penalty charge dispute</option>
+                  <option value="service_issue">Service / Driver Negligence issue</option>
+                  <option value="e_challan">Traffic violation citation dispute</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs uppercase font-extrabold text-slate-500 tracking-wider mb-1">Subject / Summary *</label>
+                <input 
+                  type="text" 
+                  value={disputeTitle}
+                  onChange={(e) => setDisputeTitle(e.target.value)}
+                  placeholder="e.g. Fuel balance calculation error"
+                  className="w-full text-xs rounded-xl border border-slate-200 h-11 px-4 font-semibold text-slate-850"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs uppercase font-extrabold text-slate-500 tracking-wider mb-1">Detailed Narrative / Request *</label>
+                <textarea 
+                  value={disputeDescription}
+                  onChange={(e) => setDisputeDescription(e.target.value)}
+                  placeholder="Provide precise details, requested refund amount, timestamps, or driver details here..."
+                  className="w-full text-xs rounded-xl border border-slate-200 p-4 font-medium min-h-[120px] resize-none text-slate-800"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDisputeFormOpen(false)}
+                  className="flex-1 py-3.5 border-2 border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-black uppercase rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingDispute}
+                  className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-lg transition-all"
+                >
+                  {submittingDispute ? 'Transmitting Claim...' : 'Transmit Dispute'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

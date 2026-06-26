@@ -49,6 +49,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
   const activeBooking = allBookings.find(b => b.vehicleId === vehicle.id && (b.status === 'active' || b.status === 'pending'));
   const isPastReturn = activeBooking && new Date() >= new Date(activeBooking.endDate);
   const effectiveStatus = (vehicle.status === 'booked' || vehicle.status === 'rented') && isPastReturn ? 'available' : vehicle.status;
+  const isCurrentlyBooked = (vehicle.status === 'booked' || vehicle.status === 'rented') && !isPastReturn;
 
   const cardLink = canEdit ? `/edit-vehicle/${vehicle.id}` : `/vehicle/${vehicle.id}?days=${rentalDays}`;
 
@@ -108,8 +109,10 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
         </button>
 
         {showBadge && (
-          <div className="absolute top-4 right-4 bg-[#2563EB] text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg z-20">
-            {getBadgeText()}
+          <div className={`absolute top-4 right-4 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg z-20 ${
+            isCurrentlyBooked ? 'bg-amber-500 text-white' : 'bg-[#2563EB] text-white'
+          }`}>
+            {isCurrentlyBooked ? 'Booked' : getBadgeText()}
           </div>
         )}
 
@@ -141,9 +144,21 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
             <p className="text-[10px] font-black text-[#2563EB] uppercase tracking-widest">
               {getHighlightText()}
             </p>
-            <p className="text-xs font-bold text-[#64748B]">
+             <p className="text-xs font-bold text-[#64748B]">
               <HighlightText text={getSubTitle()} highlight={searchQuery} />
             </p>
+            {isCurrentlyBooked && activeBooking && (
+              <p className="text-amber-600 font-extrabold text-[11px] mt-2 bg-amber-50/80 px-3 py-1.5 border border-amber-100 rounded-xl inline-block leading-relaxed tracking-wide">
+                Will be available by {new Date(activeBooking.endDate).toLocaleString('en-US', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true
+                })}
+              </p>
+            )}
           </div>
           <div className="text-right">
             <p className="text-2xl font-black text-[#2563EB]">PKR {vehicle.pricePerDay.toLocaleString()}</p>

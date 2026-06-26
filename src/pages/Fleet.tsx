@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import CustomCalendar from '../components/ui/CustomCalendar';
+import { MapPlacesAutocomplete } from '../components/ui/MapPlacesAutocomplete';
 import { 
   MapPin, 
   Navigation, 
@@ -26,8 +27,12 @@ const Fleet: React.FC = () => {
   const [searchParams] = useSearchParams();
 
   // Search/Filter State
-  const [pickupLocation, setPickupLocation] = useState('Lahore, Pakistan');
-  const [dropoffLocation, setDropoffLocation] = useState('');
+  const [pickupLocation, setPickupLocation] = useState(() => {
+    return localStorage.getItem('elitedrive_pickup_location') || 'Lahore, Pakistan';
+  });
+  const [dropoffLocation, setDropoffLocation] = useState(() => {
+    return localStorage.getItem('elitedrive_dropoff_location') || '';
+  });
   const todayStart = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -161,29 +166,25 @@ const Fleet: React.FC = () => {
               {/* Row 1: Locations */}
               <div className="space-y-3">
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-1">Pickup Location</label>
-                <div className="relative group">
-                  <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/60 group-focus-within:text-primary transition-colors" size={20} />
-                  <input 
-                    type="text"
-                    value={pickupLocation}
-                    onChange={(e) => setPickupLocation(e.target.value)}
-                    placeholder="City or Airport"
-                    className="w-full pl-14 pr-6 py-4 bg-slate-100 rounded-[20px] border-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all text-slate-900 font-bold placeholder:text-slate-400"
-                  />
-                </div>
+                <MapPlacesAutocomplete
+                  value={pickupLocation}
+                  onChange={setPickupLocation}
+                  placeholder="City or Airport"
+                  className="w-full pl-14 pr-6 py-4 bg-slate-100 rounded-[20px] border-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all text-slate-900 font-bold placeholder:text-slate-400"
+                  icon={<MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/60 group-focus-within:text-primary transition-colors z-10" size={20} />}
+                  fieldName="pickup"
+                />
               </div>
               <div className="space-y-3">
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-1">Drop-off Location</label>
-                <div className="relative group">
-                  <Navigation className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/60 group-focus-within:text-primary transition-colors" size={20} />
-                  <input 
-                    type="text"
-                    value={dropoffLocation}
-                    onChange={(e) => setDropoffLocation(e.target.value)}
-                    placeholder="Same as pickup"
-                    className="w-full pl-14 pr-6 py-4 bg-slate-100 rounded-[20px] border-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all text-slate-900 font-bold placeholder:text-slate-400"
-                  />
-                </div>
+                <MapPlacesAutocomplete
+                  value={dropoffLocation}
+                  onChange={setDropoffLocation}
+                  placeholder="Same as pickup"
+                  className="w-full pl-14 pr-6 py-4 bg-slate-100 rounded-[20px] border-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all text-slate-900 font-bold placeholder:text-slate-400"
+                  icon={<Navigation className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/60 group-focus-within:text-primary transition-colors z-10" size={20} />}
+                  fieldName="dropoff"
+                />
               </div>
 
               {/* Row 2: Dates */}

@@ -26,6 +26,18 @@ const VehicleDetails: React.FC = () => {
   const { vehicles, user, showToast, allBookings } = useStore();
   const vehicle = vehicles.find(v => v.id === id);
 
+  const [selectedImage, setSelectedImage] = React.useState('');
+  const lastVehicleId = React.useRef<string | undefined>(undefined);
+
+  React.useEffect(() => {
+    if (vehicle) {
+      if (lastVehicleId.current !== vehicle.id || !selectedImage) {
+        setSelectedImage(vehicle.image);
+        lastVehicleId.current = vehicle.id;
+      }
+    }
+  }, [vehicle, selectedImage]);
+
   const activeBooking = vehicle ? allBookings.find(b => b.vehicleId === vehicle.id && (b.status === 'active' || b.status === 'pending')) : null;
   const isPastReturn = activeBooking && new Date() >= new Date(activeBooking.endDate);
   const effectiveStatus = vehicle ? (((vehicle.status === 'booked' || vehicle.status === 'rented') && isPastReturn) ? 'available' : vehicle.status) : 'available';
@@ -91,10 +103,11 @@ const VehicleDetails: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
+            key={selectedImage}
             className="aspect-video rounded-[32px] overflow-hidden shadow-xl shadow-blue-100/50 border border-gray-100"
           >
             <img 
-              src={vehicle.image} 
+              src={selectedImage || vehicle.image} 
               alt={vehicle.name}
               referrerPolicy="no-referrer"
               onError={(e) => {
@@ -105,25 +118,43 @@ const VehicleDetails: React.FC = () => {
             />
           </motion.div>
           
-          <div className="grid grid-cols-3 gap-4 max-w-sm">
-            {[
-              vehicle.image,
-              `https://picsum.photos/seed/${vehicle.id}2/400/400`,
-              `https://picsum.photos/seed/${vehicle.id}3/400/400`
-            ].map((img, i) => (
-              <div key={i} className="aspect-square rounded-[16px] overflow-hidden border border-[#E2E8F0] cursor-pointer hover:border-[#2563EB] transition-all p-0.5">
-                <img 
-                  src={img} 
-                  alt={`Angle ${i + 1}`} 
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800';
-                  }}
-                  className="w-full h-full object-cover rounded-[14px]" 
-                />
-              </div>
-            ))}
+          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-3 max-w-xl">
+            {(() => {
+              // Gather primary image and actual uploaded gallery images
+              const gathered = [
+                vehicle.image,
+                ...(vehicle.images || [])
+              ].filter(img => !!img);
+
+              // Pad if they are fewer than 4 images so that customer always gets a proper gallery
+              while (gathered.length < 4) {
+                gathered.push(`https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=400&v=${gathered.length}`);
+              }
+
+              return gathered.map((img, i) => {
+                const isActive = selectedImage === img;
+                return (
+                  <div 
+                    key={i} 
+                    onClick={() => setSelectedImage(img)}
+                    className={`aspect-square rounded-[16px] overflow-hidden border cursor-pointer hover:border-blue-600 hover:scale-105 transition-all p-0.5 ${
+                      isActive ? 'border-blue-600 ring-2 ring-blue-600/20' : 'border-[#E2E8F0]'
+                    }`}
+                  >
+                    <img 
+                      src={img} 
+                      alt={`Gallery view ${i + 1}`} 
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800';
+                      }}
+                      className="w-full h-full object-cover rounded-[14px]" 
+                    />
+                  </div>
+                );
+              });
+            })()}
           </div>
 
           <div className="bg-white p-8 rounded-[32px] border border-gray-100 space-y-6 shadow-sm">

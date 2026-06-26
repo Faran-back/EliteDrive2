@@ -41,7 +41,7 @@ const getDeterministicDOB = (name: string = 'User') => {
 };
 
 const Customers: React.FC = () => {
-  const { allUsers, allBookings, vehicles, verifyUserCNIC } = useStore();
+  const { allUsers, allBookings, vehicles, verifyUserCNIC, toggleUserBlacklist } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'loyalty'>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<User | null>(null);
@@ -132,17 +132,24 @@ const Customers: React.FC = () => {
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    {customer.cnicVerified ? (
-                      <span className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-200 shadow-xs">
-                        <ShieldCheck size={12} className="text-emerald-700" />
-                        Verified CNIC
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-200/50">
-                        <ShieldAlert size={12} className="text-amber-600" />
-                        Unverified
-                      </span>
-                    )}
+                     <div className="flex flex-col items-end gap-1.5">
+                       {customer.isBlacklisted && (
+                         <span className="flex items-center gap-1 px-2.5 py-1 bg-red-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest border border-red-700 shadow-sm">
+                           BLACKLISTED
+                         </span>
+                       )}
+                       {customer.cnicVerified ? (
+                         <span className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-200 shadow-xs">
+                           <ShieldCheck size={12} className="text-emerald-700" />
+                           Verified CNIC
+                         </span>
+                       ) : (
+                         <span className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-200/50">
+                           <ShieldAlert size={12} className="text-amber-600" />
+                           Unverified
+                         </span>
+                       )}
+                     </div>
                   </div>
 
                   <h3 className="text-xl font-black text-slate-900 mb-1 group-hover:text-blue-600 transition-colors">{customer.name}</h3>
@@ -371,30 +378,63 @@ const Customers: React.FC = () => {
                       </div>
                     )}
 
-                    {/* CNIC verification Button Trigger Action */}
-                    <div className="pt-2 flex items-center gap-3">
-                      {!currentCustomer.cnicVerified ? (
-                        <button
-                          onClick={async () => {
-                            await verifyUserCNIC(currentCustomer.id, true);
-                          }}
-                          className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/10 hover:shadow-emerald-700/20 active:scale-[0.98]"
-                        >
-                          <ShieldCheck size={16} />
-                          Verify CNIC
-                        </button>
-                      ) : (
-                        <button
-                          onClick={async () => {
-                            await verifyUserCNIC(currentCustomer.id, false);
-                          }}
-                          className="px-6 py-3.5 bg-red-50 hover:bg-red-105 text-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-[0.98]"
-                        >
-                          <X size={16} />
-                          Revoke Verification Status
-                        </button>
-                      )}
-                    </div>
+                     {/* Outstanding Balance Info */}
+                     <div className="p-4 rounded-2xl bg-blue-50/40 border border-blue-100 flex items-center justify-between text-xs">
+                       <div>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Outstanding Balance</p>
+                         <p className="font-semibold text-slate-500 mt-1">Pending fines, damage penalties, or e-challan claims.</p>
+                       </div>
+                       <p className={`text-lg font-black ${currentCustomer.outstandingBalance && currentCustomer.outstandingBalance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                         PKR {(currentCustomer.outstandingBalance || 0).toLocaleString()}
+                       </p>
+                     </div>
+
+                     {/* CNIC verification & Blacklist Actions */}
+                     <div className="pt-2 flex flex-wrap items-center gap-3">
+                       {!currentCustomer.cnicVerified ? (
+                         <button
+                           onClick={async () => {
+                             await verifyUserCNIC(currentCustomer.id, true);
+                           }}
+                           className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/10 hover:shadow-emerald-700/20 active:scale-[0.98]"
+                         >
+                           <ShieldCheck size={16} />
+                           Verify CNIC
+                         </button>
+                       ) : (
+                         <button
+                           onClick={async () => {
+                             await verifyUserCNIC(currentCustomer.id, false);
+                           }}
+                           className="px-6 py-3.5 bg-red-105 hover:bg-red-200 text-red-605 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-[0.98]"
+                         >
+                           <X size={16} />
+                           Revoke Verification Status
+                         </button>
+                       )}
+
+                       {currentCustomer.isBlacklisted ? (
+                         <button
+                           onClick={async () => {
+                             await toggleUserBlacklist(currentCustomer.id, false);
+                           }}
+                           className="px-6 py-3.5 bg-slate-900 text-white hover:bg-slate-950 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                         >
+                           Unblacklist Account
+                         </button>
+                       ) : (
+                         <button
+                           onClick={async () => {
+                             if (confirm('Are you ABSOLUTELY certain you want to lock and BLACKLIST this client account? Booking functions will be instantly restricted.')) {
+                               await toggleUserBlacklist(currentCustomer.id, true);
+                             }
+                           }}
+                           className="px-6 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest transition-all"
+                         >
+                           Blacklist Customer
+                         </button>
+                       )}
+                     </div>
 
                   </div>
 

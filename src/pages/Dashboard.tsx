@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CustomCalendar from '../components/ui/CustomCalendar';
+import { MapPlacesAutocomplete } from '../components/ui/MapPlacesAutocomplete';
 import { 
   MapPin, 
   Navigation, 
@@ -23,8 +24,12 @@ const Dashboard: React.FC = () => {
   const { vehicles, allBookings } = useStore();
   
   // Form State
-  const [pickupLocation, setPickupLocation] = useState('Lahore, Pakistan');
-  const [dropoffLocation, setDropoffLocation] = useState('');
+  const [pickupLocation, setPickupLocation] = useState(() => {
+    return localStorage.getItem('elitedrive_pickup_location') || 'Lahore, Pakistan';
+  });
+  const [dropoffLocation, setDropoffLocation] = useState(() => {
+    return localStorage.getItem('elitedrive_dropoff_location') || '';
+  });
   const todayStart = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -84,18 +89,6 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="animate-in fade-in duration-700">
-      {/* Progress Indicator */}
-      <div className="flex justify-center mb-12">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-primary uppercase tracking-tighter">Step 1 of 3: Search</span>
-          <div className="flex gap-1.5">
-            <div className="h-1.5 w-8 bg-primary rounded-full"></div>
-            <div className="h-1.5 w-8 bg-slate-200 rounded-full"></div>
-            <div className="h-1.5 w-8 bg-slate-200 rounded-full"></div>
-          </div>
-        </div>
-      </div>
-
       <div className="flex flex-col lg:flex-row gap-12">
         {/* Left Column: Search Form (65%) */}
         <div className="lg:w-[65%]">
@@ -107,29 +100,25 @@ const Dashboard: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2.5">
                   <label className="text-sm font-bold text-slate-500 ml-1">Pickup Location</label>
-                  <div className="relative flex items-center">
-                    <MapPin className="absolute left-4 text-slate-400" size={20} />
-                    <input 
-                      type="text" 
-                      value={pickupLocation}
-                      onChange={(e) => setPickupLocation(e.target.value)}
-                      placeholder="City or airport"
-                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-primary text-slate-900 font-semibold"
-                    />
-                  </div>
+                  <MapPlacesAutocomplete
+                    value={pickupLocation}
+                    onChange={setPickupLocation}
+                    placeholder="City or airport"
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-primary text-slate-900 font-semibold"
+                    icon={<MapPin className="absolute left-4 text-slate-400 z-10" size={20} />}
+                    fieldName="pickup"
+                  />
                 </div>
                 <div className="space-y-2.5">
                   <label className="text-sm font-bold text-slate-500 ml-1">Drop-off Location</label>
-                  <div className="relative flex items-center">
-                    <Navigation className="absolute left-4 text-slate-400" size={20} />
-                    <input 
-                      type="text" 
-                      value={dropoffLocation}
-                      onChange={(e) => setDropoffLocation(e.target.value)}
-                      placeholder="Same as pickup"
-                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-primary text-slate-900 font-semibold"
-                    />
-                  </div>
+                  <MapPlacesAutocomplete
+                    value={dropoffLocation}
+                    onChange={setDropoffLocation}
+                    placeholder="Same as pickup"
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-primary text-slate-900 font-semibold"
+                    icon={<Navigation className="absolute left-4 text-slate-400 z-10" size={20} />}
+                    fieldName="dropoff"
+                  />
                 </div>
               </div>
 

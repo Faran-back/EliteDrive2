@@ -1,5 +1,6 @@
 {
   "name": "EliteDrive",
   "description": "A premium AI-driven car rental platform for smart mobility in Pakistan.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -14,21 +14,44 @@ import {
   Download, 
   Headphones, 
   XCircle, 
-  Info 
+  Info,
+  Clock,
+  RefreshCw,
+  ArrowRight
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { downloadReceiptPDF } from '../utils/receiptGenerator';
 import { calculateBaseFare, getVehicleFareConfig } from '../utils/pricing';
 
 const BookingConfirmed: React.FC = () => {
-  const { user, bookings, vehicles, setIsChatOpen, cancelBooking, showToast } = useStore();
+  const { user, bookings, vehicles, setIsChatOpen, cancelBooking, showToast, refreshData } = useStore();
   const navigate = useNavigate();
   
   const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshData();
+      showToast?.('Booking status updated!', 'success');
+    } catch (err) {
+      console.error('Error refreshing status:', err);
+      showToast?.('Failed to update status', 'error');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
   
-  // Get the latest booking
-  const latestBooking = bookings.length > 0 ? bookings[bookings.length - 1] : null;
+  // Get the latest booking by sorting on createdAt and parsing booking ID timestamps (e.g. b12345) to always get the most recently created booking
+  const latestBooking = bookings.length > 0 
+    ? [...bookings].sort((a, b) => {
+        const timeA = new Date(a.createdAt || 0).getTime() || parseInt(a.id.replace(/\D/g, '') || '0');
+        const timeB = new Date(b.createdAt || 0).getTime() || parseInt(b.id.replace(/\D/g, '') || '0');
+        return timeB - timeA;
+      })[0]
+    : null;
   const vehicle = latestBooking ? vehicles.find(v => v.id === latestBooking.vehicleId) : null;
 
   if (!latestBooking || !vehicle) {
@@ -198,25 +221,119 @@ END:VCALENDAR`;
       >
         {/* Success Status Header */}
         <div className="flex flex-col items-center gap-6">
-          <div className="flex flex-col items-center gap-4">
-            <motion.div 
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              className="size-20 rounded-full bg-green-100 flex items-center justify-center border-4 border-green-500/20"
-            >
-              <Check className="text-green-500 size-10 stroke-[3]" />
-            </motion.div>
-            <div className="flex flex-col items-center gap-2">
-              <span className="bg-green-100 text-green-700 text-[10px] font-black px-3 py-1 rounded-full border border-green-200 flex items-center gap-1.5 uppercase tracking-wider">
-                <span className="size-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                Confirmed
-              </span>
-              <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight text-center">Your trip is booked!</h1>
-              <p className="text-slate-500 font-medium">Booking ID: <span className="text-[#2463eb] font-bold">{(latestBooking.id || '').toUpperCase()}</span></p>
-            </div>
+          <div className="flex flex-col items-center gap-4 w-full">
+            {latestBooking.status === 'pending' ? (
+              <>
+                <motion.div 
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                  className="size-20 rounded-full bg-amber-100 flex items-center justify-center border-4 border-amber-500/20"
+                >
+                  <Clock className="text-amber-500 size-10 stroke-[3]" />
+                </motion.div>
+                <div className="flex flex-col items-center gap-2 max-w-2xl text-center">
+                  <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-3 py-1 rounded-full border border-amber-200 flex items-center gap-1.5 uppercase tracking-wider">
+                    <span className="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    Pending Verification
+                  </span>
+                  <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight text-center">Booking Submitted Successfully</h1>
+                  <p className="text-slate-500 font-medium">Reference ID: <span className="text-[#2463eb] font-bold">{(latestBooking.id || '').toUpperCase()}</span></p>
+                  
+                  {/* Next step prominent message */}
+                  <div className="mt-4 p-5 bg-amber-50/70 border border-amber-200 rounded-2xl max-w-lg mx-auto">
+                    <p className="text-xs text-amber-900 font-semibold leading-relaxed">
+                      Thank you for your payment! Our team is now verifying your receipt. You will receive a confirmation once the booking is approved (usually within 1–2 hours).
+                    </p>
+                  </div>
+
+                  {/* Refresh Status button */}
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="mt-4 flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-slate-300 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-700 shadow-sm hover:shadow active:scale-95 transition-all duration-200 cursor-pointer mx-auto"
+                  >
+                    <RefreshCw className={`size-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    {isRefreshing ? 'Refreshing...' : 'Refresh Status'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <motion.div 
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                  className="size-20 rounded-full bg-green-100 flex items-center justify-center border-4 border-green-500/20"
+                >
+                  <Check className="text-green-500 size-10 stroke-[3]" />
+                </motion.div>
+                <div className="flex flex-col items-center gap-2">
+                  <span className="bg-green-100 text-green-700 text-[10px] font-black px-3 py-1 rounded-full border border-green-200 flex items-center gap-1.5 uppercase tracking-wider">
+                    <span className="size-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                    Confirmed
+                  </span>
+                  <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight text-center">Your trip is booked!</h1>
+                  <p className="text-slate-500 font-medium">Booking ID: <span className="text-[#2463eb] font-bold">{(latestBooking.id || '').toUpperCase()}</span></p>
+                </div>
+              </>
+            )}
           </div>
         </div>
+
+        {/* What Happens Next Section for Pending bookings */}
+        {latestBooking.status === 'pending' && (
+          <div className="w-full bg-slate-50 border border-slate-100 rounded-[32px] p-6 md:p-8">
+            <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+              </span>
+              What Happens Next
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+              {/* Step 1 */}
+              <div className="flex gap-4 items-start bg-white p-5 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
+                <div className="size-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-sm shrink-0 border border-blue-100">
+                  1
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-slate-900 mb-1">Admin Verifies Receipt</h4>
+                  <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                    Our team checks the escrow transfer receipt reference details.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="flex gap-4 items-start bg-white p-5 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
+                <div className="size-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-sm shrink-0 border border-blue-100">
+                  2
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-slate-900 mb-1">Booking is Approved</h4>
+                  <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                    The status transitions to active and your vehicle is officially allocated.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="flex gap-4 items-start bg-white p-5 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
+                <div className="size-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-sm shrink-0 border border-blue-100">
+                  3
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-slate-900 mb-1">Get Driver Details</h4>
+                  <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                    Confirmation notification is sent along with Ali Khan driver contact dispatch.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Map & Location */}
         <div className="w-full space-y-3">
@@ -305,31 +422,25 @@ END:VCALENDAR`;
                   <CalendarCheck className="text-[#2463eb] size-6" />
                 </div>
                 <div className="flex flex-col">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Rental Duration Info</p>
-                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">{rentalDuration} {unitLabel}</h3>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
-                    {rentalType.charAt(0).toUpperCase() + rentalType.slice(1)} Booking
-                  </p>
+                  <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-0.5">Duration</p>
+                  <h3 className="text-base font-bold text-slate-900">{rentalDuration} {unitLabel} ({rentalType})</h3>
                 </div>
               </div>
 
               {/* Schedule Details (Pickup vs Return Grid) */}
               <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100/50">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Pickup Date</span>
-                  <span className="text-xs font-black text-slate-950">{pickupStr}</span>
-                  <span className="text-[10px] text-slate-500 font-bold">Scheduled Pick-up Time</span>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">Pickup</span>
+                  <span className="text-xs font-bold text-slate-950">{pickupStr}</span>
                 </div>
                 <div className="flex flex-col gap-0.5 border-l border-slate-200 pl-4">
-                  <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Return Date</span>
-                  <span className="text-xs font-black text-slate-950">{returnStr}</span>
-                  <span className="text-[10px] text-amber-600 font-black uppercase tracking-wider">Late fees apply after this time</span>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">Return</span>
+                  <span className="text-xs font-bold text-slate-950">{returnStr}</span>
                 </div>
               </div>
             </div>
 
             <div className="pt-4 mt-4 border-t border-slate-100">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Primary Actions</p>
               <div className="grid grid-cols-2 gap-3">
                 <button 
                   onClick={() => {

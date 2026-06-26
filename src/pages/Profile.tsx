@@ -14,7 +14,10 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
-  X
+  X,
+  IdCard,
+  FileBadge,
+  Upload
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -25,7 +28,6 @@ import { profileSchema, ProfileFormData } from '../schemas/profile';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { fileToBase64, validateImage } from '../lib/imageUtils';
 import { useRef, useEffect } from 'react';
-import { ConfirmationResult } from 'firebase/auth';
 
 const Profile: React.FC = () => {
   const { 
@@ -47,7 +49,7 @@ const Profile: React.FC = () => {
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [otpCode, setOtpCode] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [confirmationResult, setConfirmationResult] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isBypassed = user?.email && ['ahmed12@gmail.com', 'test@example.com'].includes(user.email.toLowerCase());
@@ -64,6 +66,7 @@ const Profile: React.FC = () => {
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -71,10 +74,21 @@ const Profile: React.FC = () => {
       name: user?.name || '',
       email: user?.email || '',
       phone: user?.phone || '',
-      location: 'Lahore, Pakistan',
+      location: user?.location || 'Lahore, Pakistan',
     },
     mode: 'onChange',
   });
+
+  useEffect(() => {
+    if (user) {
+      reset({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        location: user.location || 'Lahore, Pakistan',
+      });
+    }
+  }, [user, reset]);
 
   const onSubmit = async (data: ProfileFormData) => {
     setIsSaving(true);
@@ -82,7 +96,8 @@ const Profile: React.FC = () => {
       await updateUser({ 
         name: data.name, 
         email: data.email, 
-        phone: data.phone 
+        phone: data.phone,
+        location: data.location
       });
       showToast('Profile updated successfully!', 'success');
     } catch (error) {
@@ -122,6 +137,34 @@ const Profile: React.FC = () => {
       showToast('Failed to upload image', 'error');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const [isUploadingDoc, setIsUploadingDoc] = useState<{ [key: string]: boolean }>({
+    cnicFront: false,
+    cnicBack: false,
+    license: false,
+  });
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'cnicFront' | 'cnicBack' | 'license') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('File size must be less than 5MB', 'error');
+      return;
+    }
+
+    setIsUploadingDoc(prev => ({ ...prev, [field]: true }));
+    try {
+      const base64 = await fileToBase64(file);
+      await updateUser({ [field]: base64, cnicVerified: false });
+      showToast(`${field === 'license' ? 'Driving License' : field === 'cnicFront' ? 'CNIC Front' : 'CNIC Back'} uploaded successfully!`, 'success');
+    } catch (error) {
+      console.error('Doc upload error:', error);
+      showToast('Failed to upload document. Please try again.', 'error');
+    } finally {
+      setIsUploadingDoc(prev => ({ ...prev, [field]: false }));
     }
   };
 
@@ -359,6 +402,129 @@ const Profile: React.FC = () => {
               </button>
             </div>
           </form>
+
+          {/* Identity Verification Documents Card */}
+          <div className="bg-white p-10 rounded-[48px] border border-gray-100 shadow-sm space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <IdCard className="text-[#2563EB]" size={22} />
+                  </div>
+                  <h3 className="text-xl font-black text-[#1E293B]">Identity Verification</h3>
+                </div>
+                <p className="text-sm text-[#64748B] font-medium leading-relaxed">
+                  Upload driving license and CNIC front & back scans to unlock vehicle rentals.
+                </p>
+              </div>
+
+              {/* Status Badge */}
+              <div className="flex items-center">
+                {user?.cnicVerified ? (
+                  <span className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-700 font-extrabold text-xs uppercase tracking-wider rounded-2xl border border-emerald-100">
+                    <CheckCircle size={14} /> Fully Verified
+                  </span>
+                ) : (user?.cnicFront || user?.cnicBack || user?.license) ? (
+                  <span className="flex items-center gap-1.5 px-4 py-2 bg-amber-50 text-amber-700 font-extrabold text-xs uppercase tracking-wider rounded-2xl border border-amber-100">
+                    <AlertCircle size={14} /> Pending Review
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 px-4 py-2 bg-[#F1F5F9] text-slate-500 font-extrabold text-xs uppercase tracking-wider rounded-2xl border border-slate-200">
+                    <IdCard size={14} /> Documents Required
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Verification Helper Banner */}
+            {!user?.cnicVerified && (
+              <div className="p-5 bg-blue-50/50 rounded-3xl border border-blue-100 flex items-start gap-4">
+                <ShieldCheck className="text-blue-600 shrink-0 mt-0.5" size={20} />
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-blue-900 leading-normal">
+                    Why verify your identity documents?
+                  </p>
+                  <p className="text-xs text-blue-700/85 font-medium leading-relaxed">
+                    Elite Drive is a secure, premium luxury vehicle rental service in Pakistan. To prevent fraud, ensure vehicle safety, and comply with state regularities, we require verified driving licenses and CNICs. Your data remains encrypted and safe with us.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Document Upload Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                { label: 'CNIC Card (Front)', field: 'cnicFront' as const },
+                { label: 'CNIC Card (Back)', field: 'cnicBack' as const },
+                { label: 'Driving License', field: 'license' as const }
+              ].map((docItem) => {
+                const docVal = user?.[docItem.field];
+                const isUploading = isUploadingDoc[docItem.field];
+
+                return (
+                  <div key={docItem.field} className="space-y-3">
+                    <p className="text-xs font-black text-[#64748B] ml-1 uppercase tracking-wider">{docItem.label}</p>
+                    
+                    <div className="relative group aspect-[1.58/1] rounded-[24px] overflow-hidden border-2 border-dashed border-slate-200 hover:border-[#2563EB] bg-slate-50 transition-all flex items-center justify-center">
+                      {isUploading ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <Loader2 className="animate-spin text-[#2563EB]" size={28} />
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Uploading...</span>
+                        </div>
+                      ) : docVal ? (
+                        <>
+                          <img src={docVal} alt={docItem.label} className="w-full h-full object-cover" />
+                          
+                          {/* Hover Overlay for Changing Image */}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center gap-2">
+                            <Upload className="text-white" size={24} />
+                            <span className="text-white text-[10px] font-black uppercase tracking-widest">Replace Document</span>
+                            <label className="absolute inset-0 cursor-pointer">
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                onChange={(e) => handleDocUpload(e, docItem.field)} 
+                                className="hidden" 
+                              />
+                            </label>
+                          </div>
+
+                          {/* Verification status tag pinned */}
+                          <div className="absolute right-3 top-3">
+                            {user?.cnicVerified ? (
+                              <span className="flex items-center gap-1 bg-emerald-500/90 backdrop-blur-xs text-white px-2.5 py-1 rounded-full text-[8px] font-extrabold tracking-wider uppercase shadow-xs">
+                                <CheckCircle size={10} /> Verified
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 bg-amber-500/90 backdrop-blur-xs text-white px-2.5 py-1 rounded-full text-[8px] font-extrabold tracking-wider uppercase shadow-xs">
+                                <AlertCircle size={10} /> Pending
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-6 gap-3 group-hover:bg-blue-50/10">
+                          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
+                            <Upload className="text-[#94A3B8] group-hover:text-[#2563EB] transition-colors" size={20} />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[10px] font-black text-[#1E293B] uppercase tracking-wider">Upload Scan</p>
+                            <p className="text-[9px] text-[#94A3B8] font-bold mt-0.5">PNG, JPG up to 5MB</p>
+                          </div>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={(e) => handleDocUpload(e, docItem.field)} 
+                            className="hidden" 
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <button className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm flex items-center justify-between hover:shadow-xl transition-all group">

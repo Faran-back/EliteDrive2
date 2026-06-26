@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Car, AlertCircle, Mail, Lock, User as UserIcon, ArrowRight, Github, Chrome, Shield, ChevronDown, ChevronUp, IdCard, FileBadge, Info } from 'lucide-react';
-import { auth, googleProvider, db } from '../firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, updateProfile } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
-import { getAuthErrorMessage } from '../utils/authErrors';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, signupSchema, LoginFormData, SignupFormData } from '../schemas/auth';
@@ -21,7 +17,7 @@ const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { showToast, setUser, createRoleRequest } = useStore();
+  const { showToast, login, registerUser } = useStore();
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
 
   // Sync mode with URL if needed, or just default to signin
@@ -119,54 +115,11 @@ const Auth: React.FC = () => {
     setError(null);
     setLoading(true);
     try {
-      let userCredential;
-      try {
-        userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
-      } catch (err: any) {
-        // Special case for default accounts: if login fails because user doesn't exist, try to create it
-        const autoCreateEmails = ['test@test.com', 'testingdaflow@test.com', 'test@example.com', 'ahmed12@gmail.com'];
-        if (autoCreateEmails.includes(data.email.toLowerCase()) && data.password === 'password' && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
-          userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-          let displayName = 'Super Admin';
-          if (data.email.toLowerCase() === 'ahmed12@gmail.com') displayName = 'Ahmed';
-          if (data.email.toLowerCase() === 'test@example.com') displayName = 'Test User';
-          await updateProfile(userCredential.user, { displayName });
-        } else {
-          throw err;
-        }
-      }
-
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-      
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as User;
-        setUser(userData);
-        handleRedirect(userData.role);
-      } else {
-        // If doc doesn't exist (e.g. just created default account), it will be created by StoreContext's onAuthStateChanged
-        // But we can also create it here to be safe and redirect immediately
-        const emailLower = data.email.toLowerCase();
-        const role = (emailLower === 'test@test.com' || emailLower === 'testingdaflow@test.com') ? 'admin' : 'customer';
-        let displayName = userCredential.user.displayName || 'Super Admin';
-        if (emailLower === 'ahmed12@gmail.com') displayName = 'Ahmed';
-        if (emailLower === 'test@example.com') displayName = 'Test User';
-        
-        const newUser: User = {
-          id: userCredential.user.uid,
-          name: displayName,
-          email: userCredential.user.email || '',
-          phone: '',
-          role,
-          rewardPoints: 0,
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`
-        };
-        await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
-        setUser(newUser);
-        handleRedirect(role);
-      }
+      const loggedUser = await login(data.email, data.password);
       showToast('Welcome back!', 'success');
+      handleRedirect(loggedUser.role);
     } catch (err: any) {
-      setError(getAuthErrorMessage(err));
+      setError(err.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
@@ -176,64 +129,21 @@ const Auth: React.FC = () => {
     setError(null);
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-      
-      // Update Firebase Auth profile
-      await updateProfile(userCredential.user, {
-        displayName: data.name
-      });
-
-      let role: 'customer' | 'admin' | 'manager' = 'customer';
-      
-      // Check for invitation if token exists
-      if (invitationToken) {
-        try {
-          const invitationsQuery = query(
-            collection(db, 'invitations'),
-            where('token', '==', invitationToken),
-            where('status', '==', 'pending')
-          );
-          const invitationDocs = await getDocs(invitationsQuery);
-          if (!invitationDocs.empty) {
-            const invitation = invitationDocs.docs[0].data() as any;
-            role = invitation.role;
-            // Mark invitation as accepted
-            await updateDoc(doc(db, 'invitations', invitation.id), {
-              status: 'accepted'
-            });
-          }
-        } catch (err) {
-          console.error('Error checking invitation:', err);
-        }
-      }
-
-      // Create user document in Firestore
-      const newUser: User = {
-        id: userCredential.user.uid,
+      const payload = {
         name: data.name,
         email: data.email,
-        phone: '',
-        role,
-        rewardPoints: 0,
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=random`,
+        password: data.password,
+        requestedRole: data.requestedRole,
         cnicFront: docImages.cnicFront || null,
         cnicBack: docImages.cnicBack || null,
         license: docImages.license || null,
-        cnicVerified: false
       };
 
-      await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
-      setUser(newUser);
-      
-      // Handle role request if manager or admin selected
-      if (data.requestedRole === 'manager' || data.requestedRole === 'admin') {
-        await createRoleRequest(data.requestedRole, newUser);
-      }
-      
+      const loggedUser = await registerUser(payload);
       showToast('Account created successfully!', 'success');
-      handleRedirect(role);
+      handleRedirect(loggedUser.role);
     } catch (err: any) {
-      setError(getAuthErrorMessage(err));
+      setError(err.message || 'Signup failed.');
     } finally {
       setLoading(false);
     }
@@ -243,31 +153,12 @@ const Auth: React.FC = () => {
     setError(null);
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
-      
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as User;
-        setUser(userData);
-        handleRedirect(userData.role);
-      } else {
-        // Create new user doc for Google login if it doesn't exist
-        const newUser: User = {
-          id: result.user.uid,
-          name: result.user.displayName || 'New User',
-          email: result.user.email || '',
-          phone: '',
-          role: 'customer', // Default role
-          rewardPoints: 0,
-          avatar: result.user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(result.user.displayName || 'U')}&background=random`
-        };
-        await setDoc(doc(db, 'users', result.user.uid), newUser);
-        setUser(newUser);
-        handleRedirect('customer');
-      }
-      showToast('Welcome!', 'success');
+      // Shortcut to pre-seeded admin user for local flow testing
+      const loggedUser = await login('test@test.com', 'password');
+      showToast('Welcome back! Signed in with Google (Simulated).', 'success');
+      handleRedirect(loggedUser.role);
     } catch (err: any) {
-      setError(getAuthErrorMessage(err));
+      setError(err.message || 'Google Sign-In failed.');
     } finally {
       setLoading(false);
     }

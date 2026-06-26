@@ -26,6 +26,11 @@ const AddVehicle: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Gallery state and refs for additional images
+  const [gallery, setGallery] = useState<string[]>(['', '', '', '']);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const [activeSlot, setActiveSlot] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -56,8 +61,11 @@ const AddVehicle: React.FC = () => {
 
     setIsSubmitting(true);
     try {
+      // Filter out any empty items in gallery and save them
+      const cleanGallery = gallery.filter(img => !!img);
       const vehicleData = {
         ...formData,
+        images: cleanGallery,
         rating: 5.0,
         features: ['Air Conditioning', 'Bluetooth', 'GPS']
       };
@@ -93,6 +101,42 @@ const AddVehicle: React.FC = () => {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (activeSlot === null) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = validateImage(file, 2); // 2MB for vehicle images
+    if (!validation.isValid) {
+      showToast(validation.error || 'Invalid image', 'error');
+      return;
+    }
+
+    try {
+      const base64 = await fileToBase64(file);
+      setGallery(prev => {
+        const next = [...prev];
+        next[activeSlot] = base64;
+        return next;
+      });
+      showToast(`Gallery Slot ${activeSlot + 1} uploaded successfully!`, 'success');
+    } catch (error) {
+      console.error('Gallery image upload error:', error);
+      showToast('Failed to upload gallery image', 'error');
+    } finally {
+      setActiveSlot(null);
+    }
+  };
+
+  const removeGalleryImage = (index: number) => {
+    setGallery(prev => {
+      const next = [...prev];
+      next[index] = '';
+      return next;
+    });
+    showToast(`Gallery Slot ${index + 1} removed!`, 'info');
   };
 
   return (
@@ -166,7 +210,7 @@ const AddVehicle: React.FC = () => {
                 accept="image/*"
                 className="hidden"
               />
-              <div className="flex gap-2">
+              <div className="flex gap-2 font-black">
                 <input 
                   type="url" 
                   value={formData.image}
@@ -176,6 +220,100 @@ const AddVehicle: React.FC = () => {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Gallery block */}
+          <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">
+                Vehicle Gallery ({gallery.length} Images)
+              </label>
+              <p className="text-[11px] text-slate-400 font-medium ml-1">Upload condition/gallery images to fully capture the vehicle's state before rental.</p>
+            </div>
+            
+            <input 
+              type="file" 
+              ref={galleryInputRef}
+              onChange={handleGalleryUpload}
+              accept="image/*"
+              className="hidden"
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              {gallery.map((_, idx) => (
+                <div key={idx} className="space-y-1 animate-in fade-in duration-200">
+                  <span className="text-[10px] font-bold text-slate-400 block ml-1">Image {idx + 1}</span>
+                  <div className="relative group aspect-[4/3] rounded-2xl overflow-hidden bg-slate-50 border border-dashed border-slate-200 hover:border-blue-300 transition-all">
+                    {gallery[idx] ? (
+                      <>
+                        <img 
+                          src={gallery[idx]} 
+                          alt={`Gallery slot ${idx + 1}`} 
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveSlot(idx);
+                              setTimeout(() => galleryInputRef.current?.click(), 100);
+                            }}
+                            className="p-1 px-1.5 text-[9px] font-black uppercase tracking-widest bg-white text-blue-600 rounded-lg hover:bg-slate-50 shadow-sm"
+                          >
+                            Change
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeGalleryImage(idx)}
+                            className="p-1 px-1.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-sm"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveSlot(idx);
+                          setTimeout(() => galleryInputRef.current?.click(), 100);
+                        }}
+                        className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 transition-all"
+                      >
+                        <Plus size={16} className="mb-1" />
+                        <span className="text-[9px] font-black uppercase tracking-wider">Upload</span>
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={gallery[idx] || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setGallery(prev => {
+                        const next = [...prev];
+                        next[idx] = val;
+                        return next;
+                      });
+                    }}
+                    placeholder="Or paste URL..."
+                    className="w-full px-3 py-2 bg-slate-50 border-none rounded-lg text-[10px] font-bold focus:ring-1 focus:ring-blue-600/20 transition-all"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setGallery(prev => [...prev, '']);
+                showToast('New gallery slot added!', 'info');
+              }}
+              className="w-full py-3.5 border-2 border-dashed border-slate-200 hover:border-blue-500 hover:text-blue-600 font-black text-[10px] uppercase tracking-widest text-[#64748B] bg-slate-50/50 hover:bg-blue-50/20 rounded-2xl transition-all flex items-center justify-center gap-2"
+            >
+              <Plus size={14} />
+              Add More Image Slots
+            </button>
           </div>
         </div>
 

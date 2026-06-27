@@ -325,9 +325,29 @@ END:VCALENDAR`;
                   3
                 </div>
                 <div>
-                  <h4 className="text-sm font-black text-slate-900 mb-1">Get Driver Details</h4>
+                  <h4 className="text-sm font-black text-slate-900 mb-1">
+                    {latestBooking.chauffeurSelected ? 'Get Driver Details' : 'Prepare for Handover (Self-Drive)'}
+                  </h4>
                   <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                    Confirmation notification is sent along with Ali Khan driver contact dispatch.
+                    {latestBooking.chauffeurSelected 
+                      ? 'Confirmation notification is sent along with Ali Khan driver contact dispatch.' 
+                      : 'Prepare your original CNIC and License. Run through vehicle inspection checklist at pickup.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Emergency Hotline Card */}
+              <div className="mt-6 flex gap-4 items-center bg-rose-50/70 p-5 rounded-2xl border border-rose-100 shadow-sm relative overflow-hidden text-left">
+                <div className="size-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
+                  <Phone size={20} className="animate-pulse" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-rose-950">24/7 Helpline & Offline Incident Reporting</h4>
+                  <p className="text-xs text-rose-850 font-semibold leading-relaxed mt-0.5">
+                    No internet? Call or WhatsApp us to report an accident, breakdown, or request emergency roadside assistance:
+                  </p>
+                  <p className="text-xs font-black text-rose-900 mt-1 font-mono">
+                    Helpline: <span className="underline">+92 300 123 4567</span> &bull; WhatsApp: <span className="underline">+92 300 765 4321</span>
                   </p>
                 </div>
               </div>
@@ -540,11 +560,38 @@ END:VCALENDAR`;
                 </div>
               )}
 
-              {/* Total Price */}
-              <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
-                <span className="text-base font-black uppercase text-slate-950">Total Paid Amount</span>
-                <span className="text-2xl font-black text-[#2463eb]">PKR {latestBooking.totalPrice.toLocaleString()}</span>
-              </div>
+              {/* Total Price & Payment Type Info */}
+              {latestBooking.paymentType === 'partial' ? (
+                <>
+                  <div className="pt-4 border-t border-slate-200 flex justify-between items-center text-sm">
+                    <span className="font-bold text-slate-700">Total Booking Price</span>
+                    <span className="font-extrabold text-slate-900">PKR {latestBooking.totalPrice.toLocaleString()}</span>
+                  </div>
+                  <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-emerald-600">
+                    <div className="flex flex-col">
+                      <span className="text-base font-black uppercase">Paid Upfront (50%)</span>
+                      <span className="text-[10px] font-semibold text-emerald-500 uppercase">Paid & Escrowed via {latestBooking.paymentMethod === 'bank_transfer' ? 'Bank Transfer' : 'Card'}</span>
+                    </div>
+                    <span className="text-xl font-black">
+                      PKR {(latestBooking.upfrontAmountPaid || (latestBooking.totalPrice * 0.5)).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-amber-600">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold uppercase">To Pay at Handover (50%)</span>
+                      <span className="text-[10px] font-semibold text-amber-500 uppercase">Pay Cash / Card on Delivery</span>
+                    </div>
+                    <span className="text-sm font-extrabold">
+                      PKR {(latestBooking.remainingAmount || (latestBooking.totalPrice * 0.5)).toLocaleString()}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
+                  <span className="text-base font-black uppercase text-slate-950">Total Paid Amount</span>
+                  <span className="text-2xl font-black text-[#2463eb]">PKR {latestBooking.totalPrice.toLocaleString()}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

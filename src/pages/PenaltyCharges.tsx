@@ -19,14 +19,38 @@ import {
   DollarSign,
   Info
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useStore } from '../context/StoreContext';
 import { getVehicleFareConfig, calculateBaseFare } from '../utils/pricing';
 import { useState } from 'react';
 
 const PenaltyCharges: React.FC = () => {
-  const { vehicles } = useStore();
+  const { vehicles, bookings } = useStore();
   const [selectedType, setSelectedType] = useState<'All' | 'Hatchback' | 'Sedan' | 'SUV' | 'Luxury'>('All');
+
+  const activeOrLatestBooking = bookings?.find(b => b.status === 'active' || b.status === 'pending') || bookings?.[0];
+  const activeVehicle = activeOrLatestBooking 
+    ? vehicles.find(v => v.id === activeOrLatestBooking.vehicleId) 
+    : null;
+
+  const displayVehicleName = activeVehicle ? activeVehicle.name : 'Honda Civic RS';
+  const displayVehicleImage = activeVehicle ? activeVehicle.image : 'https://lh3.googleusercontent.com/aida-public/AB6AXuDGD-AnfmupS0NbkVFkmSas78EpmGFqzTkXevqEddZmkCZwt_OzaAzm42OS7UDfs-HhjhbhasVGC1f16bm8bV__ARAgElI0gDZE7aZRG9VdmuOqu1pEWcP2MhcUiv-lkZrlaJJYWiN850jJwDzGgPo5D16ItHn_K7ZimoMrxzslNoS3CWtORWPH7I_AZE4B_sTgEVx8oUutExmOFo7dXgwrhI-DQzgL3EsAymUJ-ZD2XIsroM3wgnX3RKzSor4KXZIv0k0thhalO-E';
+  const displayBookingId = activeOrLatestBooking 
+    ? `#ED-PK-${activeOrLatestBooking.id.slice(-7).toUpperCase()}` 
+    : '#ED-PK-9823419';
+
+  const formatDate = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const displayPeriod = activeOrLatestBooking 
+    ? `${formatDate(activeOrLatestBooking.startDate)} – ${formatDate(activeOrLatestBooking.endDate)}`
+    : 'Nov 24 – Nov 27, 2024';
 
   return (
     <div className="bg-slate-50">
@@ -380,26 +404,26 @@ const PenaltyCharges: React.FC = () => {
             >
               <div className="relative h-48">
                 <img 
-                  alt="Honda Civic RS" 
+                  alt={displayVehicleName} 
                   className="w-full h-full object-cover" 
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGD-AnfmupS0NbkVFkmSas78EpmGFqzTkXevqEddZmkCZwt_OzaAzm42OS7UDfs-HhjhbhasVGC1f16bm8bV__ARAgElI0gDZE7aZRG9VdmuOqu1pEWcP2MhcUiv-lkZrlaJJYWiN850jJwDzGgPo5D16ItHn_K7ZimoMrxzslNoS3CWtORWPH7I_AZE4B_sTgEVx8oUutExmOFo7dXgwrhI-DQzgL3EsAymUJ-ZD2XIsroM3wgnX3RKzSor4KXZIv0k0thhalO-E" 
+                  src={displayVehicleImage} 
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                 <div className="absolute bottom-4 left-6">
                   <span className="bg-blue-600/90 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full backdrop-blur-md">Your Booking</span>
-                  <h3 className="text-white font-bold text-xl mt-1">Honda Civic RS</h3>
+                  <h3 className="text-white font-bold text-xl mt-1">{displayVehicleName}</h3>
                 </div>
               </div>
               <div className="p-6 space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-slate-500 font-medium">Booking ID</span>
-                  <span className="text-sm font-bold text-slate-900">#ED-PK-9823419</span>
+                  <span className="text-sm font-bold text-slate-900">{displayBookingId}</span>
                 </div>
                 <div className="pt-4 border-t border-slate-100">
                   <p className="text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2">Rental Period</p>
                   <div className="flex items-center gap-3">
                     <Clock className="text-blue-600" size={14} />
-                    <p className="text-sm font-bold text-slate-900">Nov 24 – Nov 27, 2024</p>
+                    <p className="text-sm font-bold text-slate-900">{displayPeriod}</p>
                   </div>
                 </div>
               </div>
@@ -433,22 +457,6 @@ const PenaltyCharges: React.FC = () => {
           </aside>
         </div>
       </main>
-
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl z-[40] border-t border-slate-100 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] pb-safe">
-        <div className="max-w-7xl mx-auto px-6 h-auto md:h-24 flex flex-col md:flex-row justify-between items-center gap-4 py-6 md:py-0">
-          <div className="hidden md:block max-w-sm">
-            <p className="text-xs text-slate-500 font-medium leading-tight">By clicking "I Understand", you acknowledge all terms and penalty structures listed above.</p>
-          </div>
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-            <button className="w-full sm:w-auto border border-slate-200 text-slate-700 font-bold px-8 py-3 rounded-2xl hover:bg-slate-50 transition-all text-sm">
-              Contact Support
-            </button>
-            <button className="w-full sm:w-auto bg-blue-600 text-white font-bold px-10 py-3 rounded-2xl shadow-lg shadow-blue-500/20 hover:scale-[1.02] active:scale-95 transition-all text-sm">
-              I Understand the Policy
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

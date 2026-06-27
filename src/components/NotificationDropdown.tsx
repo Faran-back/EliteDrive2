@@ -68,19 +68,28 @@ const NotificationDropdown: React.FC = () => {
               </span>
             </div>
 
-            <div className="max-h-[400px] overflow-y-auto">
+            <div className="max-h-[400px] overflow-y-auto p-4 space-y-3">
               {notifications.length > 0 ? (
-                <div className="divide-y divide-slate-50">
+                <div className="space-y-3">
                   {notifications.map((notification) => (
                     <div 
                       key={notification.id}
-                      className={`p-5 transition-colors hover:bg-slate-50 relative group ${!notification.read ? 'bg-blue-50/30' : ''}`}
+                      className={`p-4 rounded-[22px] border transition-all relative group ${
+                        !notification.read 
+                          ? notification.type === 'booking_confirmed' ? 'bg-emerald-50/60 border-emerald-100/70 hover:bg-emerald-50/85 shadow-sm' :
+                            notification.type === 'booking_cancelled' ? 'bg-rose-50/60 border-rose-100/70 hover:bg-rose-50/85 shadow-sm' :
+                            notification.type === 'promotion' ? 'bg-amber-50/60 border-amber-100/70 hover:bg-amber-50/85 shadow-sm' :
+                            'bg-blue-50/60 border-blue-100/70 hover:bg-blue-50/85 shadow-sm'
+                          : 'bg-slate-50/40 border-slate-100/80 hover:bg-slate-50/70 text-slate-700'
+                      }`}
                     >
                       <div className="flex gap-4">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                          notification.type === 'booking_confirmed' ? 'bg-emerald-50' :
-                          notification.type === 'booking_cancelled' ? 'bg-rose-50' :
-                          notification.type === 'promotion' ? 'bg-amber-50' : 'bg-blue-50'
+                          !notification.read ? 'bg-white shadow-sm' : (
+                            notification.type === 'booking_confirmed' ? 'bg-emerald-50/85' :
+                            notification.type === 'booking_cancelled' ? 'bg-rose-50/85' :
+                            notification.type === 'promotion' ? 'bg-amber-50/85' : 'bg-blue-50/85'
+                          )
                         }`}>
                           {getIcon(notification.type)}
                         </div>
@@ -107,11 +116,11 @@ const NotificationDropdown: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="absolute top-5 right-5 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         {!notification.read && (
                           <button 
                             onClick={() => markNotificationAsRead(notification.id)}
-                            className="p-1.5 bg-white shadow-sm rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
+                            className="p-1.5 bg-white border border-slate-100 shadow-sm rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
                             title="Mark as read"
                           >
                             <Check size={14} />
@@ -119,7 +128,7 @@ const NotificationDropdown: React.FC = () => {
                         )}
                         <button 
                           onClick={() => deleteNotification(notification.id)}
-                          className="p-1.5 bg-white shadow-sm rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
+                          className="p-1.5 bg-white border border-slate-100 shadow-sm rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
                           title="Delete"
                         >
                           <Trash2 size={14} />

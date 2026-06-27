@@ -21,7 +21,8 @@ import {
   CreditCard,
   Percent,
   Shield,
-  FileText
+  FileText,
+  Camera
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { Booking } from '../../types';
@@ -112,11 +113,6 @@ const Bookings: React.FC = () => {
   };
 
   const handleApproveBooking = async (id: string) => {
-    const booking = allBookings.find(b => b.id === id);
-    if (booking && booking.paymentType === 'partial' && booking.remainingPaymentStatus === 'pending') {
-      showToast('Please collect and mark the remaining 50% payment as received in person before activating the booking.', 'error');
-      return;
-    }
     try {
       await approveBooking(id);
       showToast('Booking approved and activated successfully!', 'success');
@@ -473,6 +469,49 @@ const Bookings: React.FC = () => {
                                   <p className="text-[9px] text-slate-400 font-bold uppercase">Fuel Type</p>
                                   <p className="text-xs font-bold text-slate-700">{vehicle?.fuel}</p>
                                 </div>
+                              </div>
+
+                              <div className="pt-2.5 border-t border-slate-100">
+                                <p className="text-[9px] text-slate-400 font-bold uppercase mb-2">Vehicle Image Baseline Condition</p>
+                                {(() => {
+                                  const pics = [
+                                    vehicle?.image,
+                                    ...(vehicle?.images || [])
+                                  ].filter(Boolean) as string[];
+
+                                  const fallbacks = [
+                                    'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=600',
+                                    'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&q=80&w=600',
+                                    'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=600'
+                                  ];
+
+                                  while (pics.length < 4) {
+                                    const nextFallback = fallbacks[pics.length - 1] || fallbacks[0];
+                                    pics.push(nextFallback);
+                                  }
+
+                                  return (
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {pics.slice(0, 4).map((imgUrl, i) => (
+                                        <div 
+                                          key={i} 
+                                          onClick={() => setSelectedReceiptUrl(imgUrl)}
+                                          className="aspect-[4/3] rounded-xl overflow-hidden bg-slate-50 border border-slate-100 shadow-sm relative group/thumb cursor-zoom-in"
+                                        >
+                                          <img 
+                                            src={imgUrl} 
+                                            alt={`Baseline ${i + 1}`} 
+                                            referrerPolicy="no-referrer"
+                                            className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-300"
+                                          />
+                                          <div className="absolute inset-0 bg-black/15 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
+                                            <span className="text-[8px] text-white font-black uppercase tracking-wider bg-slate-950/70 px-2 py-1 rounded-md backdrop-blur-xs">Zoom</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </div>
                           </div>
@@ -1257,18 +1296,29 @@ const Bookings: React.FC = () => {
                 />
               </div>
 
-              <div className="p-5 flex items-center justify-between border-t border-slate-100 bg-white">
-                <div>
-                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <FileText size={14} className="text-blue-500" /> Interactive Escrow Audit View
-                  </h4>
-                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">
-                    Verify sending bank details, transaction time, and total reference ID against system logs.
-                  </p>
-                </div>
+               <div className="p-5 flex items-center justify-between border-t border-slate-100 bg-white">
+                {selectedReceiptUrl.includes('unsplash.com') ? (
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Camera size={14} className="text-blue-500" /> High-Resolution Inspection Gallery
+                    </h4>
+                    <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                      Review vehicle bodywork condition, panels, tire treading, and interior baseline cockpit views.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <FileText size={14} className="text-blue-500" /> Interactive Escrow Audit View
+                    </h4>
+                    <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                      Verify sending bank details, transaction time, and total reference ID against system logs.
+                    </p>
+                  </div>
+                )}
                 <a 
                   href={selectedReceiptUrl} 
-                  download="elite-drive-receipt.jpg"
+                  download="vehicle-inspection-photo.jpg"
                   target="_blank"
                   rel="noreferrer"
                   className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"

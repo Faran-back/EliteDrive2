@@ -34,6 +34,7 @@ const AddVehicle: React.FC = () => {
 
   const [formData, setFormData] = useState({
     name: '',
+    licensePlate: '',
     image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800',
     pricePerDay: '' as unknown as number,
     seats: '' as unknown as number,
@@ -331,6 +332,18 @@ const AddVehicle: React.FC = () => {
                   className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-600/20 transition-all"
                   placeholder="e.g. Toyota Camry 2024"
                   required
+                />
+              </div>
+
+              {/* License Plate */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">License Plate No.</label>
+                <input 
+                  type="text" 
+                  value={formData.licensePlate}
+                  onChange={(e) => setFormData({ ...formData, licensePlate: e.target.value })}
+                  className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-600/20 transition-all uppercase"
+                  placeholder="e.g. LEA-1234"
                 />
               </div>
 

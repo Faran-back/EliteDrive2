@@ -456,6 +456,7 @@ const MyBookings: React.FC = () => {
                   >
                     <div className="grid lg:grid-cols-2 gap-12">
                       <div className="space-y-6">
+                      <div className="space-y-3">
                         <div className="aspect-video rounded-[32px] overflow-hidden bg-gray-50 border border-gray-100">
                           <img 
                             src={vehicle?.image} 
@@ -464,6 +465,21 @@ const MyBookings: React.FC = () => {
                             className="w-full h-full object-cover"
                           />
                         </div>
+                        {vehicle?.images && vehicle.images.length > 0 && (
+                          <div className="grid grid-cols-4 gap-2">
+                            {vehicle.images.slice(0, 4).map((imgUrl, idx) => (
+                              <div key={idx} className="aspect-video rounded-xl overflow-hidden bg-slate-50 border border-slate-200">
+                                <img 
+                                  src={imgUrl} 
+                                  alt={`Car detail ${idx + 1}`} 
+                                  referrerPolicy="no-referrer"
+                                  className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                         <div className="flex gap-4">
                           <Link 
                             to={`/vehicle/${vehicle?.id}`}
@@ -722,7 +738,7 @@ const MyBookings: React.FC = () => {
                                   const canDispute = ec.status === 'pending';
 
                                   return (
-                                    <div key={ec.id} className="p-4 rounded-xl bg-orange-50/50 border border-orange-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                                    <div key={ec.id} className="p-5 rounded-[22px] bg-orange-50/40 border border-orange-100/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-sm hover:shadow-md transition-all">
                                       <div>
                                         <span className="inline-flex px-2 py-0.5 rounded bg-orange-100 text-orange-850 font-black uppercase tracking-wide text-[9px] mb-1">E-Challan Fine Ticket</span>
                                         <p className="font-bold text-slate-800">Violation Ticket No: {ec.challanNumber}</p>
@@ -754,7 +770,7 @@ const MyBookings: React.FC = () => {
 
                                 {/* Incidents */}
                                 {matchingIncidents.map(inc => (
-                                  <div key={inc.id} className="p-4 rounded-xl bg-red-50/50 border border-red-100/85 text-xs text-slate-700">
+                                  <div key={inc.id} className="p-5 rounded-[22px] bg-red-50/40 border border-red-100/60 text-xs text-slate-700 shadow-sm hover:shadow-md transition-all">
                                     <div className="flex justify-between items-center">
                                       <span className="inline-flex px-2 py-0.5 rounded bg-red-100 text-red-800 font-black uppercase tracking-wide text-[9px] mb-1">Accident / Damage Incident</span>
                                       <span className="text-[9px] font-black uppercase text-red-600">{inc.status?.replace('_', ' ')}</span>
@@ -770,7 +786,7 @@ const MyBookings: React.FC = () => {
 
                                 {/* Disputes */}
                                 {matchingDisputes.map(dsp => (
-                                  <div key={dsp.id} className="p-4 rounded-xl bg-blue-50/50 border border-blue-100/80 text-xs text-slate-800">
+                                  <div key={dsp.id} className="p-5 rounded-[22px] bg-blue-50/40 border border-blue-100/60 text-xs text-slate-800 shadow-sm hover:shadow-md transition-all">
                                     <div className="flex justify-between items-center mb-1">
                                       <span className="inline-flex px-2 py-0.5 rounded bg-blue-100 text-blue-850 font-black uppercase tracking-wide text-[9px]">LODGED DISPUTE</span>
                                       <span className="text-[9px] font-black uppercase text-blue-600">{dsp.status?.toUpperCase()}</span>

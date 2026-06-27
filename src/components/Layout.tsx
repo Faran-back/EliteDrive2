@@ -20,7 +20,8 @@ import {
   FileText,
   AlertCircle,
   AlertTriangle,
-  ShieldAlert
+  ShieldAlert,
+  Scale
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
@@ -42,6 +43,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const view = queryParams.get('view');
     if (location.pathname === '/admin-dashboard') {
       if (view === 'fraud-alerts') return 'Monitor Fraud Alerts';
+      if (view === 'e-challans') return 'E-Challan Registry Desk';
       return 'Admin Dashboard';
     }
     if (location.pathname === '/manager-dashboard') return 'Manager Dashboard';
@@ -73,6 +75,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { icon: LayoutDashboard, label: 'Dashboard', path: '/admin-dashboard' },
     { icon: Car, label: 'Fleet Inventory', path: '/admin-dashboard?view=inventory' },
     { icon: History, label: 'Bookings', path: '/admin-dashboard?view=bookings', badge: pendingBookingsCount },
+    { icon: Scale, label: 'E-Challans', path: '/admin-dashboard?view=e-challans' },
     { icon: ShieldCheck, label: 'Role Requests', path: '/admin-dashboard?view=role-requests', badge: pendingRoleRequestsCount },
     { icon: Users, label: 'Assign Roles', path: '/admin-dashboard?view=role-assignment' },
     { icon: FileText, label: 'Reports', path: '/admin-dashboard?view=reports' },

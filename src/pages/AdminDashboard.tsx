@@ -33,6 +33,7 @@ import RoleRequests from '../components/dashboard/RoleRequests';
 import FleetInventory from '../components/dashboard/FleetInventory';
 import FraudAlerts from '../components/dashboard/FraudAlerts';
 import ReturnVerificationWidget from '../components/dashboard/ReturnVerificationWidget';
+import EChallanManagement from '../components/dashboard/EChallanManagement';
 
 const AdminDashboard: React.FC = () => {
   const { allBookings, vehicles, allUsers } = useStore();
@@ -258,6 +259,7 @@ const AdminDashboard: React.FC = () => {
       {currentView === 'role-requests' && <RoleRequests />}
       {currentView === 'inventory' && <FleetInventory />}
       {currentView === 'fraud-alerts' && <FraudAlerts />}
+      {currentView === 'e-challans' && <EChallanManagement />}
     </div>
   );
 };

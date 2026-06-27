@@ -14,7 +14,8 @@ import {
   Minus,
   Plus,
   RefreshCw,
-  Calendar
+  Calendar,
+  Sparkles
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useStore } from '../context/StoreContext';
@@ -22,6 +23,46 @@ import { useStore } from '../context/StoreContext';
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { vehicles, allBookings } = useStore();
+  
+  // AI Recommendation State
+  const [aiBudget, setAiBudget] = useState('');
+  const [aiTravelType, setAiTravelType] = useState('in_city');
+  const [aiPreferences, setAiPreferences] = useState('');
+  const [aiResult, setAiResult] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const recommendedVehicles = useMemo(() => {
+    if (!aiResult || !aiResult.recommendations) return [];
+    return aiResult.recommendations.map((rec: any) => {
+      const vehicle = vehicles.find(v => v.id === rec.vehicleId);
+      return vehicle ? { vehicle, reasoning: rec.reasoning } : null;
+    }).filter(Boolean);
+  }, [aiResult, vehicles]);
+
+  const handleGetRecommendations = async () => {
+    setAiLoading(true);
+    try {
+      const token = localStorage.getItem('elitedrive_token');
+      const response = await fetch('/api/recommendations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          budget: aiBudget ? Number(aiBudget) : undefined,
+          travelType: aiTravelType,
+          preferences: aiPreferences
+        })
+      });
+      const data = await response.json();
+      setAiResult(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAiLoading(false);
+    }
+  };
   
   // Form State
   const [pickupLocation, setPickupLocation] = useState(() => {
@@ -303,6 +344,8 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+
 
       {/* Featured Fleet Section */}
       <div className="mt-24 space-y-10">

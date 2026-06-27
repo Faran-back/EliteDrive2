@@ -497,6 +497,132 @@ async function startServer() {
     }
   });
 
+  // AI-BASED CAR RECOMMENDATION ENGINE
+  app.post('/api/recommendations', authenticateToken, async (req: any, res) => {
+    const { budget, travelType, preferences } = req.body;
+    
+    // Filter available cars (not under repair/maintenance)
+    const candidateVehicles = dbData.vehicles.filter(v => v.status !== 'maintenance');
+    
+    if (candidateVehicles.length === 0) {
+      return res.json({
+        recommendedVehicleIds: [],
+        recommendations: [],
+        generalAdvice: "No vehicles are currently available in our fleet."
+      });
+    }
+
+    try {
+      const client = getGeminiClient();
+      if (!client) {
+        throw new Error("Gemini API Client missing");
+      }
+
+      const prompt = `You are an elite AI Car Recommendation Engine for "EliteDrive", Pakistan's premier self-drive and chauffeur car rental platform.
+Based on the following request:
+- Travel Type: ${travelType || 'general'} (e.g. in_city, out_city, mountainous, family_trip, business)
+- Daily Budget Limit: ${budget ? `PKR ${budget}` : 'No limit'}
+- Extra Preferences: ${preferences || 'None'}
+
+Here is the list of active vehicles in EliteDrive fleet:
+${JSON.stringify(candidateVehicles.map(v => ({ id: v.id, name: v.name, type: v.type, pricePerDay: v.pricePerDay, transmission: v.transmission, fuel: v.fuel, seats: v.seats, features: v.features, location: v.location })), null, 2)}
+
+Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fit the trip type (e.g., fuel efficiency for city runs, ground clearance/power for mountainous regions, premium styling for business/wedding trips, space for family trips) and budget. Avoid vehicles that exceed the budget significantly unless no alternatives exist. Include a general tip for driving or exploring in Pakistan for this travel type.`;
+
+      const response = await client.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              recommendedVehicleIds: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "List of vehicle IDs that best match the query, ordered by suitability."
+              },
+              recommendations: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    vehicleId: { type: Type.STRING },
+                    reasoning: { type: Type.STRING, description: "Personalized explanation of why this vehicle is perfect for their trip, budget, and travel type." }
+                  },
+                  required: ["vehicleId", "reasoning"]
+                }
+              },
+              generalAdvice: {
+                type: Type.STRING,
+                description: "General advice for this specific travel type in Pakistan (e.g., fuel recommendations, route safety)."
+              }
+            },
+            required: ["recommendedVehicleIds", "recommendations", "generalAdvice"]
+          }
+        }
+      });
+
+      const responseText = response.text ? response.text.trim() : "{}";
+      const result = JSON.parse(responseText);
+      return res.json(result);
+    } catch (error: any) {
+      console.log('Gemini recommendation fallback triggered.');
+      // Local Heuristics-based Fallback
+      const maxBudget = budget ? Number(budget) : Infinity;
+      let matches = candidateVehicles;
+      
+      if (budget) {
+        matches = candidateVehicles.filter(v => v.pricePerDay <= maxBudget);
+        if (matches.length === 0) {
+          matches = [...candidateVehicles].sort((a, b) => a.pricePerDay - b.pricePerDay).slice(0, 3);
+        }
+      }
+
+      // Filter by trip suitability heuristic
+      let sortedMatches = [...matches];
+      if (travelType === 'mountainous') {
+        sortedMatches.sort((a, b) => (b.type === 'SUV' ? 2 : 0) - (a.type === 'SUV' ? 2 : 0));
+      } else if (travelType === 'family_trip') {
+        sortedMatches.sort((a, b) => b.seats - a.seats);
+      } else if (travelType === 'business') {
+        sortedMatches.sort((a, b) => (b.type === 'Luxury' ? 2 : 0) - (a.type === 'Luxury' ? 2 : 0));
+      } else if (travelType === 'in_city') {
+        sortedMatches.sort((a, b) => (b.type === 'Economy' || b.type === 'Sedan' ? 2 : 0) - (a.type === 'Economy' || a.type === 'Sedan' ? 2 : 0));
+      }
+
+      const top3 = sortedMatches.slice(0, 3);
+      const recommendedVehicleIds = top3.map(v => v.id);
+      
+      const recommendations = top3.map(v => {
+        let reason = `Excellent reliable selection for your EliteDrive journey.`;
+        if (travelType === 'mountainous') {
+          reason = `Great power and robust capabilities. Ideal for Pakistan's adventurous northern routes and highway travel with spacious cabin area.`;
+        } else if (travelType === 'family_trip') {
+          reason = `Superb cabin space with comfortable ${v.seats}-seater layout. Offers perfect legroom and massive luggage capacity for the family.`;
+        } else if (travelType === 'business') {
+          reason = `Stunning executive presence. This premium model provides unparalleled comfort, high-end features, and elegant drive dynamics.`;
+        } else if (travelType === 'in_city') {
+          reason = `Ultra-efficient fuel consumption, smooth automatic gearbox, and highly maneuverable. Excellent choice for navigating urban traffic effortlessly.`;
+        }
+        return {
+          vehicleId: v.id,
+          reasoning: reason
+        };
+      });
+
+      const generalAdvice = travelType === 'mountainous' 
+        ? "When travelling to areas like Naran, Kaghan, or Hunza, always inspect the vehicle brakes, tires, and carry warm clothes. Ensure fuel tank is full at major stations." 
+        : "For city journeys, opt for automatic transmissions to ease navigating peak traffic hours in Lahore or Karachi.";
+
+      return res.json({
+        recommendedVehicleIds,
+        recommendations,
+        generalAdvice
+      });
+    }
+  });
+
   // BOOKING API
   app.get('/api/bookings', authenticateToken, (req: any, res) => {
     if (req.user.role === 'admin' || req.user.role === 'manager') {

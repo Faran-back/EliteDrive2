@@ -56,6 +56,7 @@ export interface Vehicle {
   description?: string;
   createdAt?: string;
   licensePlate?: string; // License plate number
+  mileage?: number; // Odometer reading in KM
 }
 
 export interface Booking {
@@ -104,7 +105,9 @@ export interface Booking {
     mileage: number;
     fuelLevel: string;
     existingDamage: string;
+    interiorNotes?: string;
     photos: string[];
+    timestamp?: string;
   };
   isOutOfCity?: boolean;
   outOfCityDetails?: {
@@ -115,6 +118,15 @@ export interface Booking {
   refundAmount?: number;
   refundStatus?: 'none' | 'pending_manual_bank_transfer' | 'processed';
   penaltyAmount?: number;
+  penaltyReason?: string;
+  returnChecklist?: {
+    mileage: number;
+    fuelLevel: string;
+    exteriorNotes?: string;
+    interiorNotes?: string;
+    photos?: string[];
+    timestamp?: string;
+  };
 }
 
 export interface Incident {

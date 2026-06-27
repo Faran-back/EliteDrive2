@@ -796,17 +796,16 @@ const SupportCenter: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-slate-900 p-8 rounded-[40px] shadow-2xl relative overflow-hidden text-white">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl pointer-events-none"></div>
-            <h3 className="text-xl font-black mb-2 relative z-10">Safe Drive Policy</h3>
-            <p className="text-slate-400 text-xs font-medium mb-6 leading-relaxed relative z-10">
+          <div className="bg-white p-8 rounded-[40px] border border-slate-150 shadow-sm relative overflow-hidden">
+            <h3 className="text-xl font-black mb-2 text-slate-900 relative z-10">Safe Drive Policy</h3>
+            <p className="text-slate-500 text-xs font-medium mb-6 leading-relaxed relative z-10">
               EliteDrive coordinates with traffic regulatory database in real-time. Unassigned citations are audited weekly by staff members.
             </p>
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-white relative z-10 flex items-center gap-3">
-              <ShieldAlert className="text-amber-400 shrink-0" />
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 text-amber-900 relative z-10 flex items-center gap-3">
+              <ShieldAlert className="text-amber-500 shrink-0" />
               <div className="text-[10px] font-bold leading-none">
-                <p className="uppercase text-amber-400 tracking-wider">Automated Audit Panel</p>
-                <p className="text-white/60 mt-1">Status: Online and Enforcing</p>
+                <p className="uppercase text-amber-600 tracking-wider">Automated Audit Panel</p>
+                <p className="text-slate-550 mt-1">Status: Online and Enforcing</p>
               </div>
             </div>
           </div>

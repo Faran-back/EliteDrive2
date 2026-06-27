@@ -53,6 +53,20 @@ const ReportIncident: React.FC = () => {
   const [photos, setPhotos] = useState<string[]>([]);
   const [firNumber, setFirNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [gapAlert, setGapAlert] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (incidentDate) {
+      const diffMs = Date.now() - incidentDate.getTime();
+      const diffHrs = diffMs / (1000 * 60 * 60);
+      if (diffHrs > 6) {
+        setGapAlert(`Late Report Flag Triggered: ${Math.floor(diffHrs)} hours have elapsed since the incident occurred. Reports filed past the 6-hour policy window automatically trigger severe administrative flags and manual security audits.`);
+      } else {
+        setGapAlert(null);
+      }
+    }
+  }, [incidentDate]);
 
   // Pool of bookings available to select from
   const usableBookings = React.useMemo(() => {
@@ -296,13 +310,22 @@ const ReportIncident: React.FC = () => {
 
                       {/* Customer context info shown to staff */}
                       {fileOnBehalf && matchedCustomer && (
-                        <div className="md:col-span-2 pt-3 mt-1 border-t border-slate-200 flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-black text-xs uppercase">
-                            {matchedCustomer.name.charAt(0)}
+                        <div className="md:col-span-2 pt-3 mt-1 border-t border-slate-200 space-y-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-black text-xs uppercase">
+                              {matchedCustomer.name.charAt(0)}
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-slate-400 uppercase font-black">Client Account / KYC Details</span>
+                              <span className="text-xs font-bold text-slate-800">{matchedCustomer.name} ({matchedCustomer.email})</span>
+                            </div>
                           </div>
-                          <div>
-                            <span className="block text-[10px] text-slate-400 uppercase font-black">Client Account / KYC Details</span>
-                            <span className="text-xs font-bold text-slate-800">{matchedCustomer.name} ({matchedCustomer.email})</span>
+                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2 text-[11px] text-amber-800 font-semibold">
+                            <Siren size={14} className="shrink-0 mt-0.5 text-amber-600 animate-pulse" />
+                            <div>
+                              <span className="block uppercase font-black text-[9px] text-amber-900 mb-0.5">On-Behalf Telephone Filing Mode</span>
+                              Renter's device is inaccessible/lost. You are authorized to log this accident report via phone-in customer verification.
+                            </div>
                           </div>
                         </div>
                       )}
@@ -337,6 +360,16 @@ const ReportIncident: React.FC = () => {
                     showTimeSelect
                   />
                 </div>
+
+                {gapAlert && (
+                  <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl flex gap-3 text-xs font-semibold animate-pulse">
+                    <ShieldAlert size={18} className="shrink-0 text-red-600" />
+                    <div>
+                      <span className="block font-black uppercase text-[10px] text-red-900 mb-0.5">Dual-Timestamp Policy Flag</span>
+                      {gapAlert}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs uppercase font-extrabold text-slate-500 tracking-wider mb-2">Detailed Occurrence Location *</label>
@@ -500,9 +533,7 @@ const ReportIncident: React.FC = () => {
                     <Phone size={14} />
                   </a>
                 </div>
-              </section>
-
-              {/* Insurance Coverage Summary Based on Booking selection */}
+              </section>              {/* Insurance Coverage Summary Based on Booking selection */}
               {selectedBooking && (
                 <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
                   <div className="flex items-center justify-between">
@@ -512,13 +543,15 @@ const ReportIncident: React.FC = () => {
                     </h4>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-blue-50/50 border border-blue-100/60 space-y-1">
-                    <span className="text-[10px] text-slate-400 uppercase font-black block">Active Protection Deck</span>
-                    <h5 className="text-xs font-extrabold text-slate-900 uppercase">
-                      {selectedBooking.insuranceType === 'premium' ? 'Premium Zero Deductible Cover' : selectedBooking.insuranceType === 'basic' ? 'Basic Collision Waiver Coverage' : 'Third-Party Liability Only'}
-                    </h5>
+                  <div className="p-3.5 rounded-xl bg-blue-50/50 border border-blue-100/60 space-y-3">
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase font-black block">Active Protection Deck</span>
+                      <h5 className="text-xs font-extrabold text-slate-900 uppercase">
+                        {selectedBooking.insuranceType === 'premium' ? 'Premium Zero Deductible Cover' : selectedBooking.insuranceType === 'basic' ? 'Basic Collision Waiver Coverage' : 'Third-Party Liability Only'}
+                      </h5>
+                    </div>
                     
-                    <p className="text-[10px] text-slate-500 leading-relaxed pt-1.5">
+                    <p className="text-[10px] text-slate-500 leading-relaxed">
                       {selectedBooking.insuranceType === 'premium' ? (
                         'Congratulations. You chose Premium Cover! Renter carries absolutely 100% replacement protection. PKR 0 financial deductible applies; damage costs completely covered.'
                       ) : selectedBooking.insuranceType === 'basic' ? (
@@ -527,6 +560,62 @@ const ReportIncident: React.FC = () => {
                         'No supplementary coverage selected. You opted for standard Third-Party Only liability. Renter is 100% accountable for restoration invoice costs.'
                       )}
                     </p>
+
+                    <div className="border-t border-blue-100/50 pt-2 space-y-2">
+                      <div>
+                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-wider block">🛡️ Covered:</span>
+                        <ul className="list-disc list-inside text-[9px] text-slate-600 font-semibold mt-0.5 space-y-0.5">
+                          {selectedBooking.insuranceType === 'premium' && (
+                            <>
+                              <li>100% accident collision repairs (Rs. 0 deductible)</li>
+                              <li>Full vehicle body dents & major scratches</li>
+                              <li>Mechanical failures under standard operation</li>
+                              <li>Complete vehicle theft / hijack recovery</li>
+                            </>
+                          )}
+                          {selectedBooking.insuranceType === 'basic' && (
+                            <>
+                              <li>Accident repair costs exceeding Rs. 30,000</li>
+                              <li>Major body panel replacements</li>
+                              <li>Third-party damage liability coverage</li>
+                            </>
+                          )}
+                          {(selectedBooking.insuranceType === 'none' || !selectedBooking.insuranceType) && (
+                            <>
+                              <li>Government statutory third-party bodily injury only</li>
+                            </>
+                          )}
+                        </ul>
+                      </div>
+
+                      <div>
+                        <span className="text-[9px] font-black text-rose-600 uppercase tracking-wider block">❌ NOT Covered:</span>
+                        <ul className="list-disc list-inside text-[9px] text-slate-600 font-semibold mt-0.5 space-y-0.5">
+                          {selectedBooking.insuranceType === 'premium' && (
+                            <>
+                              <li>Intentional sabotage or negligent abuse</li>
+                              <li>Driving off-road on unauthorized mountain dirt tracks</li>
+                              <li>Operating under influence of prohibited substances</li>
+                            </>
+                          )}
+                          {selectedBooking.insuranceType === 'basic' && (
+                            <>
+                              <li>First Rs. 30,000 deductible fee per claim</li>
+                              <li>Flat tires, cabin interior wear & stain cleaning</li>
+                              <li>Negligent water logging or engine hydrolock</li>
+                            </>
+                          )}
+                          {(selectedBooking.insuranceType === 'none' || !selectedBooking.insuranceType) && (
+                            <>
+                              <li>Any vehicle body scratches, dents, or paint scrapes</li>
+                              <li>Engine or mechanical wear, engine hydrolock</li>
+                              <li>Total vehicle theft, loss of parts or keys</li>
+                              <li>100% of body shop restoration & downtime loss-of-use fees</li>
+                            </>
+                          )}
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                 </section>
               )}

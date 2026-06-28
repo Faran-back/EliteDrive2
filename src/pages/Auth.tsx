@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Car, AlertCircle, Mail, Lock, User as UserIcon, ArrowRight, Github, Chrome, Shield, ChevronDown, ChevronUp, IdCard, FileBadge, Info } from 'lucide-react';
+import { Car, AlertCircle, Mail, Lock, User as UserIcon, ArrowRight, Chrome, Shield, ChevronDown, ChevronUp, IdCard, FileBadge, Info } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, signupSchema, LoginFormData, SignupFormData } from '../schemas/auth';
@@ -487,21 +487,14 @@ const Auth: React.FC = () => {
               <span className="relative px-6 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 bg-white">Continue with</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="w-full">
               <button 
                 onClick={handleGoogleLogin}
                 disabled={loading}
-                className="flex items-center justify-center gap-3 bg-white border border-slate-100 py-4 px-6 rounded-2xl hover:bg-slate-50 transition-all text-slate-700 font-black text-xs shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-3 bg-white border border-slate-100 py-4 px-6 rounded-2xl hover:bg-slate-50 transition-all text-slate-700 font-black text-xs shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 <Chrome size={18} className="text-blue-500" />
                 Google
-              </button>
-              <button 
-                disabled={loading}
-                className="flex items-center justify-center gap-3 bg-white border border-slate-100 py-4 px-6 rounded-2xl hover:bg-slate-50 transition-all text-slate-700 font-black text-xs shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                <Github size={18} className="text-slate-900" />
-                GitHub
               </button>
             </div>
 

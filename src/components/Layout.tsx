@@ -21,7 +21,8 @@ import {
   AlertCircle,
   AlertTriangle,
   ShieldAlert,
-  Scale
+  Scale,
+  Mail
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';

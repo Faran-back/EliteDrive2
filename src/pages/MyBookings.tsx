@@ -134,8 +134,8 @@ const MyBookings: React.FC = () => {
       }
 
       setReuploadImage(base64);
-      if (result.sendingBank) setReuploadSenderBank(result.sendingBank);
-      if (result.transactionRef) setReuploadRef(result.transactionRef);
+      if (result.sendingBank && !reuploadSenderBank) setReuploadSenderBank(result.sendingBank);
+      // Transaction ID / Reference (reuploadRef) is strictly user-provided and editable to prevent incorrect auto-population.
 
       showToast?.(`Receipt verified successfully! Bank: ${result.sendingBank || 'Detected'}`, 'success');
     } catch (err) {
@@ -423,6 +423,29 @@ const MyBookings: React.FC = () => {
                           <p className="font-black text-[#1E293B] text-xs truncate max-w-[120px]" title={booking.dropoffLocation || booking.destination}>{booking.dropoffLocation || booking.destination}</p>
                         </div>
                       )}
+
+                      {booking.status === 'cancelled' && (
+                        <div className="col-span-2 md:col-span-4 mt-4 p-4 bg-red-50/50 border border-red-100 rounded-2xl space-y-2">
+                          <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">Refund Details</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-bold text-slate-700">
+                            <div>
+                              Refund Amount: <span className="font-black text-emerald-600">PKR {(booking.refundAmount || 0).toLocaleString()}</span>
+                            </div>
+                            <div>
+                              Cancellation Penalty: <span className="font-black text-red-600">PKR {(booking.penaltyAmount || 0).toLocaleString()}</span>
+                            </div>
+                            <div>
+                              Refund Status: <span className="font-black text-slate-900 uppercase">
+                                {booking.refundStatus === 'pending_manual_bank_transfer' 
+                                  ? 'Awaiting Bank Transfer' 
+                                  : booking.refundStatus === 'processed' 
+                                  ? 'Transferred' 
+                                  : 'None'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -674,13 +697,16 @@ const MyBookings: React.FC = () => {
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-[9px] uppercase font-extrabold text-slate-450 mb-1">Transaction Ref / Memo ID *</label>
+                                      <div className="flex justify-between items-center mb-1">
+                                        <label className="block text-[9px] uppercase font-extrabold text-slate-450">Transaction Ref / Memo ID *</label>
+                                        <span className="text-[8px] text-blue-600 font-bold">User-provided & editable</span>
+                                      </div>
                                       <input 
                                         type="text" 
-                                        placeholder="Enter the transfer reference"
+                                        placeholder="Enter exact Transaction ID (TID) manually"
                                         value={reuploadRef}
                                         onChange={(e) => setReuploadRef(e.target.value)}
-                                        className="w-full text-xs rounded-xl border border-slate-200 h-10 px-3 bg-white font-semibold text-slate-800"
+                                        className="w-full text-xs rounded-xl border border-slate-200 h-10 px-3 bg-white font-semibold text-slate-800 focus:ring-2 focus:ring-[#2563EB] focus:border-[#2563EB] outline-none transition-all"
                                       />
                                     </div>
                                   </div>

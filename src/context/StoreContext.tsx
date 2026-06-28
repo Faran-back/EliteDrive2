@@ -134,7 +134,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setAllBookings(bData);
 
           const nData = await apiFetch('/api/notifications').catch(() => []);
-          setNotifications(nData);
+          setNotifications(prev => {
+            const newUnreads = nData.filter((item: Notification) => {
+              if (item.read) return false;
+              return !prev.some(p => p.id === item.id);
+            });
+            if (newUnreads.length > 0) {
+              newUnreads.forEach((n: Notification) => {
+                showToast(`🔔 ${n.title}: ${n.message}`, 'info');
+              });
+            }
+            return nData;
+          });
 
           const incData = await apiFetch('/api/incidents').catch(() => []);
           setIncidents(incData);

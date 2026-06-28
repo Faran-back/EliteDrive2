@@ -42,7 +42,7 @@ const VehicleDetails: React.FC = () => {
   const isPastReturn = activeBooking && new Date() >= new Date(activeBooking.endDate);
   const effectiveStatus = vehicle ? (((vehicle.status === 'booked' || vehicle.status === 'rented') && isPastReturn) ? 'available' : vehicle.status) : 'available';
   const isVerified = (user?.emailVerified && user?.phoneVerified) || 
-                      (user?.email && ['ahmed12@gmail.com', 'test@example.com'].includes(user.email.toLowerCase()));
+                      (user?.email && ['ahmed12@gmail.com', 'tj334767@gmail.com'].includes(user.email.toLowerCase()));
 
   const startDate = (() => {
     const saved = localStorage.getItem('elitedrive_pickup_date');

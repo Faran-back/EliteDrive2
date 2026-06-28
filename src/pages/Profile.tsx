@@ -21,7 +21,8 @@ import {
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import EmailLogsSandbox from '../components/dashboard/EmailLogsSandbox';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { profileSchema, ProfileFormData } from '../schemas/profile';
@@ -42,6 +43,9 @@ const Profile: React.FC = () => {
     bookings
   } = useStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const currentView = queryParams.get('view');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
@@ -52,7 +56,7 @@ const Profile: React.FC = () => {
   const [confirmationResult, setConfirmationResult] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isBypassed = user?.email && ['ahmed12@gmail.com', 'test@example.com'].includes(user.email.toLowerCase());
+  const isBypassed = user?.email && ['ahmed12@gmail.com', 'tj334767@gmail.com'].includes(user.email.toLowerCase());
   const isVerified = (user?.emailVerified && user?.phoneVerified) || isBypassed;
   const isEmailVerified = user?.emailVerified || isBypassed;
   const isPhoneVerified = user?.phoneVerified || isBypassed;
@@ -121,7 +125,7 @@ const Profile: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const validation = validateImage(file, 1); // Limit to 1MB for base64 storage
+    const validation = validateImage(file, 10); // Limit to 10MB for base64 storage
     if (!validation.isValid) {
       showToast(validation.error || 'Invalid image', 'error');
       return;
@@ -150,8 +154,8 @@ const Profile: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('File size must be less than 5MB', 'error');
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('File size must be less than 10MB', 'error');
       return;
     }
 
@@ -207,6 +211,18 @@ const Profile: React.FC = () => {
       setIsVerifyingCode(false);
     }
   };
+
+  if (currentView === 'email-logs') {
+    return (
+      <div className="space-y-10 pb-20">
+        <header className="space-y-1">
+          <h1 className="text-4xl font-black tracking-tight text-[#1E293B]">Email Logs Sandbox</h1>
+          <p className="text-[#64748B] font-medium">Review simulated transactional emails sent by the system to you.</p>
+        </header>
+        <EmailLogsSandbox isAdminView={false} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10 pb-20">

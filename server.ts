@@ -8,6 +8,175 @@ import { INITIAL_VEHICLES, User, Vehicle, Booking, Notification, RoleRequest, In
 
 const DB_PATH = path.join(process.cwd(), 'db.json');
 
+import nodemailer from 'nodemailer';
+
+// --- EMAIL SERVICE & TEMPLATES ---
+function getEmailTemplate(title: string, contentHtml: string) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>${title}</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          background-color: #f8fafc;
+          margin: 0;
+          padding: 0;
+          -webkit-font-smoothing: antialiased;
+        }
+        .wrapper {
+          width: 100%;
+          background-color: #f8fafc;
+          padding: 40px 0;
+        }
+        .container {
+          max-width: 600px;
+          margin: 0 auto;
+          background-color: #ffffff;
+          border-radius: 24px;
+          overflow: hidden;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+          border: 1px solid #f1f5f9;
+        }
+        .header {
+          background-color: #2463eb;
+          padding: 40px;
+          text-align: center;
+          color: #ffffff;
+        }
+        .logo-text {
+          font-size: 24px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          margin: 0 0 10px 0;
+        }
+        .header-title {
+          font-size: 18px;
+          font-weight: 500;
+          margin: 0;
+          opacity: 0.9;
+        }
+        .content {
+          padding: 40px;
+          color: #334155;
+          line-height: 1.6;
+        }
+        .footer {
+          background-color: #f8fafc;
+          padding: 30px;
+          text-align: center;
+          font-size: 12px;
+          color: #64748b;
+          border-top: 1px solid #f1f5f9;
+        }
+        .button {
+          display: inline-block;
+          background-color: #2463eb;
+          color: #ffffff !important;
+          font-weight: bold;
+          text-decoration: none;
+          padding: 14px 28px;
+          border-radius: 12px;
+          margin: 20px 0;
+          text-align: center;
+        }
+        .details-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 20px 0;
+        }
+        .details-table td {
+          padding: 12px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .details-table td.label {
+          font-weight: bold;
+          color: #64748b;
+          width: 35%;
+        }
+        .details-table td.value {
+          color: #0f172a;
+          font-weight: 500;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="wrapper">
+        <div class="container">
+          <div class="header">
+            <div class="logo-text">⚡ ELITEDRIVE</div>
+            <h1 class="header-title">${title}</h1>
+          </div>
+          <div class="content">
+            ${contentHtml}
+          </div>
+          <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} EliteDrive Pakistan. All rights reserved.</p>
+            <p>This is an automated operational email regarding your account activity.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+async function sendEmail({ to, subject, html, text }: { to: string; subject: string; html: string; text: string }) {
+  const emailId = `eml_${Math.random().toString(36).substring(2, 11)}`;
+  const sentEmailObj = {
+    id: emailId,
+    to,
+    subject,
+    html,
+    text,
+    sentAt: new Date().toISOString(),
+    status: 'sent' as 'sent' | 'failed'
+  };
+
+  dbData.sentEmails = dbData.sentEmails || [];
+  dbData.sentEmails.unshift(sentEmailObj);
+  saveDatabase();
+
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = process.env.SMTP_PORT;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpFrom = process.env.SMTP_FROM || 'no-reply@elitedrive.pk';
+
+  if (smtpHost && smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: parseInt(smtpPort || '587'),
+        secure: smtpPort === '465',
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+
+      await transporter.sendMail({
+        from: `EliteDrive <${smtpFrom}>`,
+        to,
+        subject,
+        text,
+        html,
+      });
+      console.log(`[Email Service] Actual email sent to ${to} successfully.`);
+    } catch (err: any) {
+      console.error(`[Email Service] Failed to send actual SMTP email to ${to}:`, err.message);
+      sentEmailObj.status = 'failed';
+      (sentEmailObj as any).error = err.message;
+      saveDatabase();
+    }
+  } else {
+    console.log(`[Email Service] SMTP parameters missing. Logged email in Sandbox DB for ${to}.`);
+  }
+}
+
 // --- DATABASE INLINE SYSTEM ---
 interface DbData {
   users: (User & { passwordHash: string })[];
@@ -19,6 +188,7 @@ interface DbData {
   incidents: Incident[];
   disputes: Dispute[];
   echallans: EChallan[];
+  sentEmails?: any[];
 }
 
 let dbData: DbData = {
@@ -31,6 +201,7 @@ let dbData: DbData = {
   incidents: [],
   disputes: [],
   echallans: [],
+  sentEmails: [],
 };
 
 function hashPassword(password: string): string {
@@ -42,10 +213,17 @@ function loadDatabase() {
     if (fs.existsSync(DB_PATH)) {
       const content = fs.readFileSync(DB_PATH, 'utf8');
       dbData = JSON.parse(content);
+      dbData.users = dbData.users || [];
+      dbData.vehicles = dbData.vehicles || [];
+      dbData.bookings = dbData.bookings || [];
+      dbData.notifications = dbData.notifications || [];
+      dbData.roleRequests = dbData.roleRequests || [];
+      dbData.invitations = dbData.invitations || [];
       dbData.incidents = dbData.incidents || [];
       dbData.disputes = dbData.disputes || [];
       dbData.echallans = dbData.echallans || [];
-      dbData.users = dbData.users || [];
+      dbData.sentEmails = dbData.sentEmails || [];
+      
       dbData.users.forEach(u => {
         if (u.outstandingBalance === undefined) u.outstandingBalance = 0;
         if (u.isBlacklisted === undefined) u.isBlacklisted = false;
@@ -90,11 +268,12 @@ function seedInitialDatabase() {
     incidents: [],
     disputes: [],
     echallans: [],
+    sentEmails: [],
   };
 
   // Seed default admin and bypassed accounts
   const adminEmails = ['ahmed@gmail.com', 'test@test.com', 'inotfarhan@gmail.com', 'testingdaflow@test.com'];
-  const bypassedEmails = ['ahmed12@gmail.com', 'test@example.com'];
+  const bypassedEmails = ['ahmed12@gmail.com', 'tj334767@gmail.com'];
   const defaultPassHash = hashPassword('password');
 
   adminEmails.forEach((email) => {
@@ -202,7 +381,7 @@ async function startServer() {
     }
 
     const userId = `usr_${Math.random().toString(36).substring(2, 11)}`;
-    const isBypassed = ['ahmed12@gmail.com', 'test@example.com'].includes(email.toLowerCase());
+    const isBypassed = ['ahmed12@gmail.com', 'tj334767@gmail.com'].includes(email.toLowerCase());
     const adminEmails = ['test@test.com', 'inotfarhan@gmail.com', 'testingdaflow@test.com'];
     const isAdmin = adminEmails.includes(email.toLowerCase());
 
@@ -499,16 +678,39 @@ async function startServer() {
 
   // AI-BASED CAR RECOMMENDATION ENGINE
   app.post('/api/recommendations', authenticateToken, async (req: any, res) => {
-    const { budget, travelType, preferences } = req.body;
+    const { budget, travelType, preferences, pickupLocation, dropoffLocation, pickupDate, returnDate } = req.body;
     
-    // Filter available cars (not under repair/maintenance)
-    const candidateVehicles = dbData.vehicles.filter(v => v.status !== 'maintenance');
+    // Calculate overlapping bookings if dates are provided
+    let bookedVehicleIds: string[] = [];
+    if (pickupDate && returnDate) {
+      try {
+        const userStart = new Date(pickupDate);
+        const userEnd = new Date(returnDate);
+        if (!isNaN(userStart.getTime()) && !isNaN(userEnd.getTime())) {
+          bookedVehicleIds = dbData.bookings
+            .filter(b => b.status === 'active' || b.status === 'pending')
+            .filter(b => {
+              const bStart = new Date(b.startDate);
+              const bEnd = new Date(b.endDate);
+              return (userStart < bEnd && userEnd > bStart);
+            })
+            .map(b => b.vehicleId);
+        }
+      } catch (err) {
+        console.error("Error parsing dates for recommendation availability: ", err);
+      }
+    }
+
+    // Filter available cars (not under repair/maintenance, and not already booked in requested period)
+    const candidateVehicles = dbData.vehicles.filter(v => 
+      v.status !== 'maintenance' && !bookedVehicleIds.includes(v.id)
+    );
     
     if (candidateVehicles.length === 0) {
       return res.json({
         recommendedVehicleIds: [],
         recommendations: [],
-        generalAdvice: "No vehicles are currently available in our fleet."
+        generalAdvice: "No vehicles are currently available in our fleet during your requested travel window."
       });
     }
 
@@ -522,12 +724,20 @@ async function startServer() {
 Based on the following request:
 - Travel Type: ${travelType || 'general'} (e.g. in_city, out_city, mountainous, family_trip, business)
 - Daily Budget Limit: ${budget ? `PKR ${budget}` : 'No limit'}
+- Pickup Location: ${pickupLocation || 'Lahore, Pakistan'}
+- Drop-off Location: ${dropoffLocation || 'Same as pickup'}
+- Pickup Date: ${pickupDate || 'N/A'}
+- Return Date: ${returnDate || 'N/A'}
 - Extra Preferences: ${preferences || 'None'}
 
-Here is the list of active vehicles in EliteDrive fleet:
+Here is the list of active, available vehicles in EliteDrive fleet for this specific travel window:
 ${JSON.stringify(candidateVehicles.map(v => ({ id: v.id, name: v.name, type: v.type, pricePerDay: v.pricePerDay, transmission: v.transmission, fuel: v.fuel, seats: v.seats, features: v.features, location: v.location })), null, 2)}
 
-Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fit the trip type (e.g., fuel efficiency for city runs, ground clearance/power for mountainous regions, premium styling for business/wedding trips, space for family trips) and budget. Avoid vehicles that exceed the budget significantly unless no alternatives exist. Include a general tip for driving or exploring in Pakistan for this travel type.`;
+Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fit:
+1. The budget limit (PKR).
+2. The pickup and dropoff locations & estimated travel distance/terrain (e.g. Inter-city on Motorways M2/M3 requires stability, mountainous terrain requires power/clearance, city commuting requires fuel efficiency).
+3. The specified travel type and preferences.
+Avoid vehicles that exceed the budget significantly unless no alternatives exist. Include a general tip for driving or exploring in Pakistan for this travel type.`;
 
       const response = await client.models.generateContent({
         model: 'gemini-3.5-flash',
@@ -548,14 +758,14 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
                   type: Type.OBJECT,
                   properties: {
                     vehicleId: { type: Type.STRING },
-                    reasoning: { type: Type.STRING, description: "Personalized explanation of why this vehicle is perfect for their trip, budget, and travel type." }
+                    reasoning: { type: Type.STRING, description: "Personalized explanation of why this vehicle is perfect for their trip, budget, locations/distance, and travel type." }
                   },
                   required: ["vehicleId", "reasoning"]
                 }
               },
               generalAdvice: {
                 type: Type.STRING,
-                description: "General advice for this specific travel type in Pakistan (e.g., fuel recommendations, route safety)."
+                description: "General advice for this specific travel type, locations, and distance in Pakistan (e.g., fuel recommendations, route safety, toll estimations)."
               }
             },
             required: ["recommendedVehicleIds", "recommendations", "generalAdvice"]
@@ -567,7 +777,7 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
       const result = JSON.parse(responseText);
       return res.json(result);
     } catch (error: any) {
-      console.log('Gemini recommendation fallback triggered.');
+      console.log('Gemini recommendation fallback triggered.', error);
       // Local Heuristics-based Fallback
       const maxBudget = budget ? Number(budget) : Infinity;
       let matches = candidateVehicles;
@@ -595,15 +805,15 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
       const recommendedVehicleIds = top3.map(v => v.id);
       
       const recommendations = top3.map(v => {
-        let reason = `Excellent reliable selection for your EliteDrive journey.`;
+        let reason = `Excellent reliable selection for your EliteDrive journey. Matches your budget (PKR ${v.pricePerDay.toLocaleString()}/day) and route from ${pickupLocation || 'pickup'} to ${dropoffLocation || 'destination'}.`;
         if (travelType === 'mountainous') {
-          reason = `Great power and robust capabilities. Ideal for Pakistan's adventurous northern routes and highway travel with spacious cabin area.`;
+          reason = `Great power, high ground clearance, and robust capabilities. Ideal for Pakistan's adventurous northern routes (e.g., Karakoram Highway/Naran) from ${pickupLocation || 'your starting point'}.`;
         } else if (travelType === 'family_trip') {
-          reason = `Superb cabin space with comfortable ${v.seats}-seater layout. Offers perfect legroom and massive luggage capacity for the family.`;
+          reason = `Superb cabin space with comfortable ${v.seats}-seater layout. Offers perfect legroom and massive luggage capacity for the family trip.`;
         } else if (travelType === 'business') {
-          reason = `Stunning executive presence. This premium model provides unparalleled comfort, high-end features, and elegant drive dynamics.`;
+          reason = `Stunning executive presence. This premium model provides unparalleled comfort, high-end features, and elegant drive dynamics for business in ${pickupLocation || 'major cities'}.`;
         } else if (travelType === 'in_city') {
-          reason = `Ultra-efficient fuel consumption, smooth automatic gearbox, and highly maneuverable. Excellent choice for navigating urban traffic effortlessly.`;
+          reason = `Ultra-efficient fuel consumption, smooth automatic gearbox, and highly maneuverable. Excellent choice for navigating urban traffic in ${pickupLocation || 'Lahore'} effortlessly.`;
         }
         return {
           vehicleId: v.id,
@@ -612,8 +822,8 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
       });
 
       const generalAdvice = travelType === 'mountainous' 
-        ? "When travelling to areas like Naran, Kaghan, or Hunza, always inspect the vehicle brakes, tires, and carry warm clothes. Ensure fuel tank is full at major stations." 
-        : "For city journeys, opt for automatic transmissions to ease navigating peak traffic hours in Lahore or Karachi.";
+        ? "When travelling to high-altitude areas like Naran, Kaghan, or Hunza, always inspect the vehicle brakes, tires, and carry warm clothes. Ensure fuel tank is full at major stations." 
+        : `For commuting in ${pickupLocation || 'Pakistan'}, opt for automatic transmissions to ease navigating peak traffic hours. Always keep active identification and booking copy on hand.`;
 
       return res.json({
         recommendedVehicleIds,
@@ -718,6 +928,61 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
       link: '/my-bookings'
     });
 
+    // Notify customer via Email
+    if (userProfile) {
+      const emailHtml = getEmailTemplate(
+        'Booking Pending Approval',
+        `
+        <p>Dear ${userProfile.name || 'Valued Customer'},</p>
+        <p>We are excited to let you know that your booking request has been successfully received by EliteDrive Pakistan.</p>
+        <p>Our team is currently reviewing your application, driver profile, and required credentials. Below are your booking details:</p>
+        
+        <table class="details-table">
+          <tr>
+            <td class="label">Booking ID</td>
+            <td class="value">${newBooking.id}</td>
+          </tr>
+          <tr>
+            <td class="label">Vehicle</td>
+            <td class="value">${vehicle.name} (${vehicle.type})</td>
+          </tr>
+          <tr>
+            <td class="label">Duration</td>
+            <td class="value">${newBooking.startDate} to ${newBooking.endDate}</td>
+          </tr>
+          <tr>
+            <td class="label">Total Price</td>
+            <td class="value">PKR ${newBooking.totalPrice.toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td class="label">Security Deposit</td>
+            <td class="value">PKR 10,000 (Refundable)</td>
+          </tr>
+          <tr>
+            <td class="label">Payment Status</td>
+            <td class="value">${newBooking.paymentStatus.toUpperCase()} (${newBooking.paymentMethod.replace('_', ' ')})</td>
+          </tr>
+        </table>
+        
+        <p>If you selected **Bank Transfer**, please ensure you upload your payment receipt in the portal to expedite the verification process.</p>
+        
+        <div style="text-align: center;">
+          <a href="${process.env.APP_URL || 'http://localhost:3000'}/my-bookings" class="button">Go to My Bookings</a>
+        </div>
+        
+        <p>If you have any questions or require immediate assistance, feel free to reply to this email or reach out via our 24/7 Live Support Chat.</p>
+        <p>Best regards,<br>The EliteDrive Team</p>
+        `
+      );
+
+      sendEmail({
+        to: userProfile.email,
+        subject: `🚗 EliteDrive: Booking Pending Approval - ${vehicle.name}`,
+        html: emailHtml,
+        text: `Dear ${userProfile.name},\n\nYour booking request for ${vehicle.name} has been received. Booking ID: ${newBooking.id}.\nTotal Price: PKR ${newBooking.totalPrice}.\nGo to your portal to upload payment verification if using Bank Transfer.\n\nBest regards,\nEliteDrive Team`
+      });
+    }
+
     // Notify staff
     dbData.users.filter(u => u.role === 'admin' || u.role === 'manager').forEach(staff => {
       dbData.notifications.push({
@@ -747,6 +1012,28 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
       return res.status(403).json({ error: 'Permission denied to update this booking' });
     }
 
+    // Role-based validation for customers to prevent self-approvals & unauthorized changes
+    if (req.user.role === 'customer') {
+      const forbiddenFields = [
+        'paymentStatus', 'penaltyAmount', 'refundAmount', 'refundStatus',
+        'securityDepositRefundStatus', 'returnVerification', 'incidentsCount', 'remainingPaymentStatus'
+      ];
+      
+      for (const field of forbiddenFields) {
+        if (field in updates) {
+          return res.status(403).json({ error: `Permission denied: Customers cannot modify the restricted field '${field}'.` });
+        }
+      }
+
+      if ('status' in updates && updates.status !== 'cancelled') {
+        return res.status(403).json({ error: "Permission denied: Customers cannot approve or change booking status directly." });
+      }
+
+      if ('bankReceiptApproved' in updates && updates.bankReceiptApproved !== 'pending') {
+        return res.status(403).json({ error: "Permission denied: Customers cannot approve bank receipt status." });
+      }
+    }
+
     // 1. If cancellation requested, calculate refund and penalty rules
     if (updates.status === 'cancelled' && originalBooking.status !== 'cancelled') {
       const now = new Date();
@@ -754,22 +1041,40 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
       const diffMs = startDate.getTime() - now.getTime();
       const hoursLeft = diffMs / (1000 * 60 * 60);
 
+      // Total amount the user has actually paid so far:
+      let actualPaidAmount = 0;
+      if (originalBooking.paymentStatus === 'paid' || originalBooking.bankReceiptApproved === 'approved') {
+        actualPaidAmount += (originalBooking.upfrontAmountPaid || 0);
+      }
+      if (originalBooking.remainingPaymentStatus === 'paid') {
+        actualPaidAmount += (originalBooking.remainingAmount || 0);
+      }
+
       let refundAmount = 0;
       let penaltyAmount = 0;
       let refundStatus: 'none' | 'pending_manual_bank_transfer' | 'processed' = 'none';
 
       if (hoursLeft >= 48) {
-        // Full refund
-        refundAmount = originalBooking.totalPrice;
+        // Full refund of actually paid amount, 0 penalty
+        refundAmount = actualPaidAmount;
         penaltyAmount = 0;
-        refundStatus = originalBooking.paymentMethod === 'bank_transfer' ? 'pending_manual_bank_transfer' : 'processed';
+        if (refundAmount > 0) {
+          refundStatus = (originalBooking.paymentMethod === 'bank_transfer' || originalBooking.paymentMethod === 'transfer')
+            ? 'pending_manual_bank_transfer' 
+            : 'processed';
+        }
       } else if (hoursLeft >= 24) {
-        // 50% penalty
-        refundAmount = originalBooking.totalPrice * 0.5;
-        penaltyAmount = originalBooking.totalPrice * 0.5;
-        refundStatus = originalBooking.paymentMethod === 'bank_transfer' ? 'pending_manual_bank_transfer' : 'processed';
+        // 50% penalty on total price
+        const penaltyRule = originalBooking.totalPrice * 0.5;
+        penaltyAmount = penaltyRule;
+        refundAmount = Math.max(0, actualPaidAmount - penaltyRule);
+        if (refundAmount > 0) {
+          refundStatus = (originalBooking.paymentMethod === 'bank_transfer' || originalBooking.paymentMethod === 'transfer')
+            ? 'pending_manual_bank_transfer' 
+            : 'processed';
+        }
       } else {
-        // 100% penalty
+        // 100% penalty on total price, 0 refund
         refundAmount = 0;
         penaltyAmount = originalBooking.totalPrice;
         refundStatus = 'none';
@@ -784,7 +1089,7 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
         id: `not_${Math.random().toString(36).substring(2, 11)}`,
         userId: originalBooking.userId,
         title: 'Booking Refund Logged',
-        message: `Your booking cancellation has been processed. Refund: Rs. ${refundAmount}, Penalty: Rs. ${penaltyAmount}. Status: ${refundStatus}`,
+        message: `Your booking cancellation has been processed. Refund: Rs. ${refundAmount.toLocaleString()}, Penalty: Rs. ${penaltyAmount.toLocaleString()}. Status: ${refundStatus}`,
         type: 'booking_cancelled',
         read: false,
         createdAt: new Date().toISOString()
@@ -821,9 +1126,11 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
       }
     }
 
-    // Status notifications
+    // Status notifications & Email Triggers
+    const customerUser = dbData.users.find(u => u.id === originalBooking.userId);
+    const vehicle = dbData.vehicles.find(v => v.id === originalBooking.vehicleId);
+
     if (updates.status === 'active' && originalBooking.status !== 'active') {
-      const vehicle = dbData.vehicles.find(v => v.id === originalBooking.vehicleId);
       dbData.notifications.push({
         id: `not_${Math.random().toString(36).substring(2, 11)}`,
         userId: originalBooking.userId,
@@ -834,8 +1141,57 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
         createdAt: new Date().toISOString(),
         link: '/my-bookings'
       });
+
+      // Send Email to Customer
+      if (customerUser && vehicle) {
+        const emailHtml = getEmailTemplate(
+          'Booking Approved & Active',
+          `
+          <p>Dear ${customerUser.name || 'Valued Customer'},</p>
+          <p>Congratulations! Your booking for the <strong>${vehicle.name}</strong> has been fully verified and approved. Your rental is now <strong>Active</strong>.</p>
+          
+          <table class="details-table">
+            <tr>
+              <td class="label">Booking ID</td>
+              <td class="value">${originalBooking.id}</td>
+            </tr>
+            <tr>
+              <td class="label">Vehicle</td>
+              <td class="value">${vehicle.name}</td>
+            </tr>
+            <tr>
+              <td class="label">Period</td>
+              <td class="value">${originalBooking.startDate} to ${originalBooking.endDate}</td>
+            </tr>
+            <tr>
+              <td class="label">Rental Price</td>
+              <td class="value">PKR ${originalBooking.totalPrice.toLocaleString()} (PAID)</td>
+            </tr>
+            <tr>
+              <td class="label">Security Deposit</td>
+              <td class="value">PKR 10,000 (Refundable, VERIFIED)</td>
+            </tr>
+          </table>
+          
+          <p>Please present your physical CNIC and original driving license at the time of vehicle delivery or pickup.</p>
+          
+          <div style="text-align: center;">
+            <a href="${process.env.APP_URL || 'http://localhost:3000'}/my-bookings" class="button">Manage Active Booking</a>
+          </div>
+          
+          <p>Drive safely, adhere to speed limits, and have an exceptional premium journey!</p>
+          <p>Best regards,<br>The EliteDrive Team</p>
+          `
+        );
+
+        sendEmail({
+          to: customerUser.email,
+          subject: `✅ EliteDrive APPROVED: Your ${vehicle.name} is ready!`,
+          html: emailHtml,
+          text: `Dear ${customerUser.name},\n\nYour booking for ${vehicle.name} (ID: ${originalBooking.id}) has been approved and is now active.\nEnjoy your ride!\n\nBest regards,\nEliteDrive Team`
+        });
+      }
     } else if (updates.status === 'cancelled' && originalBooking.status !== 'cancelled') {
-      const vehicle = dbData.vehicles.find(v => v.id === originalBooking.vehicleId);
       dbData.notifications.push({
         id: `not_${Math.random().toString(36).substring(2, 11)}`,
         userId: originalBooking.userId,
@@ -846,11 +1202,107 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
         createdAt: new Date().toISOString(),
         link: '/my-bookings'
       });
+
+      // Send Email to Customer
+      if (customerUser && vehicle) {
+        const emailHtml = getEmailTemplate(
+          'Booking Cancelled',
+          `
+          <p>Dear ${customerUser.name || 'Valued Customer'},</p>
+          <p>Your booking for the <strong>${vehicle.name}</strong> has been cancelled.</p>
+          
+          <p>Here is a summary of the cancellation details:</p>
+          <table class="details-table">
+            <tr>
+              <td class="label">Booking ID</td>
+              <td class="value">${originalBooking.id}</td>
+            </tr>
+            <tr>
+              <td class="label">Vehicle</td>
+              <td class="value">${vehicle.name}</td>
+            </tr>
+            <tr>
+              <td class="label">Cancellation Refund</td>
+              <td class="value">PKR ${(updates.refundAmount || 0).toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td class="label">Late Penalty Fee</td>
+              <td class="value">PKR ${(updates.penaltyAmount || 0).toLocaleString()}</td>
+            </tr>
+          </table>
+          
+          <p>Refunds (if applicable) are processed back to the original payment source or via bank transfer for verified cash payments.</p>
+          
+          <p>We look forward to serving you again in the future under better circumstances.</p>
+          <p>Best regards,<br>The EliteDrive Team</p>
+          `
+        );
+
+        sendEmail({
+          to: customerUser.email,
+          subject: `⚠️ EliteDrive: Booking Cancelled - ${vehicle.name}`,
+          html: emailHtml,
+          text: `Dear ${customerUser.name},\n\nYour booking for ${vehicle.name} has been cancelled. Refund: PKR ${updates.refundAmount || 0}, Penalty: PKR ${updates.penaltyAmount || 0}.\n\nBest regards,\nEliteDrive Team`
+        });
+      }
+    } else if (updates.status === 'completed' && originalBooking.status !== 'completed') {
+      dbData.notifications.push({
+        id: `not_${Math.random().toString(36).substring(2, 11)}`,
+        userId: originalBooking.userId,
+        title: 'Booking Completed 🎉',
+        message: `Your booking for ${vehicle?.name || 'a vehicle'} has been completed successfully. Security deposit refund initiated!`,
+        type: 'booking_confirmed',
+        read: false,
+        createdAt: new Date().toISOString(),
+        link: '/my-bookings'
+      });
+
+      // Send Email to Customer
+      if (customerUser && vehicle) {
+        const emailHtml = getEmailTemplate(
+          'Rental Completed - Thank You!',
+          `
+          <p>Dear ${customerUser.name || 'Valued Customer'},</p>
+          <p>Thank you for choosing EliteDrive for your premium journey. Your rental of the <strong>${vehicle.name}</strong> has been successfully marked as <strong>Completed</strong>.</p>
+          
+          <p>Our team has inspected the vehicle and initiated the refund procedure for your PKR 10,000 security deposit. This will be credited back to your account within 2-3 business days.</p>
+          
+          <table class="details-table">
+            <tr>
+              <td class="label">Booking ID</td>
+              <td class="value">${originalBooking.id}</td>
+            </tr>
+            <tr>
+              <td class="label">Vehicle</td>
+              <td class="value">${vehicle.name}</td>
+            </tr>
+            <tr>
+              <td class="label">Security Deposit Refund</td>
+              <td class="value">PKR 10,000 (Initiated)</td>
+            </tr>
+          </table>
+          
+          <p>We'd love to hear about your experience! Please rate your ride and provide any feedback directly in your portal to help us maintain elite service standards.</p>
+          
+          <div style="text-align: center;">
+            <a href="${process.env.APP_URL || 'http://localhost:3000'}/customer-dashboard" class="button">Explore Our Fleet for Next Time</a>
+          </div>
+          
+          <p>Best regards,<br>The EliteDrive Team</p>
+          `
+        );
+
+        sendEmail({
+          to: customerUser.email,
+          subject: `🌟 EliteDrive: Rental of ${vehicle.name} Completed!`,
+          html: emailHtml,
+          text: `Dear ${customerUser.name},\n\nThank you for choosing EliteDrive! Your rental of ${vehicle.name} has been completed and your security deposit refund has been initiated.\n\nBest regards,\nEliteDrive Team`
+        });
+      }
     }
 
     // Bank Transfer Notifications
     if (updates.bankReceiptApproved === 'approved' && originalBooking.bankReceiptApproved !== 'approved') {
-      const vehicle = dbData.vehicles.find(v => v.id === originalBooking.vehicleId);
       dbData.notifications.push({
         id: `not_${Math.random().toString(36).substring(2, 11)}`,
         userId: originalBooking.userId,
@@ -861,8 +1313,27 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
         createdAt: new Date().toISOString(),
         link: '/my-bookings'
       });
+
+      // Send Email
+      if (customerUser && vehicle) {
+        const emailHtml = getEmailTemplate(
+          'Payment Receipt Approved!',
+          `
+          <p>Dear ${customerUser.name || 'Valued Customer'},</p>
+          <p>Excellent news! Your uploaded bank transfer payment receipt for the <strong>${vehicle.name}</strong> rental has been successfully verified and <strong>Approved</strong> by our accounts department.</p>
+          <p>Your booking status has been updated. We are finalizing vehicle dispatch preparations.</p>
+          <p>Best regards,<br>The EliteDrive Team</p>
+          `
+        );
+
+        sendEmail({
+          to: customerUser.email,
+          subject: `💳 EliteDrive: Payment Receipt Approved!`,
+          html: emailHtml,
+          text: `Dear ${customerUser.name},\n\nYour payment receipt for ${vehicle.name} was approved.\n\nBest regards,\nEliteDrive Team`
+        });
+      }
     } else if (updates.bankReceiptApproved === 'rejected' && originalBooking.bankReceiptApproved !== 'rejected') {
-      const vehicle = dbData.vehicles.find(v => v.id === originalBooking.vehicleId);
       dbData.notifications.push({
         id: `not_${Math.random().toString(36).substring(2, 11)}`,
         userId: originalBooking.userId,
@@ -873,6 +1344,31 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
         createdAt: new Date().toISOString(),
         link: '/my-bookings'
       });
+
+      // Send Email
+      if (customerUser && vehicle) {
+        const emailHtml = getEmailTemplate(
+          'Payment Receipt Rejected',
+          `
+          <p>Dear ${customerUser.name || 'Valued Customer'},</p>
+          <p>We noticed an issue with your uploaded bank transfer payment receipt for the <strong>${vehicle.name}</strong> rental.</p>
+          <p>Reason for rejection: <strong>${updates.bankReceiptRejectionReason || 'No details provided.'}</strong></p>
+          <p>Please log in to your portal and upload a valid payment receipt as soon as possible to keep your reservation secured.</p>
+          
+          <div style="text-align: center;">
+            <a href="${process.env.APP_URL || 'http://localhost:3000'}/my-bookings" class="button">Upload Correct Receipt</a>
+          </div>
+          <p>Best regards,<br>The EliteDrive Team</p>
+          `
+        );
+
+        sendEmail({
+          to: customerUser.email,
+          subject: `💳 EliteDrive: Payment Receipt Rejected`,
+          html: emailHtml,
+          text: `Dear ${customerUser.name},\n\nYour payment receipt for ${vehicle.name} was rejected. Reason: ${updates.bankReceiptRejectionReason}\n\nBest regards,\nEliteDrive Team`
+        });
+      }
     }
 
     saveDatabase();
@@ -1110,6 +1606,16 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
     res.json({ success: true });
   });
 
+  // EMAIL SANDBOX API
+  app.get('/api/sent-emails', authenticateToken, checkRole(['admin', 'manager']), (req, res) => {
+    res.json(dbData.sentEmails || []);
+  });
+
+  app.get('/api/my-emails', authenticateToken, (req: any, res) => {
+    const userEmails = (dbData.sentEmails || []).filter(e => e.to.toLowerCase() === req.user.email.toLowerCase());
+    res.json(userEmails);
+  });
+
   // --- NEW INTEGRATED ENTERPRISE MODULES ---
 
   // INCIDENTS API
@@ -1123,6 +1629,14 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
 
   app.post('/api/incidents', authenticateToken, (req: any, res) => {
     const data = req.body;
+
+    if (req.user.role === 'customer' && data.bookingId) {
+      const booking = dbData.bookings.find(b => b.id === data.bookingId);
+      if (!booking || booking.userId !== req.user.id) {
+        return res.status(403).json({ error: 'Permission denied: This booking does not belong to you.' });
+      }
+    }
+
     const occurredAt = new Date(data.occurredAt);
     const submittedAt = new Date();
     
@@ -1248,6 +1762,14 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
 
   app.post('/api/disputes', authenticateToken, (req: any, res) => {
     const data = req.body;
+
+    if (req.user.role === 'customer' && data.bookingId) {
+      const booking = dbData.bookings.find(b => b.id === data.bookingId);
+      if (!booking || booking.userId !== req.user.id) {
+        return res.status(403).json({ error: 'Permission denied: This booking does not belong to you.' });
+      }
+    }
+
     const id = `disp_${Math.random().toString(36).substring(2, 11)}`;
     const newDispute: Dispute = {
       id,

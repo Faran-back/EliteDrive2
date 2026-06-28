@@ -132,16 +132,12 @@ const Bookings: React.FC = () => {
         paymentStatus: 'paid'
       };
       
-      if (!isPartial) {
-        updates.status = 'active';
-      }
-
       await updateBooking(booking.id, updates);
       
       if (isPartial) {
         showToast('Upfront payment verified! Booking is now confirmed. Collect the remaining 50% at handover to activate.', 'success');
       } else {
-        showToast('Payment receipt verified and booking approved!', 'success');
+        showToast('Payment receipt verified successfully! You can now review and approve this booking.', 'success');
       }
       setSelectedBooking(null);
     } catch (err) {
@@ -889,6 +885,56 @@ const Bookings: React.FC = () => {
                           >
                             Approve Booking
                           </button>
+                        </div>
+                      )}
+                      {booking.status === 'cancelled' && (booking.refundAmount && booking.refundAmount > 0) && (
+                        <div className="mt-8 p-6 bg-rose-50/50 rounded-3xl border border-rose-100/50 space-y-4 text-left">
+                          <div className="flex items-center gap-2 pb-3 border-b border-rose-200">
+                            <Building2 className="text-rose-600" size={18} />
+                            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Refund Status & Settlement</h4>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs font-semibold text-slate-700">
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase">Calculated Refund Amount</p>
+                              <p className="text-emerald-700 font-black mt-0.5">PKR {booking.refundAmount.toLocaleString()}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase">Cancellation Penalty</p>
+                              <p className="text-rose-600 font-black mt-0.5">PKR {(booking.penaltyAmount || 0).toLocaleString()}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase">Settlement Status</p>
+                              <span className={`inline-block px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded mt-1 ${
+                                booking.refundStatus === 'processed'
+                                  ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-100'
+                              }`}>
+                                {booking.refundStatus === 'processed' ? 'Settled / Processed' : 'Awaiting Settlement'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {booking.refundStatus !== 'processed' && (
+                            <div className="pt-2 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    await updateBooking(booking.id, { refundStatus: 'processed' });
+                                    showToast('Refund marked as successfully processed and settled!', 'success');
+                                  } catch (err) {
+                                    console.error(err);
+                                    showToast('Failed to update refund status.', 'error');
+                                  }
+                                }}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all cursor-pointer shadow-md shadow-emerald-100"
+                              >
+                                Mark Refund as Processed
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </motion.div>

@@ -373,12 +373,11 @@ const Payment: React.FC = () => {
       setReceiptAnalysisStep('approved');
       setReceiptImage(base);
       
-      if (result.sendingBank) {
+      if (result.sendingBank && !senderBank) {
         setSenderBank(result.sendingBank);
       }
-      if (result.transactionRef) {
-        setTransactionRef(result.transactionRef);
-      }
+      // Transaction ID (TID) is strictly user-provided to prevent incorrect auto-population or hardcoding.
+      // Therefore, we do not auto-populate it from scanned data.
 
       showToast(`Secure receipt captured and verified successfully! Bank: ${result.sendingBank || 'Detected'}`, 'success');
     } catch (err: any) {
@@ -1414,14 +1413,18 @@ const Payment: React.FC = () => {
                               </div>
 
                               <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Transaction ID / TID Reference</label>
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex justify-between items-center">
+                                  <span>Transaction ID / TID Reference *</span>
+                                  <span className="text-[9px] text-blue-600 font-bold normal-case">User-provided & editable</span>
+                                </label>
                                 <input 
                                   type="text"
                                   value={transactionRef}
                                   onChange={(e) => setTransactionRef(e.target.value)}
-                                  placeholder="e.g. FT261937402"
-                                  className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:ring-2 focus:ring-[#2563EB] focus:border-[#2563EB] outline-none font-mono text-xs font-bold uppercase"
+                                  placeholder="Enter exact Transaction ID (TID) from receipt"
+                                  className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white focus:ring-2 focus:ring-[#2563EB] focus:border-[#2563EB] outline-none font-mono text-xs font-bold uppercase transition-all"
                                 />
+                                <p className="text-[9px] text-slate-400 font-medium">Please enter your reference ID manually to ensure accuracy.</p>
                               </div>
                             </div>
 

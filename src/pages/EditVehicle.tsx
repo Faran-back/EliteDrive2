@@ -129,7 +129,7 @@ const EditVehicle: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const validation = validateImage(file, 2); // 2MB for vehicle images
+    const validation = validateImage(file, 10); // 10MB for vehicle images
     if (!validation.isValid) {
       showToast(validation.error || 'Invalid image', 'error');
       return;
@@ -153,7 +153,7 @@ const EditVehicle: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const validation = validateImage(file, 2); // 2MB for vehicle images
+    const validation = validateImage(file, 10); // 10MB for vehicle images
     if (!validation.isValid) {
       showToast(validation.error || 'Invalid image', 'error');
       return;

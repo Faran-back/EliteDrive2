@@ -43,12 +43,12 @@ export async function registerPushNotifications(): Promise<PushRegistrationResul
   // Check if we are running inside an iframe
   const isInIframe = window.self !== window.top;
   if (isInIframe && window.Notification.permission !== 'granted') {
-    console.warn('Push registration blocked: cannot request notification permissions inside an iframe.');
+    console.log('[WebPush] Push registration is not available inside the preview iframe. Please open the app in a new tab.');
     return { success: false, reason: 'iframe' };
   }
 
   if (window.Notification.permission === 'denied') {
-    console.warn('Push registration blocked: Notification permission has been denied by the user.');
+    console.log('[WebPush] Push registration blocked: Notification permission has been denied by the user.');
     return { success: false, reason: 'permission_denied' };
   }
 

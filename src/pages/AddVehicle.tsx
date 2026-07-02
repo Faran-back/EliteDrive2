@@ -35,7 +35,7 @@ const AddVehicle: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     licensePlate: '',
-    image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800',
+    image: '',
     pricePerDay: '' as unknown as number,
     seats: '' as unknown as number,
     transmission: 'Automatic' as Vehicle['transmission'],
@@ -182,23 +182,27 @@ const AddVehicle: React.FC = () => {
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Vehicle Image</label>
               <div className="relative group aspect-[4/3] rounded-3xl overflow-hidden bg-slate-100 border-2 border-slate-50">
-                <img 
-                  src={formData.image} 
-                  alt="Preview" 
-                  className={`w-full h-full object-cover transition-opacity duration-300 ${isUploading ? 'opacity-40' : 'opacity-100'}`}
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800';
-                  }}
-                />
+                {formData.image ? (
+                  <img 
+                    src={formData.image} 
+                    alt="Preview" 
+                    className={`w-full h-full object-cover transition-opacity duration-300 ${isUploading ? 'opacity-40' : 'opacity-100'}`}
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 bg-slate-50 border border-dashed border-slate-200 p-6 text-center">
+                    <Car className="text-slate-300 mb-2" size={40} />
+                    <span className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">No Image Uploaded</span>
+                    <span className="text-[9px] text-slate-400 mt-1 max-w-[200px] leading-relaxed">Select a photo using the button or paste a valid URL below</span>
+                  </div>
+                )}
                 {isUploading && (
-                  <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10">
                     <Loader2 className="text-blue-600 animate-spin" size={32} />
                   </div>
                 )}
                 <div 
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute inset-0 bg-blue-600/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                  className="absolute inset-0 bg-blue-600/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer z-10"
                 >
                   <Upload className="text-white mb-2" size={32} />
                   <span className="text-white text-[10px] font-black uppercase tracking-widest">Upload Photo</span>

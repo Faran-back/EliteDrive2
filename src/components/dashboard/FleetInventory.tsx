@@ -15,9 +15,11 @@ import {
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { Vehicle } from '../../types';
+import ConfirmationModal from '../ConfirmationModal';
 
 const FleetInventory: React.FC = () => {
   const { vehicles, deleteVehicle, showToast } = useStore();
+  const [vehicleToDelete, setVehicleToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [startDateFilter, setStartDateFilter] = useState('');
@@ -64,8 +66,19 @@ const FleetInventory: React.FC = () => {
   });
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this vehicle?')) {
-      deleteVehicle(id);
+    setVehicleToDelete(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (vehicleToDelete) {
+      try {
+        await deleteVehicle(vehicleToDelete);
+        showToast('Vehicle deleted successfully!', 'success');
+      } catch (error: any) {
+        showToast(error.message || 'Failed to delete vehicle', 'error');
+      } finally {
+        setVehicleToDelete(null);
+      }
     }
   };
 
@@ -305,6 +318,17 @@ const FleetInventory: React.FC = () => {
           </table>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={vehicleToDelete !== null}
+        onClose={() => setVehicleToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Vehicle"
+        message="Are you sure you want to delete this vehicle? This action cannot be undone and will permanently remove this vehicle from the fleet inventory."
+        confirmLabel="Yes, Delete"
+        cancelLabel="Cancel"
+        type="danger"
+      />
     </div>
   );
 };

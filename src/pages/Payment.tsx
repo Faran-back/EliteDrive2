@@ -45,6 +45,8 @@ const Payment: React.FC = () => {
   const [outOfCityDestination, setOutOfCityDestination] = useState('');
   const [guarantorName, setGuarantorName] = useState('');
   const [guarantorPhone, setGuarantorPhone] = useState('');
+  const [hasSignedAgreement, setHasSignedAgreement] = useState(false);
+  const [gpsTrackingConsent, setGpsTrackingConsent] = useState(false);
 
   // Premium, interactive Credit/Debit Card state variables
   const [cardNumber, setCardNumber] = useState('');
@@ -437,6 +439,10 @@ const Payment: React.FC = () => {
         showToast('Out-of-city bookings require a destination city, outstation guarantor name, and guarantor phone.', 'error');
         return;
       }
+      if (!hasSignedAgreement && !gpsTrackingConsent) {
+        showToast('For out-of-city bookings, you must either provide a Signed Rental Agreement or consent to GPS Tracking.', 'error');
+        return;
+      }
     }
 
     setIsProcessing(true);
@@ -504,7 +510,9 @@ const Payment: React.FC = () => {
         outOfCityDetails: isOutOfCity ? {
           destination: outOfCityDestination,
           guarantorName,
-          guarantorPhone
+          guarantorPhone,
+          hasSignedAgreement,
+          gpsTrackingConsent
         } : undefined
       };
 
@@ -987,6 +995,47 @@ const Payment: React.FC = () => {
                                 onClick={(e) => e.stopPropagation()}
                               />
                             </div>
+                          </div>
+
+                          {/* Document Requirements Toggles */}
+                          <div className="pt-2.5 border-t border-slate-100 space-y-2.5">
+                            <span className="block text-[10px] uppercase font-black text-slate-500 tracking-wider">Additional Outstation Requirements</span>
+                            
+                            {/* Signed Rental Agreement */}
+                            <label className="flex items-start gap-2.5 cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                              <input 
+                                type="checkbox" 
+                                checked={hasSignedAgreement} 
+                                onChange={(e) => {
+                                  setHasSignedAgreement(e.target.checked);
+                                  if (e.target.checked) {
+                                    setGpsTrackingConsent(false);
+                                  }
+                                }}
+                                className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-4 w-4 mt-0.5"
+                              />
+                              <div>
+                                <h5 className="font-bold text-slate-800 text-[11px]">Provide Signed Rental Agreement</h5>
+                                <p className="text-[9px] text-slate-400">Provide/sign physical or digital rental agreement copy</p>
+                              </div>
+                            </label>
+
+                            {/* GPS Tracking Consent */}
+                            <label className="flex items-start gap-2.5 cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                              <input 
+                                type="checkbox" 
+                                checked={gpsTrackingConsent} 
+                                disabled={hasSignedAgreement}
+                                onChange={(e) => setGpsTrackingConsent(e.target.checked)}
+                                className={`rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-4 w-4 mt-0.5 ${hasSignedAgreement ? 'opacity-55 cursor-not-allowed' : ''}`}
+                              />
+                              <div>
+                                <h5 className={`font-bold text-[11px] ${hasSignedAgreement ? 'text-slate-400' : 'text-slate-800'}`}>
+                                  Consent to GPS Tracking {hasSignedAgreement && <span className="font-normal text-[9px] text-emerald-600 font-mono">(Agreement Selected)</span>}
+                                </h5>
+                                <p className="text-[9px] text-slate-400">Required if customer hasn't provided a signed rental agreement yet (customer informed)</p>
+                              </div>
+                            </label>
                           </div>
                         </div>
                       )}

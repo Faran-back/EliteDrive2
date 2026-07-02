@@ -29,6 +29,57 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import ModifyBookingModal from '../components/ModifyBookingModal';
 import { Booking } from '../types';
 
+const renderStatusTracker = (status: string) => {
+  const stages = [
+    { key: 'filed', label: 'Filed' },
+    { key: 'under_review', label: 'Under Review' },
+    { key: 'action_taken', label: 'Action Taken' },
+    { key: 'closed', label: 'Closed' }
+  ];
+
+  const currentIdx = stages.findIndex(s => s.key === status?.toLowerCase());
+
+  return (
+    <div className="w-full py-4 px-2 bg-white/60 rounded-2xl border border-slate-100 my-3">
+      <div className="flex items-center justify-between relative max-w-md mx-auto">
+        {/* Progress Line Background */}
+        <div className="absolute left-4 right-4 top-[14px] -translate-y-1/2 h-0.5 bg-slate-200 rounded" />
+        {/* Progress Line Active */}
+        <div 
+          className="absolute left-4 top-[14px] -translate-y-1/2 h-0.5 bg-gradient-to-r from-rose-500 to-indigo-600 rounded transition-all duration-500" 
+          style={{ width: `${currentIdx >= 0 ? (currentIdx / (stages.length - 1)) * 92 : 0}%` }}
+        />
+        
+        {stages.map((stage, idx) => {
+          const isCompleted = idx <= currentIdx;
+          const isActive = idx === currentIdx;
+          
+          return (
+            <div key={stage.key} className="flex flex-col items-center relative z-10 flex-1">
+              <div 
+                className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] border-2 transition-all duration-300 ${
+                  isActive 
+                    ? 'bg-indigo-600 border-indigo-600 text-white ring-4 ring-indigo-50' 
+                    : isCompleted 
+                      ? 'bg-rose-500 border-rose-500 text-white' 
+                      : 'bg-white border-slate-200 text-slate-400'
+                }`}
+              >
+                {isCompleted ? '✓' : idx + 1}
+              </div>
+              <span className={`text-[8px] font-black uppercase tracking-wider mt-1.5 text-center ${
+                isActive ? 'text-indigo-600' : isCompleted ? 'text-rose-500' : 'text-slate-400'
+              }`}>
+                {stage.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const formatBookingDate = (dateStr: string) => {
   try {
     const d = new Date(dateStr);
@@ -373,15 +424,7 @@ const MyBookings: React.FC = () => {
                       })()}
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-gray-50">
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Pickup</p>
-                        <p className="font-black text-[#1E293B] text-sm">{formatBookingDate(booking.startDate)}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Return</p>
-                        <p className="font-black text-[#1E293B] text-sm">{formatBookingDate(booking.endDate)}</p>
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-50">
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Total Price</p>
                         <p className="font-black text-[#2563EB] text-sm">PKR {booking.totalPrice.toLocaleString()}</p>
@@ -401,7 +444,7 @@ const MyBookings: React.FC = () => {
                                   return <span className="text-blue-600">50% PAID, 50% AT HANDOVER</span>;
                                 }
                               } else {
-                                return <span className="text-emerald-600">PAID</span>;
+                                  return <span className="text-emerald-600">PAID</span>;
                               }
                             }
                             
@@ -425,7 +468,7 @@ const MyBookings: React.FC = () => {
                       )}
 
                       {booking.status === 'cancelled' && (
-                        <div className="col-span-2 md:col-span-4 mt-4 p-4 bg-red-50/50 border border-red-100 rounded-2xl space-y-2">
+                        <div className="col-span-1 md:col-span-2 mt-4 p-4 bg-red-50/50 border border-red-100 rounded-2xl space-y-2">
                           <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">Refund Details</p>
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-bold text-slate-700">
                             <div>
@@ -529,58 +572,8 @@ const MyBookings: React.FC = () => {
 
                       <div className="space-y-8">
                         <div className="space-y-4">
-                          <h4 className="text-xs font-black uppercase tracking-widest text-[#94A3B8]">Journey Schedule</h4>
-                          <div className="grid gap-4">
-                            <div className="bg-[#F8FAFC] p-6 rounded-2xl flex items-center gap-4 border border-gray-50">
-                              <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-[#2563EB]">
-                                <Calendar size={20} />
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Pickup Date & Time</p>
-                                <p className="font-black text-[#1E293B]">{formatBookingDate(booking.startDate)}</p>
-                              </div>
-                            </div>
-                            <div className="bg-[#F8FAFC] p-6 rounded-2xl flex items-center gap-4 border border-gray-50">
-                              <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-500">
-                                <Clock size={20} />
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Return Date & Time</p>
-                                <p className="font-black text-[#1E293B]">{formatBookingDate(booking.endDate)}</p>
-                              </div>
-                            </div>
-                            {booking.pickupLocation && (
-                              <div className="bg-[#F8FAFC] p-6 rounded-2xl flex items-center gap-4 border border-gray-50">
-                                <div className="w-12 h-12 bg-blue-50/50 rounded-xl flex items-center justify-center text-blue-600">
-                                  <MapPin size={20} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Pick-up Location</p>
-                                  <p className="font-semibold text-slate-800 text-sm leading-snug">{booking.pickupLocation}</p>
-                                </div>
-                              </div>
-                            )}
-                            {(booking.dropoffLocation || booking.destination) && (
-                              <div className="bg-[#F8FAFC] p-6 rounded-2xl flex items-center gap-4 border border-gray-50">
-                                <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-500">
-                                  <MapPin size={20} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Drop-off Location</p>
-                                  <p className="font-semibold text-indigo-900 text-sm leading-snug">{booking.dropoffLocation || booking.destination}</p>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="space-y-4">
                           <h4 className="text-xs font-black uppercase tracking-widest text-[#94A3B8]">Booking Information</h4>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="p-4 rounded-2xl border border-gray-100">
-                              <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest mb-1">Booking ID</p>
-                              <p className="font-black text-[#1E293B] text-sm uppercase">#{booking.id.slice(0, 8)}</p>
-                            </div>
+                          <div className="grid grid-cols-1 gap-4">
                             <div className="p-4 rounded-2xl border border-gray-100">
                               <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest mb-1">Booking Date</p>
                               <p className="font-black text-[#1E293B] text-sm">{booking.bookingDate || 'N/A'}</p>
@@ -803,6 +796,10 @@ const MyBookings: React.FC = () => {
                                     </div>
                                     <p className="font-bold text-slate-800 mt-1">Type: {inc.type?.replace('_', ' ').toUpperCase()}</p>
                                     <p className="text-slate-500 mt-0.5 font-bold">Occurred: {new Date(inc.occurredAt).toLocaleString()} | Location: {inc.location}</p>
+                                    
+                                    {/* Visual Status Tracker */}
+                                    {renderStatusTracker(inc.status)}
+
                                     <p className="text-slate-600 mt-1.5 leading-relaxed font-medium">{inc.statement}</p>
                                     {inc.firNumber && (
                                       <p className="text-[10px] font-mono text-blue-700 bg-blue-50 py-1 px-2 rounded-md mt-2 w-fit">Police FIR Reference: {inc.firNumber}</p>
@@ -843,13 +840,15 @@ const MyBookings: React.FC = () => {
                                     Lodge New Service Dispute
                                   </button>
                                   
-                                  <Link
-                                    to={`/report-incident?bookingId=${booking.id}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="px-4 py-2 text-xs font-black uppercase text-red-600 bg-red-50 hover:bg-red-100 rounded-lg"
-                                  >
-                                    Report Accident / Incident
-                                  </Link>
+                                  {booking.status === 'active' && (
+                                    <Link
+                                      to={`/report-incident?bookingId=${booking.id}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="px-4 py-2 text-xs font-black uppercase text-red-600 bg-red-50 hover:bg-red-100 rounded-lg"
+                                    >
+                                      Report Accident / Incident
+                                    </Link>
+                                  )}
                                 </div>
                               </div>
                             );

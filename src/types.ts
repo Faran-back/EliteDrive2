@@ -19,6 +19,7 @@ export interface User {
   location?: string;
   outstandingBalance?: number;
   isBlacklisted?: boolean;
+  isBlackListed?: boolean;
   pendingInvitation?: {
     role: 'admin' | 'manager';
     invitedBy: string;
@@ -114,6 +115,8 @@ export interface Booking {
     destination: string;
     guarantorName: string;
     guarantorPhone: string;
+    hasSignedAgreement?: boolean;
+    gpsTrackingConsent?: boolean;
   };
   refundAmount?: number;
   refundStatus?: 'none' | 'pending_manual_bank_transfer' | 'processed';
@@ -197,11 +200,13 @@ export interface Notification {
   userId: string;
   title: string;
   message: string;
-  type: 'booking_confirmed' | 'booking_cancelled' | 'promotion' | 'info' | 'invitation' | 'role_request_approved' | 'role_request_rejected';
+  type: 'booking_confirmed' | 'booking_cancelled' | 'promotion' | 'info' | 'invitation' | 'role_request_approved' | 'role_request_rejected' | string;
   read: boolean;
   createdAt: string;
   link?: string;
   invitationId?: string;
+  ws_notified?: boolean;
+  webpush_notified?: boolean;
 }
 
 export const INITIAL_VEHICLES: Vehicle[] = [

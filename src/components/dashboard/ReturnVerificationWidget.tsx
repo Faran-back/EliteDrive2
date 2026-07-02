@@ -51,8 +51,59 @@ const FUEL_LEVEL_VALUES: Record<string, number> = {
 };
 
 const ReturnVerificationWidget: React.FC = () => {
-  const { vehicles, allBookings, allUsers, updateBooking, updateVehicle, showToast, user } = useStore();
+  const { vehicles, allBookings, allUsers, updateBooking, updateVehicle, queueBookingTransaction, refreshData, showToast, user } = useStore();
   
+  // Background Job States (Queue system)
+  const [activeJob, setActiveJob] = useState<{
+    id: string;
+    status: 'queued' | 'processing' | 'completed' | 'failed';
+    progress: number;
+    statusText: string;
+  } | null>(null);
+
+  const pollJobStatus = (jobId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const token = localStorage.getItem('elitedrive_token');
+        const res = await fetch(`/api/jobs/${jobId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (!res.ok) throw new Error('Failed to fetch job');
+        const job = await res.json();
+        
+        setActiveJob({
+          id: job.id,
+          status: job.status,
+          progress: job.progress,
+          statusText: job.statusText
+        });
+
+        if (job.status === 'completed') {
+          clearInterval(interval);
+          setTimeout(() => {
+            setActiveJob(null);
+            setIsModalOpen(false);
+            setSelectedBooking(null);
+            refreshData();
+          }, 1000);
+        } else if (job.status === 'failed') {
+          clearInterval(interval);
+          showToast(`Transaction queue failed: ${job.error || 'Unknown error'}`, 'error');
+          setTimeout(() => {
+            setActiveJob(null);
+          }, 4000);
+        }
+      } catch (err) {
+        console.error('Error polling job status:', err);
+        clearInterval(interval);
+        setActiveJob(null);
+        showToast('Lost connection to background synchronization service.', 'error');
+      }
+    }, 500);
+  };
+
   // Dashboard Tabs: 'checkout' (Pre-Rental Handover) or 'checkin' (Return Verification)
   const [activeTab, setActiveTab] = useState<'checkout' | 'checkin'>('checkout');
   
@@ -219,8 +270,8 @@ const ReturnVerificationWidget: React.FC = () => {
     } else {
       // Set default values for return
       const preChecklist = booking.preRentalChecklist || { fuelLevel: "Full", mileage: 35000, exteriorNotes: "No major scratches", interiorNotes: "Spotless cabin" };
-      setReturnFuel(preChecklist.fuelLevel);
-      setReturnMileage(Number(preChecklist.mileage) + 120); // estimate some trip kms
+      setReturnFuel(preChecklist.fuelLevel || 'Full');
+      setReturnMileage((Number(preChecklist.mileage) || 35000) + 120); // estimate some trip kms
       setReturnExterior('No new damage detected.');
       setReturnInterior('Cabin returned clean.');
       setReturnKeysCollected(false);
@@ -278,7 +329,7 @@ const ReturnVerificationWidget: React.FC = () => {
     try {
       const cleanGallery = localGalleryImages.filter(img => !!img);
 
-      // 1. Save Pre-Rental Checklist & transition status to Active
+      // 1. Prepare Pre-Rental Checklist & transition status to Active
       const bookingUpdates: any = { 
         status: 'active',
         preRentalChecklist: {
@@ -295,20 +346,31 @@ const ReturnVerificationWidget: React.FC = () => {
         bookingUpdates.remainingPaymentStatus = remainingPaymentCollected ? 'paid' : 'pending';
       }
 
-      await updateBooking(selectedBooking.id, bookingUpdates);
-
-      // 2. Set vehicle status to rented, update vehicle mileage, and save recent photos as new baseline
-      await updateVehicle(selectedBooking.vehicleId, {
+      const vehicleUpdates = {
         status: 'rented',
         mileage: checkoutMileage,
         image: localPrimaryImage,
         images: cleanGallery
-      });
+      };
 
-      const vehicle = vehicles.find(v => v.id === selectedBooking.vehicleId);
-      showToast(`Pre-Rental Handover Complete! Keys delivered. ${vehicle?.name || 'Car'} is now officially RENTED & ACTIVE.`, 'success');
-      setIsModalOpen(false);
-      setSelectedBooking(null);
+      // Call our high-speed queued transaction API
+      const res = await queueBookingTransaction(selectedBooking.id, bookingUpdates, vehicleUpdates);
+      
+      if (res && res.status === 'queued') {
+        showToast('Handover registered! Synchronizing in background queue...', 'info');
+        setActiveJob({
+          id: res.jobId,
+          status: 'queued',
+          progress: 5,
+          statusText: 'Placed in background queue.'
+        });
+        pollJobStatus(res.jobId);
+      } else {
+        showToast('Pre-Rental Handover Complete!', 'success');
+        setIsModalOpen(false);
+        setSelectedBooking(null);
+      }
+
     } catch (error) {
       console.error('Error completing checkout:', error);
       showToast('Failed to complete vehicle checkout handover.', 'error');
@@ -347,19 +409,33 @@ const ReturnVerificationWidget: React.FC = () => {
         bookingUpdates.remainingPaymentStatus = remainingPaymentCollected ? 'paid' : 'pending';
       }
 
-      await updateBooking(selectedBooking.id, bookingUpdates);
+      const finalReturnMileage = Number(returnMileage) || 0;
+      const baseMileage = Number(selectedBooking.preRentalChecklist?.mileage) || 0;
+      const finalMileage = Math.max(finalReturnMileage, baseMileage);
 
-      // 2. Return vehicle status to Available & log modern mileage count
-      await updateVehicle(selectedBooking.vehicleId, {
+      const vehicleUpdates = {
         status: 'available',
-        mileage: Math.max(returnMileage, selectedBooking.preRentalChecklist?.mileage || 0)
-      });
+        mileage: finalMileage
+      };
 
-      const vehicle = vehicles.find(v => v.id === selectedBooking.vehicleId);
-      const feeText = hasPenalty ? ` with PKR ${penaltyAmount.toLocaleString()} charges debited to customer's balance.` : '';
-      showToast(`Vehicle return checked in! ${vehicle?.name || 'Car'} status restored to AVAILABLE.${feeText}`, 'success');
-      setIsModalOpen(false);
-      setSelectedBooking(null);
+      // Call our high-speed queued transaction API
+      const res = await queueBookingTransaction(selectedBooking.id, bookingUpdates, vehicleUpdates);
+      
+      if (res && res.status === 'queued') {
+        showToast('Return registered! Synchronizing in background queue...', 'info');
+        setActiveJob({
+          id: res.jobId,
+          status: 'queued',
+          progress: 5,
+          statusText: 'Placed in background queue.'
+        });
+        pollJobStatus(res.jobId);
+      } else {
+        showToast('Vehicle return checked in!', 'success');
+        setIsModalOpen(false);
+        setSelectedBooking(null);
+      }
+
     } catch (error) {
       console.error('Error submitting return inspection:', error);
       showToast('Failed to complete return inspection.', 'error');
@@ -596,6 +672,48 @@ const ReturnVerificationWidget: React.FC = () => {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="relative w-full max-w-3xl bg-white rounded-[40px] shadow-2xl overflow-hidden z-10 max-h-[90vh] overflow-y-auto"
             >
+              {activeJob && (
+                <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-[120] flex flex-col items-center justify-center p-8 text-center">
+                  <div className="relative size-24 mb-6">
+                    <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+                    <div className="absolute inset-0 rounded-full border-4 border-t-blue-600 animate-spin" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-sm font-black text-blue-600">
+                        {activeJob.progress}%
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <h3 className="text-xl font-black text-slate-900 mb-2">
+                    Transaction Queue Processing
+                  </h3>
+                  <p className="text-slate-500 text-sm max-w-sm mb-6">
+                    Your handover/return details and 50% remaining payment status are updating securely in the background synchronization queue.
+                  </p>
+                  
+                  <div className="w-full max-w-xs bg-slate-100 h-2 rounded-full overflow-hidden mb-4">
+                    <div 
+                      className="bg-blue-600 h-full rounded-full transition-all duration-300" 
+                      style={{ width: `${activeJob.progress}%` }}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center gap-2 justify-center bg-slate-50 px-4 py-2 border border-slate-100 rounded-full">
+                    <div className="size-2 bg-blue-500 rounded-full animate-pulse" />
+                    <span className="text-xs font-mono text-slate-600">
+                      {activeJob.statusText}
+                    </span>
+                  </div>
+
+                  {activeJob.status === 'completed' && (
+                    <div className="mt-6 flex items-center gap-2 text-emerald-600 font-black text-sm animate-bounce">
+                      <CheckCircle2 size={18} />
+                      Sync Completed Successfully!
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="p-8 md:p-10">
                 <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
                   <div>

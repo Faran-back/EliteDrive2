@@ -32,7 +32,7 @@ import NotificationDropdown from './NotificationDropdown';
 import SupportChatWidget from './SupportChatWidget';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, logout, acceptInvitation, declineInvitation, notifications, markNotificationAsRead, allBookings, roleRequests } = useStore();
+  const { user, logout, acceptInvitation, declineInvitation, notifications, markNotificationAsRead, allBookings, roleRequests, allUsers, vehicles } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
@@ -59,6 +59,60 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const pendingBookingsCount = allBookings.filter(b => b.status === 'pending').length;
   const pendingRoleRequestsCount = roleRequests.filter(r => r.status === 'pending').length;
+  const pendingVerificationCount = allUsers ? allUsers.filter(u => u.role === 'customer' && !u.cnicVerified && (u.cnicFront || u.cnicBack || u.license)).length : 0;
+
+  // Dynamic active fraud alerts count based on active threats
+  const activeFraudAlertsCount = React.useMemo(() => {
+    let count = 0;
+    if (!allUsers || !allBookings) return 0;
+    
+    // 1. Rapid multi-vehicle booking pattern
+    allUsers.forEach(usr => {
+      if (usr.role === 'customer' && !usr.isBlacklisted) {
+        const usrBookings = allBookings.filter(b => b.userId === usr.id && (b.status === 'pending' || b.status === 'active'));
+        if (usrBookings.length >= 2) {
+          count++;
+        }
+      }
+    });
+
+    // 2. Unverified High-Value Reservation
+    allBookings.forEach(b => {
+      const usr = allUsers.find(u => u.id === b.userId);
+      const vehicle = vehicles?.find(v => v.id === b.vehicleId);
+      if (usr && !usr.isBlacklisted && vehicle && (vehicle.pricePerDay > 12000 || b.totalPrice > 40000)) {
+        const isKycIncomplete = !usr.cnicVerified || !usr.cnicFront || !usr.license;
+        if (isKycIncomplete) {
+          count++;
+        }
+      }
+    });
+
+    // 3. Missing Out-of-City Route Verification
+    allBookings.forEach(b => {
+      if (b.isOutOfCity) {
+        const hasGuarantor = b.outOfCityDetails?.guarantorName && b.outOfCityDetails?.guarantorPhone;
+        if (!hasGuarantor) {
+          const usr = allUsers.find(u => u.id === b.userId);
+          if (usr && !usr.isBlacklisted) {
+            count++;
+          }
+        }
+      }
+    });
+
+    // 4. Outstanding Debt Liability & Active Reservation
+    allUsers.forEach(usr => {
+      if (usr.outstandingBalance && usr.outstandingBalance > 15000 && !usr.isBlacklisted) {
+        const activeOrPendingBookings = allBookings.filter(b => b.userId === usr.id && (b.status === 'pending' || b.status === 'active'));
+        if (activeOrPendingBookings.length > 0) {
+          count++;
+        }
+      }
+    });
+
+    return count;
+  }, [allUsers, allBookings, vehicles]);
 
   if (location.pathname === '/auth') return <>{children}</>;
 
@@ -96,9 +150,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   ];
 
   const managementNavItems = [
-    { icon: Users, label: 'Customers', path: (user?.role === 'admin' ? '/admin-dashboard' : '/manager-dashboard') + '?view=customers' },
+    { icon: Users, label: 'Customers', path: (user?.role === 'admin' ? '/admin-dashboard' : '/manager-dashboard') + '?view=customers', badge: pendingVerificationCount },
     { icon: BarChart3, label: 'Performance', path: (user?.role === 'admin' ? '/admin-dashboard' : '/manager-dashboard') + '?view=performance' },
-    ...(user?.role === 'admin' ? [{ icon: ShieldAlert, label: 'Monitor Fraud Alerts', path: '/admin-dashboard?view=fraud-alerts' }] : []),
+    ...(user?.role === 'admin' ? [{ icon: ShieldAlert, label: 'Monitor Fraud Alerts', path: '/admin-dashboard?view=fraud-alerts', badge: activeFraudAlertsCount }] : []),
   ];
 
   const settingsNavItems = [
@@ -303,7 +357,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 {/* Notifications */}
                 <div className="relative">
                   <NotificationDropdown />
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
                 </div>
 
                 <div className="h-8 w-px bg-slate-200 mx-2 hidden sm:block"></div>

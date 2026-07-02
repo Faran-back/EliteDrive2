@@ -169,6 +169,51 @@ const RulesPolicies: React.FC = () => {
             </div>
           </motion.section>
 
+          {/* Cancellation & Refund Policy */}
+          <motion.section 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="bg-white p-8 md:p-10 rounded-[2rem] shadow-sm border border-slate-100"
+          >
+            <div className="flex items-center gap-4 mb-8">
+              <div className="w-12 h-12 rounded-2xl bg-blue-600/5 flex items-center justify-center text-blue-600">
+                <Calendar size={28} />
+              </div>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">Cancellation Policy & Refund Rules</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+              <div>
+                <p className="text-slate-600 leading-relaxed mb-6">
+                  We understand plans change. To maintain fleet operational efficiency, our cancellation tiers and refunds are defined strictly based on pickup timing:
+                </p>
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                  <h4 className="text-sm font-bold uppercase tracking-widest text-blue-600 mb-3">Manual Processing Note</h4>
+                  <p className="text-slate-500 text-xs leading-relaxed">
+                    Refunds on bank-transfer payments are marked as manually processed by administrators and logged securely against the corresponding booking record with receipt verification.
+                  </p>
+                </div>
+              </div>
+              <div className="bg-slate-50 p-6 rounded-2xl">
+                <h4 className="text-sm font-bold uppercase tracking-widest text-blue-600 mb-4">Refund Eligibility Tiers</h4>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-200">
+                    <span className="font-extrabold text-slate-800 uppercase">48 Hours Before Pickup</span>
+                    <span className="font-black text-emerald-600 uppercase">Full 100% Refund</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-200">
+                    <span className="font-extrabold text-slate-800 uppercase">Within 24-48 Hours</span>
+                    <span className="font-black text-amber-600 uppercase">50% Penalty Applied</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-extrabold text-slate-800 uppercase">No-Show / Past Pickup</span>
+                    <span className="font-black text-red-600 uppercase">No Refund Permitted</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.section>
+
           {/* Traffic & Maintenance */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <motion.section 

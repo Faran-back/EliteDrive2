@@ -28,8 +28,59 @@ import { useStore } from '../context/StoreContext';
 import CustomSelect from '../components/ui/CustomSelect';
 import CustomCalendar from '../components/ui/CustomCalendar';
 
+const renderStatusTracker = (status: string) => {
+  const stages = [
+    { key: 'filed', label: 'Filed' },
+    { key: 'under_review', label: 'Under Review' },
+    { key: 'action_taken', label: 'Action Taken' },
+    { key: 'closed', label: 'Closed' }
+  ];
+
+  const currentIdx = stages.findIndex(s => s.key === status?.toLowerCase());
+
+  return (
+    <div className="w-full py-4 px-2 bg-slate-50/50 rounded-2xl border border-slate-100 my-4">
+      <div className="flex items-center justify-between relative max-w-xl mx-auto">
+        {/* Progress Line Background */}
+        <div className="absolute left-4 right-4 top-[14px] -translate-y-1/2 h-0.5 bg-slate-200 rounded" />
+        {/* Progress Line Active */}
+        <div 
+          className="absolute left-4 top-[14px] -translate-y-1/2 h-0.5 bg-gradient-to-r from-rose-500 to-indigo-600 rounded transition-all duration-500" 
+          style={{ width: `${currentIdx >= 0 ? (currentIdx / (stages.length - 1)) * 94 : 0}%` }}
+        />
+        
+        {stages.map((stage, idx) => {
+          const isCompleted = idx <= currentIdx;
+          const isActive = idx === currentIdx;
+          
+          return (
+            <div key={stage.key} className="flex flex-col items-center relative z-10 flex-1">
+              <div 
+                className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs border-2 transition-all duration-300 ${
+                  isActive 
+                    ? 'bg-indigo-600 border-indigo-600 text-white ring-4 ring-indigo-100' 
+                    : isCompleted 
+                      ? 'bg-rose-500 border-rose-500 text-white' 
+                      : 'bg-white border-slate-200 text-slate-400'
+                }`}
+              >
+                {isCompleted ? '✓' : idx + 1}
+              </div>
+              <span className={`text-[9px] font-black uppercase tracking-wider mt-1.5 text-center ${
+                isActive ? 'text-indigo-600' : isCompleted ? 'text-rose-500' : 'text-slate-400'
+              }`}>
+                {stage.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const ReportIncident: React.FC = () => {
-  const { user, bookings, allBookings, allUsers, createIncident, showToast } = useStore();
+  const { user, bookings, allBookings, allUsers, vehicles, createIncident, incidents, updateIncidentStatus, showToast } = useStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -39,8 +90,11 @@ const ReportIncident: React.FC = () => {
   // Determine user authorization role
   const isStaff = user?.role === 'admin' || user?.role === 'manager';
 
-  // Toggle mode for staff: file for self (if they rented a car) vs on behalf of database customer
-  const [fileOnBehalf, setFileOnBehalf] = useState(isStaff);
+  // Toggle mode for user:
+  // For staff: 'view' (View Customer Incidents) vs 'file' (File Incident On Behalf)
+  // For customer: 'file' (File New Incident) vs 'my_incidents' (My Reported Incidents)
+  const [activeTab, setActiveTab] = useState<'view' | 'file' | 'my_incidents'>(isStaff ? 'view' : 'file');
+  const fileOnBehalf = isStaff && activeTab === 'file';
 
   // States
   const [selectedBookingId, setSelectedBookingId] = useState(queryBookingId);
@@ -74,8 +128,8 @@ const ReportIncident: React.FC = () => {
       // Staff can file for any active or completed booking in system
       return allBookings.filter(b => b.status === 'active' || b.status === 'completed');
     } else {
-      // Customers can file only for their own active or completed bookings
-      return bookings.filter(b => b.userId === user?.id && (b.status === 'active' || b.status === 'completed'));
+      // Customers can file only for their own active bookings
+      return bookings.filter(b => b.userId === user?.id && b.status === 'active');
     }
   }, [fileOnBehalf, isStaff, bookings, allBookings, user]);
 
@@ -92,6 +146,12 @@ const ReportIncident: React.FC = () => {
   const selectedBooking = React.useMemo(() => {
     return allBookings.find(b => b.id === selectedBookingId) || bookings.find(b => b.id === selectedBookingId);
   }, [selectedBookingId, allBookings, bookings]);
+
+  // Retrieve current active vehicle detailed details
+  const selectedVehicle = React.useMemo(() => {
+    if (!selectedBooking) return null;
+    return (vehicles || []).find(v => v.id === selectedBooking.vehicleId);
+  }, [selectedBooking, vehicles]);
 
   // Retrieve corresponding customer profile if staff is filing on behalf of client
   const matchedCustomer = React.useMemo(() => {
@@ -217,45 +277,391 @@ const ReportIncident: React.FC = () => {
             </p>
           </div>
 
-          {isStaff && (
+          {isStaff ? (
             <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
               <button 
-                onClick={() => setFileOnBehalf(false)}
-                className={`px-4 py-2 text-xs font-black uppercase rounded-lg transition-all ${!fileOnBehalf ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                type="button"
+                onClick={() => setActiveTab('view')}
+                className={`px-4 py-2 text-xs font-black uppercase rounded-lg transition-all ${activeTab === 'view' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
               >
-                My Personal Booking
+                View Customer Incidents
               </button>
               <button 
-                onClick={() => setFileOnBehalf(true)}
-                className={`px-4 py-2 text-xs font-black uppercase rounded-lg transition-all ${fileOnBehalf ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                type="button"
+                onClick={() => setActiveTab('file')}
+                className={`px-4 py-2 text-xs font-black uppercase rounded-lg transition-all ${activeTab === 'file' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
               >
-                Filing On Behalf of Customer
+                File Incident on Behalf
+              </button>
+            </div>
+          ) : (
+            <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+              <button 
+                type="button"
+                onClick={() => setActiveTab('file')}
+                className={`px-4 py-2 text-xs font-black uppercase rounded-lg transition-all ${activeTab === 'file' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                File New Incident
+              </button>
+              <button 
+                type="button"
+                onClick={() => setActiveTab('my_incidents')}
+                className={`px-4 py-2 text-xs font-black uppercase rounded-lg transition-all ${activeTab === 'my_incidents' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                My Reported Incidents ({incidents.filter(inc => inc.userId === user?.id).length})
               </button>
             </div>
           )}
         </header>
 
-        {usableBookings.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-2xl mx-auto">
-            <AlertTriangle className="text-amber-500 mx-auto mb-4" size={48} />
-            <h3 className="text-lg font-bold text-slate-900 uppercase mb-2">No active rental agreements found</h3>
-            <p className="text-slate-500 text-xs leading-relaxed mb-6">
-              You can only submit incident reports against active, upcoming approved, or completed trip bookings. If you are experiencing an absolute emergency, please dial emergency lines directly.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <a href="tel:15" className="px-5 py-3 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase rounded-xl flex items-center justify-center gap-2">
-                <Siren size={16} /> Call Police (15)
-              </a>
-              <a href="tel:1122" className="px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase rounded-xl flex items-center justify-center gap-2">
-                <Siren size={16} /> Rescue 1122
-              </a>
+        {activeTab === 'view' ? (
+          <div className="space-y-6">
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900 uppercase">Registered Customer Damage Incidents</h2>
+                <p className="text-xs text-slate-500 mt-1">Direct real-time query of incidents filed by EliteDrive customers.</p>
+              </div>
+              <span className="bg-red-50 text-red-700 px-3 py-1 text-xs font-black rounded-xl border border-red-100">
+                Total Files: {incidents.length}
+              </span>
             </div>
+
+            {incidents.length === 0 ? (
+              <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-2xl mx-auto">
+                <ShieldAlert className="text-slate-300 mx-auto mb-4 animate-bounce" size={48} />
+                <h3 className="text-lg font-bold text-slate-700 uppercase mb-2">No Incidents Logged</h3>
+                <p className="text-slate-400 text-xs">
+                  The active database has zero registered incident folders at this moment. Excellent safety records!
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6">
+                {incidents.map((inc) => {
+                  const matchedUser = allUsers.find(u => u.id === inc.userId);
+                  const matchedBooking = allBookings.find(b => b.id === inc.bookingId);
+                  const matchedVehicle = vehicles.find(v => v.id === inc.vehicleId);
+                  const isLate = inc.isLateReport;
+
+                  return (
+                    <div key={inc.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 hover:shadow-md transition-all">
+                      {/* Top Header Row with status, and late flag */}
+                      <div className="flex flex-wrap justify-between items-start gap-4 pb-4 border-b border-slate-100">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="px-2.5 py-0.5 bg-red-50 text-red-700 text-[10px] font-black uppercase tracking-wider rounded border border-red-100">
+                              {inc.type?.replace('_', ' ') || 'Incident Report'}
+                            </span>
+                            {isLate && (
+                              <span className="px-2.5 py-0.5 bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider rounded animate-pulse">
+                                LATE REPORT FLAG (&gt;6 hrs window)
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="text-lg font-extrabold text-slate-900 mt-2">
+                            Folder Reference: <span className="font-mono font-bold text-slate-600">{inc.id}</span>
+                          </h3>
+                        </div>
+
+                        {/* Status update select selector */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black uppercase text-slate-400">Status:</span>
+                          <select
+                            value={inc.status}
+                            onChange={async (e) => {
+                              try {
+                                await updateIncidentStatus(inc.id, e.target.value);
+                                showToast(`Incident state set to ${e.target.value.toUpperCase()}`, 'success');
+                              } catch (err: any) {
+                                showToast('Error updating incident state', 'error');
+                              }
+                            }}
+                            className={`text-xs h-9 px-3 rounded-xl border font-bold text-slate-800 ${
+                              inc.status === 'closed' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
+                              inc.status === 'action_taken' ? 'bg-indigo-50 border-indigo-200 text-indigo-800' :
+                              inc.status === 'under_review' ? 'bg-amber-50 border-amber-200 text-amber-800' :
+                              'bg-red-50 border-red-200 text-red-800'
+                            }`}
+                          >
+                            <option value="filed">Filed</option>
+                            <option value="under_review">Under Review</option>
+                            <option value="action_taken">Action Taken</option>
+                            <option value="closed">Closed</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Visual Status Tracker Section */}
+                      {renderStatusTracker(inc.status)}
+
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+                        {/* Left Side: Customer & Vehicle detail */}
+                        <div className="lg:col-span-5 space-y-4 border-r border-slate-100 pr-0 lg:pr-6">
+                          {/* Customer Profile */}
+                          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                            <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Customer Profile</span>
+                            <p className="text-sm font-extrabold text-slate-800">{matchedUser?.name || inc.userName}</p>
+                            <p className="text-xs text-slate-500 font-medium">{matchedUser?.email || 'N/A'}</p>
+                            <p className="text-xs text-slate-500 font-medium">{matchedUser?.phone || 'N/A'}</p>
+                            <div className="text-[10px] text-slate-400 mt-1 uppercase font-bold">
+                              KYC: {matchedUser?.cnicVerified ? 'CNIC VERIFIED ✅' : 'CNIC UNVERIFIED ⚠️'}
+                            </div>
+                          </div>
+
+                          {/* Active Vehicle details */}
+                          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-150 flex gap-4">
+                            {matchedVehicle?.image && (
+                              <img src={matchedVehicle.image} alt={matchedVehicle.name} className="w-16 h-12 object-cover rounded-xl border border-slate-200" />
+                            )}
+                            <div>
+                              <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Active Rented Vehicle</span>
+                              <p className="text-sm font-extrabold text-slate-800">{matchedVehicle?.name || inc.vehicleName}</p>
+                              {matchedVehicle?.licensePlate && (
+                                <span className="inline-block mt-1 px-2 py-0.5 font-mono text-[10px] font-black bg-slate-200 text-slate-800 rounded uppercase">
+                                  {matchedVehicle.licensePlate}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Active Booking Trip timeframe & billing */}
+                          {matchedBooking && (
+                            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-150 space-y-2">
+                              <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Booking & Trip Context</span>
+                              <div className="text-xs font-semibold text-slate-700">
+                                <span className="block">Ref ID: <strong className="font-mono text-slate-900">{matchedBooking.id}</strong></span>
+                                <span className="block">Timeframe: <strong className="text-slate-900">{new Date(matchedBooking.startDate).toLocaleDateString()} to {new Date(matchedBooking.endDate).toLocaleDateString()}</strong></span>
+                                <span className="block">Route Scope: <strong className="text-slate-900">{matchedBooking.isOutOfCity ? `Out-of-City (${matchedBooking.destination})` : 'In-City Only'}</strong></span>
+                                <span className="block">Chauffeur Service: <strong className="text-slate-900">{matchedBooking.chauffeurSelected ? 'Yes (Driver Assigned)' : 'No (Self-Driven)'}</strong></span>
+                                <span className="block">Security Deposit: <strong className="text-blue-600">PKR {(matchedBooking.securityDepositAmount || 5000).toLocaleString()} ({matchedBooking.securityDepositStatus || 'Collected'})</strong></span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right Side: Incident report files */}
+                        <div className="lg:col-span-7 space-y-4">
+                          {/* Narratives */}
+                          <div>
+                            <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Statement of Facts</span>
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-150 text-xs text-slate-800 leading-relaxed font-semibold italic">
+                              "{inc.statement}"
+                            </div>
+                          </div>
+
+                          {/* Incident location, date, gaps */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                              <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Location of Incident</span>
+                              <p className="text-xs font-bold text-slate-800 mt-1">{inc.location}</p>
+                            </div>
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                              <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Date & Time of Incident</span>
+                              <p className="text-xs font-bold text-slate-800 mt-1">{new Date(inc.occurredAt).toLocaleString()}</p>
+                            </div>
+                          </div>
+
+                          {/* Witness & Registration info */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                              <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Witness Details</span>
+                              {inc.witnessName ? (
+                                <p className="text-xs font-bold text-slate-800 mt-1">{inc.witnessName} ({inc.witnessPhone || 'No Phone'})</p>
+                              ) : (
+                                <p className="text-xs font-medium text-slate-400 mt-1">None specified</p>
+                              )}
+                            </div>
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                              <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Police FIR Registration Entry No</span>
+                              {inc.firNumber ? (
+                                <p className="text-xs font-extrabold text-blue-700 mt-1 font-mono uppercase">{inc.firNumber}</p>
+                              ) : (
+                                <p className="text-xs font-medium text-slate-400 mt-1">No police report attached</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Damage Photos AttachmentProofs */}
+                          {inc.photos && inc.photos.length > 0 && (
+                            <div>
+                              <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Damage Scan Attachments ({inc.photos.length})</span>
+                              <div className="flex gap-3 overflow-x-auto py-1">
+                                {inc.photos.map((ph: string, pi: number) => (
+                                  <a key={pi} href={ph} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                                    <img src={ph} alt={`Damage item ${pi}`} className="w-24 h-18 object-cover rounded-xl border border-slate-200 shadow-sm hover:scale-105 transition-all" />
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            {/* Left Column: Form Details */}
-            <div className="lg:col-span-8 space-y-8">
+        ) : activeTab === 'my_incidents' ? (
+          <div className="space-y-6">
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900 uppercase">My Reported Damage Incidents</h2>
+                <p className="text-xs text-slate-500 mt-1">Real-time status updates on filed safety reports and vehicle damage cases.</p>
+              </div>
+              <span className="bg-blue-50 text-blue-700 px-3 py-1 text-xs font-black rounded-xl border border-blue-100">
+                Total Claims Filed: {incidents.filter(inc => inc.userId === user?.id).length}
+              </span>
+            </div>
+
+            {incidents.filter(inc => inc.userId === user?.id).length === 0 ? (
+              <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-2xl mx-auto">
+                <ShieldCheck className="text-slate-300 mx-auto mb-4 animate-bounce" size={48} />
+                <h3 className="text-lg font-bold text-slate-700 uppercase mb-2">No Incidents Logged</h3>
+                <p className="text-slate-400 text-xs">
+                  You have not submitted any incident folders under your profile. Safe driving record!
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6">
+                {incidents.filter(inc => inc.userId === user?.id).map((inc) => {
+                  const matchedBooking = bookings.find(b => b.id === inc.bookingId) || allBookings.find(b => b.id === inc.bookingId);
+                  const matchedVehicle = vehicles.find(v => v.id === inc.vehicleId);
+
+                  return (
+                    <div key={inc.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 hover:shadow-md transition-all">
+                      <div className="flex flex-wrap justify-between items-start gap-4 pb-4 border-b border-slate-100">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="px-2.5 py-0.5 bg-red-50 text-red-700 text-[10px] font-black uppercase tracking-wider rounded border border-red-100">
+                              {inc.type?.replace('_', ' ') || 'Incident Report'}
+                            </span>
+                            {inc.isLateReport && (
+                              <span className="px-2.5 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-black uppercase tracking-wider rounded border border-rose-200">
+                                Late Submission
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="text-lg font-extrabold text-slate-900 mt-2">
+                            Folder Reference: <span className="font-mono font-bold text-slate-600">{inc.id}</span>
+                          </h3>
+                        </div>
+
+                        {/* Status Label */}
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-3 py-1.5 rounded-full font-black uppercase tracking-wider ${
+                            inc.status === 'closed' ? 'bg-emerald-100 text-emerald-800' :
+                            inc.status === 'action_taken' ? 'bg-indigo-100 text-indigo-800' :
+                            inc.status === 'under_review' ? 'bg-amber-100 text-amber-800' :
+                            'bg-rose-100 text-rose-800'
+                          }`}>
+                            Status: {inc.status?.replace('_', ' ')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Visual Status Tracker Section */}
+                      {renderStatusTracker(inc.status)}
+
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+                        {/* Left Side: Vehicle detail */}
+                        <div className="lg:col-span-5 space-y-4 border-r border-slate-100 pr-0 lg:pr-6">
+                          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
+                            <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Involved Asset details</span>
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 bg-white rounded-xl border border-slate-100 flex items-center justify-center p-1">
+                                {matchedVehicle?.image ? (
+                                  <img src={matchedVehicle.image} alt={inc.vehicleName} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <Car size={24} className="text-slate-400" />
+                                )}
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-extrabold text-slate-800">{inc.vehicleName || 'Corporate Vehicle'}</h4>
+                                <span className="text-[10px] text-slate-400 font-mono">ID: {inc.vehicleId}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                            <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Incident Timeline</span>
+                            <div className="space-y-1 text-xs">
+                              <span className="block text-slate-500">Occurred: <strong className="text-slate-900">{new Date(inc.occurredAt).toLocaleString()}</strong></span>
+                              <span className="block text-slate-500">Submitted: <strong className="text-slate-900">{new Date(inc.submittedAt).toLocaleString()}</strong></span>
+                              {matchedBooking && (
+                                <span className="block">Route Scope: <strong className="text-slate-900">{matchedBooking.isOutOfCity ? `Out-of-City (${matchedBooking.destination})` : 'In-City Only'}</strong></span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right Side: Incident statements & file proofs */}
+                        <div className="lg:col-span-7 space-y-4">
+                          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Renter Statement of Facts</span>
+                            <p className="text-xs text-slate-700 leading-relaxed font-medium">{inc.statement}</p>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                              <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Witness Contacts</span>
+                              {inc.witnessName ? (
+                                <p className="text-xs font-bold text-slate-800 mt-1">{inc.witnessName} <span className="text-[10px] text-slate-400">({inc.witnessPhone})</span></p>
+                              ) : (
+                                <p className="text-xs font-medium text-slate-400 mt-1">None specified</p>
+                              )}
+                            </div>
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                              <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Police FIR Registration Entry No</span>
+                              {inc.firNumber ? (
+                                <p className="text-xs font-extrabold text-blue-700 mt-1 font-mono uppercase">{inc.firNumber}</p>
+                              ) : (
+                                <p className="text-xs font-medium text-slate-400 mt-1">No police report attached</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Damage Photos */}
+                          {inc.photos && inc.photos.length > 0 && (
+                            <div>
+                              <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Damage Scan Attachments ({inc.photos.length})</span>
+                              <div className="flex gap-3 overflow-x-auto py-1">
+                                {inc.photos.map((ph: string, pi: number) => (
+                                  <a key={pi} href={ph} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                                    <img src={ph} alt={`Damage item ${pi}`} className="w-24 h-18 object-cover rounded-xl border border-slate-200 shadow-sm hover:scale-105 transition-all" />
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : usableBookings.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-2xl mx-auto">
+              <AlertTriangle className="text-amber-500 mx-auto mb-4" size={48} />
+              <h3 className="text-lg font-bold text-slate-900 uppercase mb-2">No active rental agreements found</h3>
+              <p className="text-slate-500 text-xs leading-relaxed mb-6">
+                You can only submit incident reports against active, upcoming approved, or completed trip bookings. If you are experiencing an absolute emergency, please dial emergency lines directly.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <a href="tel:15" className="px-5 py-3 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase rounded-xl flex items-center justify-center gap-2">
+                  <Siren size={16} /> Call Police (15)
+                </a>
+                <a href="tel:1122" className="px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase rounded-xl flex items-center justify-center gap-2">
+                  <Siren size={16} /> Rescue 1122
+                </a>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              
+              {/* Left Column: Form Details */}
+              <div className="lg:col-span-8 space-y-8">
               
               {/* Reference Selector block */}
               <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
@@ -274,20 +680,46 @@ const ReportIncident: React.FC = () => {
                     onChange={(e) => setSelectedBookingId(e.target.value)}
                     className="w-full text-xs rounded-xl border border-slate-200 bg-white focus:ring-blue-600 h-11 px-4 font-bold text-slate-800"
                   >
-                    {usableBookings.map(b => (
-                      <option key={b.id} value={b.id}>
-                        Ref: {b.id} — Vehicle: {b.vehicleId} ({b.rentalType} package, {b.calendarDays} days) - Status: {b.status.toUpperCase()}
-                      </option>
-                    ))}
+                    {usableBookings.map(b => {
+                      const v = (vehicles || []).find(veh => veh.id === b.vehicleId);
+                      const displayLabel = !isStaff 
+                        ? `${v?.name || 'Unknown Vehicle'} (${new Date(b.startDate).toLocaleDateString()} to ${new Date(b.endDate).toLocaleDateString()})`
+                        : `Ref: ${b.id} — Vehicle: ${v?.name || b.vehicleId} (${b.rentalType} package, ${b.calendarDays} days) - Status: ${b.status.toUpperCase()}`;
+                      return (
+                        <option key={b.id} value={b.id}>
+                          {displayLabel}
+                        </option>
+                      );
+                    })}
                   </select>
 
                   {/* Render detail info block of matching selected booking */}
                   {selectedBooking && (
                     <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/60 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <span className="block text-[10px] text-slate-400 uppercase font-black">Vehicle Handover ID</span>
-                        <span className="text-xs font-bold text-slate-800">ED-CAR-{selectedBooking.vehicleId}</span>
+                      <div className="md:col-span-2 p-3 bg-blue-50/50 rounded-lg border border-blue-100 flex items-center gap-3">
+                        {selectedVehicle?.image && (
+                          <img src={selectedVehicle.image} alt={selectedVehicle.name} className="w-12 h-8 object-cover rounded" />
+                        )}
+                        <div>
+                          <span className="block text-[9px] uppercase font-black text-blue-600">Selected Vehicle Model</span>
+                          <span className="text-xs font-black text-slate-800">{selectedVehicle?.name || 'Unknown Vehicle'}</span>
+                          {selectedVehicle?.licensePlate && (
+                            <span className="ml-2 px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[9px] font-mono font-bold uppercase">{selectedVehicle.licensePlate}</span>
+                          )}
+                        </div>
                       </div>
+
+                      <div>
+                        <span className="block text-[10px] text-slate-400 uppercase font-black">Booking Reference ID</span>
+                        <span className="text-xs font-mono font-bold text-slate-800">{selectedBooking.id}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-slate-400 uppercase font-black">Trip Booking Status</span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wide">
+                          ● {selectedBooking.status}
+                        </span>
+                      </div>
+
                       <div>
                         <span className="block text-[10px] text-slate-400 uppercase font-black">Insurance Protection Tier</span>
                         <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-blue-700 capitalize mt-0.5">
@@ -295,6 +727,28 @@ const ReportIncident: React.FC = () => {
                           {selectedBooking.insuranceType || 'Basic Protection'} Coverage
                         </span>
                       </div>
+                      <div>
+                        <span className="block text-[10px] text-slate-400 uppercase font-black">Rental Trip Cost</span>
+                        <span className="text-xs font-black text-slate-800">PKR {selectedBooking.totalPrice.toLocaleString()}</span>
+                      </div>
+
+                      <div>
+                        <span className="block text-[10px] text-slate-400 uppercase font-black">Refundable Security Deposit</span>
+                        <span className="text-xs font-black text-blue-600">
+                          PKR {(selectedBooking.securityDepositAmount || 5000).toLocaleString()} — <span className="uppercase text-[9px] font-bold text-slate-500">Status: {selectedBooking.securityDepositStatus || 'Collected'}</span>
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-slate-400 uppercase font-black">Destination Scope</span>
+                        <span className="text-xs font-bold text-slate-700">
+                          {selectedBooking.isOutOfCity ? (
+                            <span className="text-amber-600 font-extrabold">OUT-OF-CITY: {selectedBooking.destination || 'Authorized'}</span>
+                          ) : (
+                            <span className="text-slate-600">IN-CITY TRIP</span>
+                          )}
+                        </span>
+                      </div>
+
                       <div>
                         <span className="block text-[10px] text-slate-400 uppercase font-black">Delivery Dates</span>
                         <span className="text-xs font-semibold text-slate-600">
@@ -305,6 +759,22 @@ const ReportIncident: React.FC = () => {
                         <span className="block text-[10px] text-slate-400 uppercase font-black">Chauffeur Status</span>
                         <span className="text-xs font-semibold text-slate-600">
                           {selectedBooking.chauffeurSelected ? 'Professional Captain Assigned' : 'Self-Driven Agreement'}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="block text-[10px] text-slate-400 uppercase font-black">Trip Route Nodes</span>
+                        <span className="text-xs font-medium text-slate-600">
+                          Pickup: <strong className="text-slate-800">{selectedBooking.pickupLocation || 'EliteDrive HQ'}</strong> <br />
+                          Dropoff: <strong className="text-slate-800">{selectedBooking.dropoffLocation || 'EliteDrive HQ'}</strong>
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-slate-400 uppercase font-black">Billing & Breakdown Details</span>
+                        <span className="text-xs font-medium text-slate-600">
+                          Payment Method: <strong className="text-slate-800 capitalize">{selectedBooking.paymentMethod || 'Credit Card'}</strong> <br />
+                          Amount Upfront Paid: <strong className="text-slate-800">PKR {(selectedBooking.upfrontAmountPaid || selectedBooking.totalPrice).toLocaleString()}</strong> <br />
+                          Remaining Collected In-Person: <strong className="text-blue-600">PKR {(selectedBooking.remainingAmount || 0).toLocaleString()}</strong>
                         </span>
                       </div>
 

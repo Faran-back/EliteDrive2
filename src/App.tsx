@@ -37,6 +37,29 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: strin
     return <Navigate to="/auth" />;
   }
 
+  if (user.isBlacklisted || (user as any).isBlackListed) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-center text-white font-sans">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-10 rounded-[2.5rem] shadow-2xl">
+          <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6 animate-bounce">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-black uppercase tracking-wider text-rose-500 mb-3">ACCESS DENIED</h1>
+          <h2 className="text-md font-bold text-slate-200 mb-4">You are blacklisted by EliteDrive</h2>
+          <p className="text-xs text-slate-400 leading-relaxed mb-8">
+            Your account has been restricted due to terms of service violations, active damage disputes, or outstanding payment irregularities.
+          </p>
+          <div className="border-t border-slate-800 pt-6">
+            <p className="text-xs text-slate-500 mb-1 font-semibold uppercase tracking-wider">Contact Administration</p>
+            <p className="text-[10px] text-slate-400">Please reach out to the support line or visit the corporate office to resolve pending outstanding balances.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     if (user.role === 'admin') return <Navigate to="/admin-dashboard" />;
     if (user.role === 'manager') return <Navigate to="/manager-dashboard" />;

@@ -12,13 +12,45 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
+import { checkPushSubscription, registerPushNotifications } from '../utils/pushRegister';
 
 const NotificationDropdown: React.FC = () => {
-  const { notifications, markNotificationAsRead, deleteNotification } = useStore();
+  const { notifications, markNotificationAsRead, deleteNotification, showToast } = useStore();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isPushSupported, setIsPushSupported] = useState(true);
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  useEffect(() => {
+    const supported = 'serviceWorker' in navigator && 'PushManager' in window;
+    setIsPushSupported(supported);
+    if (supported) {
+      checkPushSubscription().then(setIsSubscribed);
+    }
+  }, []);
+
+  const handleEnablePush = async () => {
+    const result = await registerPushNotifications();
+    if (result.success) {
+      setIsSubscribed(true);
+      showToast('Desktop notifications successfully enabled!', 'success');
+    } else {
+      if (result.reason === 'iframe') {
+        showToast(
+          'Desktop alerts are blocked in the preview window. Please open the app in a new tab (button at top right) to enable alerts!',
+          'info'
+        );
+      } else if (result.reason === 'permission_denied') {
+        showToast('Notification permission was denied. Please allow notifications in your browser address bar.', 'error');
+      } else if (result.reason === 'unsupported') {
+        showToast('Push notifications are not supported in this browser.', 'error');
+      } else {
+        showToast('An error occurred while enabling desktop alerts. Please try again.', 'error');
+      }
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -67,6 +99,30 @@ const NotificationDropdown: React.FC = () => {
                 {unreadCount} New
               </span>
             </div>
+
+            {isPushSupported && (
+              <div className="mx-4 mt-4 p-3 bg-blue-50/50 border border-blue-100 rounded-2xl flex items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Bell className="text-blue-500 shrink-0" size={16} />
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800">Desktop Alerts</h4>
+                    <p className="text-[10px] text-slate-400 font-medium leading-tight">Get real-time booking alerts</p>
+                  </div>
+                </div>
+                {isSubscribed ? (
+                  <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border border-emerald-100 shrink-0">
+                    Active
+                  </span>
+                ) : (
+                  <button
+                    onClick={handleEnablePush}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-xl transition-colors shadow-sm shrink-0"
+                  >
+                    Enable
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="max-h-[400px] overflow-y-auto p-4 space-y-3">
               {notifications.length > 0 ? (

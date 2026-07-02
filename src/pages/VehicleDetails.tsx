@@ -126,11 +126,6 @@ const VehicleDetails: React.FC = () => {
                 ...(vehicle.images || [])
               ].filter(img => !!img);
 
-              // Pad if they are fewer than 4 images so that customer always gets a proper gallery
-              while (gathered.length < 4) {
-                gathered.push(`https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=400&v=${gathered.length}`);
-              }
-
               return gathered.map((img, i) => {
                 const isActive = selectedImage === img;
                 return (

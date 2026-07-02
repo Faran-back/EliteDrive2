@@ -17,6 +17,7 @@ interface StoreContextType {
   addBooking: (booking: Booking) => Promise<void>;
   approveBooking: (id: string) => Promise<void>;
   updateBooking: (id: string, updates: Partial<Booking>) => Promise<void>;
+  queueBookingTransaction: (id: string, bookingUpdates: Partial<Booking>, vehicleUpdates?: any) => Promise<any>;
   cancelBooking: (id: string) => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
   toggleFavorite: (vehicleId: string) => Promise<void>;
@@ -112,61 +113,86 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // --- REFRESH DATA CENTRAL ---
   const refreshData = async () => {
     try {
-      // 1. Vehicles
-      const vData = await apiFetch('/api/vehicles').catch(() => []);
-      setVehicles(vData);
-
-      // 2. Auth user if token exists
       const token = localStorage.getItem('elitedrive_token');
-      if (token) {
-        const uData = await apiFetch('/api/auth/me').catch(() => {
+
+      // Fetch vehicles and user profile in parallel to eliminate waterfall
+      const [vData, uData] = await Promise.all([
+        apiFetch('/api/vehicles').catch(() => []),
+        token ? apiFetch('/api/auth/me').catch(() => {
           localStorage.removeItem('elitedrive_token');
           setUser(null);
           return null;
+        }) : Promise.resolve(null)
+      ]);
+
+      setVehicles(vData);
+
+      if (uData) {
+        setUser(uData);
+
+        // Auto-sync push subscription if already granted
+        if ('Notification' in window && window.Notification.permission === 'granted') {
+          import('../utils/pushRegister').then(({ registerPushNotifications }) => {
+            registerPushNotifications().catch(err => console.error('Failed to auto-sync push subscription:', err));
+          });
+        }
+
+        // Define base data parallel fetches
+        const fetchPromises: Promise<any>[] = [
+          apiFetch('/api/bookings').catch(() => []),
+          apiFetch('/api/notifications').catch(() => []),
+          apiFetch('/api/incidents').catch(() => []),
+          apiFetch('/api/disputes').catch(() => []),
+          apiFetch('/api/e-challans').catch(() => [])
+        ];
+
+        // Fetch administrative collections concurrently if authorized
+        const isAdminOrManager = uData.role === 'admin' || uData.role === 'manager';
+        const isAdmin = uData.role === 'admin';
+
+        if (isAdminOrManager) {
+          fetchPromises.push(apiFetch('/api/users').catch(() => []));
+        } else {
+          fetchPromises.push(Promise.resolve([]));
+        }
+
+        if (isAdmin) {
+          fetchPromises.push(apiFetch('/api/role-requests').catch(() => []));
+        } else {
+          fetchPromises.push(Promise.resolve([]));
+        }
+
+        // Run all operations in parallel
+        const [bData, nData, incData, dispData, chalData, usrData, rrData] = await Promise.all(fetchPromises);
+
+        setBookings(bData);
+        setAllBookings(bData);
+
+        setNotifications(prev => {
+          const newUnreads = nData.filter((item: Notification) => {
+            if (item.read) return false;
+            return !prev.some(p => p.id === item.id);
+          });
+          if (newUnreads.length > 0) {
+            newUnreads.forEach((n: Notification) => {
+              showToast(`🔔 ${n.title}: ${n.message}`, 'info');
+            });
+          }
+          return nData;
         });
 
-        if (uData) {
-          setUser(uData);
+        setIncidents(incData);
+        setDisputes(dispData);
+        setEChallans(chalData);
 
-          // 3. Bookings and Notification collections
-          const bData = await apiFetch('/api/bookings').catch(() => []);
-          setBookings(bData);
-          setAllBookings(bData);
-
-          const nData = await apiFetch('/api/notifications').catch(() => []);
-          setNotifications(prev => {
-            const newUnreads = nData.filter((item: Notification) => {
-              if (item.read) return false;
-              return !prev.some(p => p.id === item.id);
-            });
-            if (newUnreads.length > 0) {
-              newUnreads.forEach((n: Notification) => {
-                showToast(`🔔 ${n.title}: ${n.message}`, 'info');
-              });
-            }
-            return nData;
-          });
-
-          const incData = await apiFetch('/api/incidents').catch(() => []);
-          setIncidents(incData);
-
-          const dispData = await apiFetch('/api/disputes').catch(() => []);
-          setDisputes(dispData);
-
-          const chalData = await apiFetch('/api/e-challans').catch(() => []);
-          setEChallans(chalData);
-
-          // Admin or Manager full tables
-          if (uData.role === 'admin' || uData.role === 'manager') {
-            const usrData = await apiFetch('/api/users').catch(() => []);
-            setAllUsers(usrData);
-
-            if (uData.role === 'admin') {
-              const rrData = await apiFetch('/api/role-requests').catch(() => []);
-              setRoleRequests(rrData);
-            }
-          }
+        if (isAdminOrManager) {
+          setAllUsers(usrData);
         }
+        if (isAdmin) {
+          setRoleRequests(rrData);
+        }
+      } else {
+        setUser(null);
       }
     } catch (e) {
       console.error('Error in refreshData:', e);
@@ -190,6 +216,110 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     return () => clearInterval(interval);
   }, []);
+
+  // --- REAL-TIME WEBSOCKET NOTIFICATION LISTENER ---
+  useEffect(() => {
+    const token = localStorage.getItem('elitedrive_token');
+    if (!user || !token) return;
+
+    // Use current location protocol to derive ws vs wss
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+    console.log('[WebSocket] Connecting to live notification service:', wsUrl);
+    let socket: WebSocket | null = new WebSocket(wsUrl);
+    let pingInterval: any = null;
+    let reconnectTimeout: any = null;
+
+    const setupSocket = (ws: WebSocket) => {
+      ws.onopen = () => {
+        console.log('[WebSocket] Connection established. Sending authentication token...');
+        ws.send(JSON.stringify({ type: 'auth', token }));
+        
+        // Heartbeat ping to keep socket alive
+        pingInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 20000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'notification') {
+            const newNotif = payload.data;
+            console.log('[WebSocket] Received live notification event:', newNotif);
+            
+            // Instantly append to local state
+            setNotifications(prev => {
+              if (prev.some(n => n.id === newNotif.id)) return prev;
+              return [newNotif, ...prev];
+            });
+
+            // Play elegant sound chime using the Web Audio API
+            try {
+              const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+              const playTone = (freq: number, start: number, duration: number) => {
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, start);
+                gainNode.gain.setValueAtTime(0.06, start);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                osc.start(start);
+                osc.stop(start + duration);
+              };
+              const now = audioCtx.currentTime;
+              playTone(880, now, 0.12); // A5 chime
+              playTone(1109, now + 0.1, 0.25); // C#6 chime
+            } catch (soundErr) {
+              console.log('AudioContext initialization bypassed or blocked by auto-play policies.');
+            }
+
+            // Trigger beautiful top toast notification
+            showToast(`🔔 ${newNotif.title}: ${newNotif.message}`, 'info');
+          }
+        } catch (err) {
+          console.error('[WebSocket] Failed to process message payload:', err);
+        }
+      };
+
+      ws.onclose = (event) => {
+        console.log('[WebSocket] Connection closed:', event.reason || 'Network transition');
+        cleanup();
+        
+        // Auto-reconnect with backing timer
+        reconnectTimeout = setTimeout(() => {
+          console.log('[WebSocket] Executing reconnection retry...');
+          const nextWs = new WebSocket(wsUrl);
+          socket = nextWs;
+          setupSocket(nextWs);
+        }, 3000);
+      };
+
+      ws.onerror = (err) => {
+        console.error('[WebSocket] Socket encountered error:', err);
+      };
+    };
+
+    const cleanup = () => {
+      if (pingInterval) clearInterval(pingInterval);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+
+    setupSocket(socket);
+
+    return () => {
+      cleanup();
+      if (socket) {
+        socket.onclose = null;
+        socket.close();
+      }
+    };
+  }, [user?.id]);
 
   // --- ACTIONS IMPLEMENTATION ---
 
@@ -240,11 +370,34 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateBooking = async (id: string, updates: Partial<Booking>) => {
+    // Optimistic local state updates for instant response
+    setAllBookings(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+    setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+
     await apiFetch(`/api/bookings/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updates)
     });
     await refreshData();
+  };
+
+  const queueBookingTransaction = async (id: string, bookingUpdates: Partial<Booking>, vehicleUpdates?: any) => {
+    // Optimistic local state updates for instant response
+    if (bookingUpdates) {
+      setAllBookings(prev => prev.map(b => b.id === id ? { ...b, ...bookingUpdates } : b));
+      setBookings(prev => prev.map(b => b.id === id ? { ...b, ...bookingUpdates } : b));
+    }
+    if (vehicleUpdates) {
+      setVehicles(prev => prev.map(v => v.id === vehicleUpdates.id || v.id === (bookingUpdates as any)?.vehicleId ? { ...v, ...vehicleUpdates } : v));
+    }
+
+    const res = await apiFetch(`/api/bookings/${id}/queue-transaction`, {
+      method: 'POST',
+      body: JSON.stringify({ bookingUpdates, vehicleUpdates })
+    });
+    
+    refreshData();
+    return res;
   };
 
   const cancelBooking = async (id: string) => {
@@ -326,11 +479,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const verifyUserCNIC = async (userId: string, isVerified: boolean = true) => {
-    await apiFetch(`/api/users/${userId}/verify-cnic`, {
+    // 1. Optimistic local state update for immediate UI response
+    setAllUsers(prevUsers =>
+      prevUsers.map(u => u.id === userId ? { ...u, cnicVerified: isVerified } : u)
+    );
+
+    // 2. Perform DB update asynchronously in the background without blocking the UI
+    apiFetch(`/api/users/${userId}/verify-cnic`, {
       method: 'PUT',
       body: JSON.stringify({ cnicVerified: isVerified })
+    }).then(() => {
+      refreshData();
+    }).catch(err => {
+      console.error("Failed background cnic verification:", err);
+      // Revert optimistic state update on failure
+      setAllUsers(prevUsers =>
+        prevUsers.map(u => u.id === userId ? { ...u, cnicVerified: !isVerified } : u)
+      );
     });
-    await refreshData();
   };
 
   const bulkUpdateUserRoles = async (userIds: string[], role: 'admin' | 'manager' | 'customer') => {
@@ -364,6 +530,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateVehicle = async (id: string, updates: Partial<Vehicle>) => {
+    // Optimistic local state update for instant response
+    setVehicles(prev => prev.map(v => v.id === id ? { ...v, ...updates } : v));
+
     const updated = await apiFetch(`/api/vehicles/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updates)
@@ -485,6 +654,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       addBooking,
       approveBooking,
       updateBooking,
+      queueBookingTransaction,
       cancelBooking,
       updateUser,
       toggleFavorite,

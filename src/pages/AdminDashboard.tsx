@@ -41,6 +41,7 @@ const AdminDashboard: React.FC = () => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const currentView = queryParams.get('view') || 'overview';
+  const [showAllPopular, setShowAllPopular] = React.useState(false);
 
   // Dynamic Stats
   const totalRevenue = allBookings
@@ -167,30 +168,70 @@ const AdminDashboard: React.FC = () => {
           {/* Tables Row */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Popular Cars */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden lg:col-span-1">
-              <div className="p-6 border-b border-slate-100">
-                <h3 className="font-bold text-slate-900">Popular Cars</h3>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden lg:col-span-1 flex flex-col justify-between">
+              <div>
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                  <h3 className="font-bold text-slate-900">Popular Cars</h3>
+                  <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">Real-Time Fleet</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {(() => {
+                    const sortedPopular = (vehicles || [])
+                      .map(vehicle => {
+                        const bookingCount = (allBookings || []).filter(b => b.vehicleId === vehicle.id).length;
+                        return { ...vehicle, bookingCount };
+                      })
+                      .filter(v => v.bookingCount > 0)
+                      .sort((a, b) => b.bookingCount - a.bookingCount);
+
+                    const itemsToShow = showAllPopular ? sortedPopular : sortedPopular.slice(0, 2);
+
+                    if (sortedPopular.length === 0) {
+                      return (
+                        <div className="p-8 text-center text-slate-400 text-xs font-medium">
+                          No booking records found yet. Bookings will populate this fleet leaderboard automatically.
+                        </div>
+                      );
+                    }
+
+                    return itemsToShow.map((vehicle) => {
+                      const hasPending = (allBookings || []).some(b => b.vehicleId === vehicle.id && b.status === 'pending');
+                      const hasActive = (allBookings || []).some(b => b.vehicleId === vehicle.id && b.status === 'active');
+
+                      let statusBadge = { label: 'Available', style: 'bg-emerald-50 text-emerald-700 border-emerald-100' };
+                      if (hasPending) {
+                        statusBadge = { label: 'Pending Approval', style: 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse' };
+                      } else if (hasActive) {
+                        statusBadge = { label: 'Rented', style: 'bg-indigo-50 text-indigo-700 border-indigo-100' };
+                      }
+
+                      return (
+                        <div key={vehicle.id} className="p-4 flex items-center gap-4 hover:bg-slate-50/50 transition-colors">
+                          <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden border border-slate-100">
+                            <img src={vehicle.image} alt={vehicle.name} className="object-cover h-full w-full" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-slate-900 truncate">{vehicle.name}</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{vehicle.bookingCount} Booking{vehicle.bookingCount > 1 ? 's' : ''}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded border ${statusBadge.style}`}>
+                              {statusBadge.label}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
               </div>
-              <div className="divide-y divide-slate-100">
-                {vehicles.slice(0, 2).map((vehicle, idx) => (
-                  <div key={vehicle.id} className="p-4 flex items-center gap-4">
-                    <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden">
-                      <img src={vehicle.image} alt={vehicle.name} className="object-cover h-full w-full" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-slate-900">{vehicle.name}</p>
-                      <p className="text-xs text-slate-500">{allBookings.filter(b => b.vehicleId === vehicle.id).length} Total Bookings</p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-sm font-bold ${vehicle.available ? 'text-emerald-600' : 'text-amber-600'}`}>
-                        {vehicle.available ? 'Available' : 'Rented'}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="p-4 bg-slate-50 text-center">
-                <button className="text-xs text-blue-600 font-semibold hover:underline transition-all">View All Fleet</button>
+              <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
+                <button 
+                  onClick={() => setShowAllPopular(prev => !prev)}
+                  className="text-xs text-blue-600 font-bold hover:text-blue-700 transition-colors uppercase tracking-wider"
+                >
+                  {showAllPopular ? 'Collapse Fleet List' : 'View All Fleet Leaderboard'}
+                </button>
               </div>
             </div>
 

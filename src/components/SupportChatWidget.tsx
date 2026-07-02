@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI } from "@google/genai";
 import ReactMarkdown from 'react-markdown';
 
 interface ChatMessage {
@@ -63,32 +62,28 @@ const SupportChatWidget: React.FC = () => {
     setIsTyping(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: `You are EliteDrive Support Assistant. You help customers with their car rental bookings and system navigation.
-            Context: The user is ${user?.name || 'Guest'}, role is ${user?.role || 'customer'}.
-            System features: Explore Fleet, Booking, My Bookings, Profile, Favorites.
-            User query: ${inputMessage}` }]
-          }
-        ],
-        config: {
-          systemInstruction: `You are a helpful, professional support assistant for EliteDrive, a premium car rental management system. 
-          Your goal is to provide clean, structured, and concise responses.
-          - Use **bold** for key terms or actions.
-          - Use bullet points for lists of options or steps.
-          - Keep paragraphs short and readable.
-          - If the user asks for help with a specific feature, provide clear instructions.
-          - Be polite and professional at all times.`
-        }
+      const token = localStorage.getItem('elitedrive_token');
+      const response = await fetch('/api/support-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          messages: messages.slice(-5), // Send last few messages for rolling history context
+          inputMessage: userMessage.content
+        })
       });
+
+      if (!response.ok) {
+        throw new Error('Support API returned error status');
+      }
+
+      const data = await response.json();
 
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: response.text || "I'm sorry, I couldn't process that request. Please try again.",
+        content: data.text || "I'm sorry, I couldn't process that request. Please try again.",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 

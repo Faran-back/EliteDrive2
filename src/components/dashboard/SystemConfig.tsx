@@ -20,9 +20,18 @@ import {
 import { useStore } from '../../context/StoreContext';
 
 const SystemConfig: React.FC = () => {
-  const { allUsers, showToast, migrateVehicleIds } = useStore();
+  const { user, allUsers, showToast, migrateVehicleIds } = useStore();
   const [activeTab, setActiveTab] = useState<'roles' | 'fleet' | 'integrations' | 'backup'>('roles');
   const [isMigrating, setIsMigrating] = useState(false);
+
+  // Webhook Simulator state
+  const [webhookUserId, setWebhookUserId] = useState('');
+  const [webhookType, setWebhookType] = useState('info');
+  const [webhookTitle, setWebhookTitle] = useState('New Live Alert');
+  const [webhookMessage, setWebhookMessage] = useState('A real-time notification was received via the Webhook API!');
+  const [webhookLink, setWebhookLink] = useState('/admin-dashboard');
+  const [isSendingWebhook, setIsSendingWebhook] = useState(false);
+  const [copiedCurl, setCopiedCurl] = useState(false);
 
   const tabs = [
     { id: 'roles', label: 'Roles & Permissions', icon: Shield },
@@ -161,7 +170,11 @@ const SystemConfig: React.FC = () => {
 
           {activeTab === 'integrations' && (
             <div className="space-y-8">
-              <h3 className="text-xl font-black text-slate-900">External API Integrations</h3>
+              <div>
+                <h3 className="text-xl font-black text-slate-900">External API Integrations</h3>
+                <p className="text-sm text-slate-500 font-medium">Manage and configure active API services connected to the EliteDrive platform</p>
+              </div>
+              
               <div className="space-y-4">
                 {[
                   { name: 'Stripe Payments', status: 'Connected', icon: Key, color: 'emerald' },
@@ -192,6 +205,168 @@ const SystemConfig: React.FC = () => {
                     </button>
                   </div>
                 ))}
+              </div>
+
+              {/* Live Webhook & Notification Playground */}
+              <div className="pt-8 border-t border-slate-100 space-y-6">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                    </span>
+                    Live Webhook Notification Desk
+                  </h3>
+                  <p className="text-sm text-slate-500 font-medium">
+                    Trigger and receive instant real-time notifications over the Webhook integration. Test external system pings live.
+                  </p>
+                </div>
+
+                <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Left Column: Config & Copy */}
+                  <div className="space-y-4">
+                    <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Webhook Target URL</span>
+                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 font-mono text-xs text-slate-600 select-all break-all">
+                        {window.location.origin}/api/webhooks/notification
+                      </div>
+                      <div className="flex gap-4 text-xs font-bold text-slate-500">
+                        <span>Method: <strong className="text-blue-600">POST</strong></span>
+                        <span>Content: <strong className="text-slate-800">JSON</strong></span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 text-slate-100 p-5 rounded-2xl border border-slate-800 shadow-xl space-y-3 relative overflow-hidden font-mono text-xs">
+                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <span>cURL Integration Command</span>
+                        <button 
+                          onClick={() => {
+                            const curlCmd = `curl -X POST ${window.location.origin}/api/webhooks/notification \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "userId": "${webhookUserId || (user?.id || '')}",\n    "title": "${webhookTitle}",\n    "message": "${webhookMessage}",\n    "type": "${webhookType}",\n    "link": "${webhookLink}"\n  }'`;
+                            navigator.clipboard.writeText(curlCmd);
+                            setCopiedCurl(true);
+                            setTimeout(() => setCopiedCurl(false), 2000);
+                          }}
+                          className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white transition-all font-sans"
+                        >
+                          {copiedCurl ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                      <pre className="overflow-x-auto whitespace-pre-wrap select-all leading-relaxed max-h-[140px] text-slate-300 text-[10px]">
+{`curl -X POST ${window.location.origin}/api/webhooks/notification \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "userId": "${webhookUserId || (user?.id || '')}",
+    "title": "${webhookTitle}",
+    "message": "${webhookMessage}",
+    "type": "${webhookType}",
+    "link": "${webhookLink}"
+  }'`}
+                      </pre>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Interactive Form */}
+                  <div className="space-y-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Webhook Simulator Console</span>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Target Recipient</label>
+                        <select 
+                          value={webhookUserId}
+                          onChange={(e) => setWebhookUserId(e.target.value)}
+                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-600/20"
+                        >
+                          <option value="">Default Admin ({user?.name || 'Me'})</option>
+                          {allUsers.map(u => (
+                            <option key={u.id} value={u.id}>
+                              {u.name} ({u.role})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Type</label>
+                          <select 
+                            value={webhookType}
+                            onChange={(e) => setWebhookType(e.target.value)}
+                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-600/20"
+                          >
+                            <option value="info">Info / System</option>
+                            <option value="booking_confirmed">Booking Confirmed</option>
+                            <option value="booking_cancelled">Booking Cancelled</option>
+                            <option value="promotion">Promo / Message</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Redirect Route</label>
+                          <input 
+                            type="text"
+                            value={webhookLink}
+                            onChange={(e) => setWebhookLink(e.target.value)}
+                            placeholder="/admin-dashboard"
+                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-600/20"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Notification Title</label>
+                        <input 
+                          type="text"
+                          value={webhookTitle}
+                          onChange={(e) => setWebhookTitle(e.target.value)}
+                          placeholder="Notification Title"
+                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-600/20"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Notification Message</label>
+                        <textarea 
+                          rows={2}
+                          value={webhookMessage}
+                          onChange={(e) => setWebhookMessage(e.target.value)}
+                          placeholder="Type notification message body..."
+                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-600/20 resize-none"
+                        />
+                      </div>
+
+                      <button
+                        onClick={async () => {
+                          setIsSendingWebhook(true);
+                          try {
+                            const res = await fetch('/api/webhooks/notification', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                userId: webhookUserId || user?.id,
+                                title: webhookTitle,
+                                message: webhookMessage,
+                                type: webhookType,
+                                link: webhookLink
+                              })
+                            });
+                            if (!res.ok) throw new Error('Webhook failed');
+                            const data = await res.json();
+                            showToast('Webhook successfully triggered! Live broadcast dispatched.', 'success');
+                          } catch (err) {
+                            console.error('Webhook trigger failed:', err);
+                            showToast('Failed to trigger Webhook endpoint.', 'error');
+                          } finally {
+                            setIsSendingWebhook(false);
+                          }
+                        }}
+                        disabled={isSendingWebhook}
+                        className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                      >
+                        {isSendingWebhook ? 'Triggering...' : 'Dispatch Live Webhook'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

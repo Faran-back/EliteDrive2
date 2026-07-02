@@ -22,6 +22,14 @@ import { useStore } from '../context/StoreContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 
+const TRAVEL_OPTIONS = [
+  { value: 'in_city', label: 'In-City Commute (Fuel Efficiency focus)' },
+  { value: 'out_city', label: 'Out-City Highway (Comfort & Speed focus)' },
+  { value: 'mountainous', label: 'Mountainous Terrain (Naran/Kaghan/Hunza 4x4)' },
+  { value: 'family_trip', label: 'Family Trip (Maximum Seating & Space)' },
+  { value: 'business', label: 'Executive/Business (Luxury & Presentation)' },
+];
+
 const Fleet: React.FC = () => {
   const { vehicles, user, allBookings } = useStore();
   const navigate = useNavigate();
@@ -66,6 +74,7 @@ const Fleet: React.FC = () => {
   const [isAiMode, setIsAiMode] = useState(false);
   const [aiBudget, setAiBudget] = useState('');
   const [aiTravelType, setAiTravelType] = useState('in_city');
+  const [isTravelTypeOpen, setIsTravelTypeOpen] = useState(false);
   const [aiPreferences, setAiPreferences] = useState('');
   const [aiResult, setAiResult] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -167,6 +176,7 @@ const Fleet: React.FC = () => {
       });
       const data = await response.json();
       setAiResult(data);
+      setIsAiMode(true);
     } catch (err) {
       console.error("AI Recommendation error: ", err);
     } finally {
@@ -426,19 +436,67 @@ const Fleet: React.FC = () => {
                     />
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-3 relative">
                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-1">Travel Type & Terrain</label>
-                    <select
-                      value={aiTravelType}
-                      onChange={(e) => setAiTravelType(e.target.value)}
-                      className="w-full px-6 py-4 bg-slate-100 rounded-[20px] border-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all text-slate-900 font-bold"
-                    >
-                      <option value="in_city">In-City Commute (Fuel Efficiency focus)</option>
-                      <option value="out_city">Out-City Highway (Comfort & Speed focus)</option>
-                      <option value="mountainous">Mountainous Terrain (Naran/Kaghan/Hunza 4x4)</option>
-                      <option value="family_trip">Family Trip (Maximum Seating & Space)</option>
-                      <option value="business">Executive/Business (Luxury & Presentation)</option>
-                    </select>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsTravelTypeOpen(!isTravelTypeOpen)}
+                        className="w-full px-6 py-4 bg-slate-100 rounded-[20px] border-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all text-slate-900 font-bold text-left flex items-center justify-between shadow-sm hover:bg-slate-200/50"
+                      >
+                        <span className="truncate">
+                          {TRAVEL_OPTIONS.find(opt => opt.value === aiTravelType)?.label || 'In-City Commute (Fuel Efficiency focus)'}
+                        </span>
+                        <ChevronDown 
+                          size={18} 
+                          className={`text-slate-500 transition-transform duration-200 shrink-0 ml-2 ${isTravelTypeOpen ? 'rotate-180 text-blue-600' : ''}`} 
+                        />
+                      </button>
+
+                      <AnimatePresence>
+                        {isTravelTypeOpen && (
+                          <>
+                            {/* Overlay to handle click outside safely */}
+                            <div 
+                              className="fixed inset-0 z-40 cursor-default" 
+                              onClick={() => setIsTravelTypeOpen(false)}
+                            />
+                            
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              transition={{ duration: 0.15 }}
+                              className="absolute left-0 right-0 mt-2 bg-white border border-slate-100 rounded-[20px] shadow-2xl shadow-slate-200/80 overflow-hidden z-50 py-2.5"
+                            >
+                              {TRAVEL_OPTIONS.map((option) => {
+                                const isSelected = aiTravelType === option.value;
+                                return (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => {
+                                      setAiTravelType(option.value);
+                                      setIsTravelTypeOpen(false);
+                                    }}
+                                    className={`w-full px-6 py-3.5 text-left text-sm font-bold transition-all flex items-center justify-between ${
+                                      isSelected 
+                                        ? 'bg-blue-50 text-blue-600' 
+                                        : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                                    }`}
+                                  >
+                                    <span className="truncate">{option.label}</span>
+                                    {isSelected && (
+                                      <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse shrink-0 ml-2" />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </motion.div>
+                          </>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
                 </div>
 

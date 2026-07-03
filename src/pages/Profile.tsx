@@ -278,7 +278,7 @@ const Profile: React.FC = () => {
               </div>
               <div className="w-px bg-gray-100" />
               <div className="space-y-1">
-                <p className="text-3xl font-black text-[#2563EB]">{user?.rewardPoints.toLocaleString()}</p>
+                <p className="text-3xl font-black text-[#2563EB]">{(user?.rewardPoints ?? 0).toLocaleString()}</p>
                 <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest">Points</p>
               </div>
             </div>

@@ -22,7 +22,7 @@ export default defineConfig(({mode}) => {
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: {
-        ignored: ['**/db.json', '**/server.ts', '**/server.tsx'],
+        ignored: ['**/db.json', '**/data.sqlite*', '**/server.ts', '**/server.tsx'],
       },
     },
   };

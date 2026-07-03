@@ -20,6 +20,7 @@ export interface User {
   outstandingBalance?: number;
   isBlacklisted?: boolean;
   isBlackListed?: boolean;
+  emailVerificationCode?: string;
   pendingInvitation?: {
     role: 'admin' | 'manager';
     invitedBy: string;

@@ -259,7 +259,7 @@ const SupportCenter: React.FC = () => {
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="px-2 py-0.5 bg-red-100 text-red-700 font-extrabold text-[9px] uppercase tracking-wider rounded">
-                                {inc.incidentType.replace('_', ' ')}
+                                {(inc.type || '').replace('_', ' ')}
                               </span>
                               {isOverdueReport && (
                                 <span className="px-2 py-0.5 bg-rose-600 text-white font-extrabold text-[9px] uppercase tracking-wider rounded animate-pulse">
@@ -281,7 +281,7 @@ const SupportCenter: React.FC = () => {
                             inc.status === 'under_review' ? 'bg-amber-50 text-amber-700 border-amber-100' :
                             'bg-red-50 text-red-600 border-red-150'
                           }`}>
-                            {inc.status.replace('_', ' ')}
+                            {(inc.status || '').replace('_', ' ')}
                           </span>
                         </div>
 
@@ -311,7 +311,7 @@ const SupportCenter: React.FC = () => {
                         {inc.actionType && (
                           <div className="p-3 bg-indigo-50/50 rounded-xl text-[11px] text-indigo-800 border border-indigo-100">
                             <span className="font-extrabold uppercase text-[9px] block mb-0.5">Administrative Action log</span>
-                            <strong>Resolved Category:</strong> {inc.actionType.replace('_', ' ')} • <em>{inc.notes || 'No notes added'}</em>
+                            <strong>Resolved Category:</strong> {(inc.actionType || '').replace('_', ' ')} • <em>{inc.notes || 'No notes added'}</em>
                           </div>
                         )}
 
@@ -419,7 +419,7 @@ const SupportCenter: React.FC = () => {
                         <div className="flex justify-between items-start flex-wrap gap-2">
                           <div>
                             <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-extrabold text-[9px] uppercase tracking-wider rounded">
-                              {dsp.disputeType.replace('_', ' ')} Dispute
+                              {(dsp.type || '').replace('_', ' ')} Dispute
                             </span>
                             <h4 className="text-base font-black text-slate-905 mt-2">
                               Subject: "{dsp.title}"

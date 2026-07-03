@@ -43,7 +43,7 @@ interface StoreContextType {
   deleteVehicle: (id: string) => Promise<void>;
   addVehicle: (vehicleData: Omit<Vehicle, 'id'>) => Promise<void>;
   migrateVehicleIds: () => Promise<void>;
-  sendVerificationEmail: () => Promise<void>;
+  sendVerificationEmail: (email?: string) => Promise<void>;
   setupRecaptcha: (containerId: string) => void;
   sendPhoneVerificationCode: (phoneNumber: string) => Promise<any>;
   verifyPhoneCode: (confirmationResult: any, code: string) => Promise<void>;
@@ -553,8 +553,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     showToast('All vehicles migrated to custom Node server successfully.', 'success');
   };
 
-  const sendVerificationEmail = async () => {
-    showToast('Verification email simulated successfully.', 'success');
+  const sendVerificationEmail = async (email?: string) => {
+    try {
+      const targetEmail = email || user?.email;
+      if (!targetEmail) {
+        throw new Error('No email specified.');
+      }
+      await apiFetch('/api/auth/send-verification', {
+        method: 'POST',
+        body: JSON.stringify({ email: targetEmail })
+      });
+      showToast(`Verification email sent successfully to ${targetEmail}!`, 'success');
+    } catch (err: any) {
+      console.error('Failed to send verification email:', err);
+      showToast(err.message || 'Failed to send verification email.', 'error');
+    }
   };
 
   const setupRecaptcha = (containerId: string) => {

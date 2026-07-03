@@ -96,7 +96,6 @@ async function sendWebPushNotification(userId: string, payload: { title: string;
   );
 }
 
-const DB_PATH = path.join(process.cwd(), 'db.json');
 
 import nodemailer from 'nodemailer';
 import pg from 'pg';
@@ -264,11 +263,11 @@ async function sendEmail({ to, subject, html, text }: { to: string; subject: str
   dbData.sentEmails.unshift(sentEmailObj);
   saveDatabase();
 
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpPort = process.env.SMTP_PORT;
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
-  const smtpFrom = process.env.SMTP_FROM || 'no-reply@elitedrive.pk';
+  const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const smtpPort = process.env.SMTP_PORT || '587';
+  const smtpUser = process.env.SMTP_USER || 'noreply.elitedrive@gmail.com';
+  const smtpPass = process.env.SMTP_PASS || 'tand zfwh cvbi pmgr';
+  const smtpFrom = process.env.SMTP_FROM || 'noreply.elitedrive@gmail.com';
 
   if (smtpHost && smtpUser && smtpPass) {
     try {
@@ -314,6 +313,7 @@ interface DbData {
   echallans: EChallan[];
   sentEmails?: any[];
   pushSubscriptions?: any[];
+  transientVerificationCodes?: Record<string, string>;
 }
 
 let dbData: DbData = {
@@ -328,10 +328,84 @@ let dbData: DbData = {
   echallans: [],
   sentEmails: [],
   pushSubscriptions: [],
+  transientVerificationCodes: {},
 };
 
 const RESET_DATABASE_ON_START = false;
 const SQLITE_DB_PATH = getSqliteDatabasePath();
+
+function checkForBookingFraudThreats(booking: Booking, user: any, vehicle: Vehicle) {
+  const threats: string[] = [];
+
+  // 1. Rapid Multi-Vehicle Booking Pattern
+  const activeOrPendingBookings = dbData.bookings.filter(b => b.userId === user.id && b.id !== booking.id && (b.status === 'pending' || b.status === 'active'));
+  if (activeOrPendingBookings.length >= 1) {
+    threats.push(`🚨 <strong>Rapid Multi-Vehicle Booking Pattern</strong>: Customer has ${activeOrPendingBookings.length + 1} concurrent bookings in active/pending status, indicating high risk of commercial subletting or credit card mule fraud.`);
+  }
+
+  // 2. Unverified High-Value Reservation
+  const isHighValue = vehicle.pricePerDay > 12000 || booking.totalPrice > 40000;
+  const isKycIncomplete = !user.cnicVerified || !user.cnicFront || !user.license;
+  if (isHighValue && isKycIncomplete) {
+    threats.push(`🚨 <strong>Unverified High-Value Reservation</strong>: Premium category vehicle (${vehicle.name}) reserved by a customer without completed CNIC/License verification.`);
+  }
+
+  if (threats.length > 0) {
+    // Send email to all admins and managers
+    dbData.users.filter(u => u.role === 'admin' || u.role === 'manager').forEach(staff => {
+      const fraudEmailHtml = getEmailTemplate(
+        'SECURITY ALERT: Fraud Threat Detected',
+        `
+        <p>Dear ${staff.name},</p>
+        <p style="color: #dc2626; font-weight: 800; font-size: 16px;">⚠️ SECURITY WARNING: Suspicious activity/fraud threats have been detected on booking reference #${booking.id}!</p>
+        
+        <div style="background-color: #fef2f2; border: 1px solid #fee2e2; border-radius: 12px; padding: 20px; margin: 20px 0;">
+          <h4 style="color: #991b1b; margin-top: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">Detected Threats:</h4>
+          <ul style="margin: 0; padding-left: 20px; color: #7f1d1d; font-size: 13px; line-height: 1.6;">
+            ${threats.map(t => `<li style="margin-bottom: 10px;">${t}</li>`).join('')}
+          </ul>
+        </div>
+
+        <table class="details-table">
+          <tr>
+            <td class="label">Renter Name</td>
+            <td class="value">${user.name}</td>
+          </tr>
+          <tr>
+            <td class="label">Renter Email</td>
+            <td class="value">${user.email}</td>
+          </tr>
+          <tr>
+            <td class="label">Vehicle Name</td>
+            <td class="value">${vehicle.name}</td>
+          </tr>
+          <tr>
+            <td class="label">Total Amount</td>
+            <td class="value">PKR ${booking.totalPrice.toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td class="label">Booking Status</td>
+            <td class="value">${booking.status.toUpperCase()}</td>
+          </tr>
+        </table>
+        
+        <div style="text-align: center; margin-top: 25px;">
+          <a href="${process.env.APP_URL || 'http://localhost:3000'}/${staff.role === 'admin' ? 'admin' : 'manager'}-dashboard?view=fraud-alerts" class="button" style="background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">View Fraud Monitor</a>
+        </div>
+        
+        <p>Best regards,<br>EliteDrive Fraud Detection System</p>
+        `
+      );
+
+      sendEmail({
+        to: staff.email,
+        subject: `🚨 FRAUD THREAT ALERT: Suspicious Activity Detected - ${user.name}`,
+        html: fraudEmailHtml,
+        text: `SECURITY WARNING: Suspicious activity detected for Booking #${booking.id} (Customer: ${user.name}). Please review immediately on the Fraud Monitor panel.\n\nBest regards,\nEliteDrive System`
+      });
+    });
+  }
+}
 
 function hashPassword(password: string): string {
   return crypto.pbkdf2Sync(password, 'elitedrivesalt', 1000, 64, 'sha512').toString('hex');
@@ -459,212 +533,40 @@ function sanitizeLoadedData() {
 }
 
 async function loadDatabase() {
-  const loadFromPersistence = async () => {
-    try {
-      const sqliteData = loadCollectionsFromSqlite(SQLITE_DB_PATH);
-      if (Object.keys(sqliteData).length > 0) {
-        const loadedData: Partial<DbData> = {};
-        for (const [name, data] of Object.entries(sqliteData)) {
-          loadedData[name as keyof DbData] = data as any;
-        }
-
-        dbData = {
-          users: loadedData.users || [],
-          vehicles: loadedData.vehicles || [],
-          bookings: loadedData.bookings || [],
-          notifications: loadedData.notifications || [],
-          roleRequests: loadedData.roleRequests || [],
-          invitations: loadedData.invitations || [],
-          incidents: loadedData.incidents || [],
-          disputes: loadedData.disputes || [],
-          echallans: loadedData.echallans || [],
-          sentEmails: loadedData.sentEmails || [],
-          pushSubscriptions: loadedData.pushSubscriptions || [],
-        };
-
-        sanitizeLoadedData();
-        ensureSeedUsers(dbData as any);
-        saveDatabase();
-        console.log(`[Database] Loaded persisted data from SQLite at ${SQLITE_DB_PATH}`);
-        return;
-      }
-    } catch (err) {
-      console.error('[Database] Failed to load from SQLite, continuing with fallback:', err);
-    }
-
-    if (fs.existsSync(DB_PATH)) {
-      try {
-        const content = fs.readFileSync(DB_PATH, 'utf8');
-        dbData = JSON.parse(content);
-        sanitizeLoadedData();
-        saveCollectionsToSqlite({
-          users: dbData.users,
-          vehicles: dbData.vehicles,
-          bookings: dbData.bookings,
-          notifications: dbData.notifications,
-          roleRequests: dbData.roleRequests,
-          invitations: dbData.invitations,
-          incidents: dbData.incidents,
-          disputes: dbData.disputes,
-          echallans: dbData.echallans,
-          sentEmails: dbData.sentEmails,
-          pushSubscriptions: dbData.pushSubscriptions,
-        }, SQLITE_DB_PATH);
-        console.log(`[Database] Loaded from local db.json fallback and mirrored to SQLite at ${SQLITE_DB_PATH}.`);
-        return;
-      } catch (err) {
-        console.error('[Database] Failed to read local db.json fallback:', err);
-      }
-    }
-
-    console.log('[Database] No persisted data found. Seeding default admin and manager accounts.');
-    seedInitialDatabase();
-    return;
-  };
-
-  if (RESET_DATABASE_ON_START) {
-    console.log('[Database] RESET_DATABASE_ON_START is enabled. Starting from a clean empty dataset.');
-    await loadFromPersistence();
-    return;
-  }
-
-  await loadFromPersistence();
-  return;
-
-  // 1. Try Loading from PostgreSQL if configured (Best for automatic table creation & direct connection)
-  if (pgPool) {
-    try {
-      await initPgDatabase();
-      console.log('[Database] Attempting to load collections from PostgreSQL...');
-      const res = await pgPool.query('SELECT name, data FROM collections');
-      
-      if (res.rows.length > 0) {
-        console.log(`[Database] Successfully loaded state from PostgreSQL (${res.rows.length} collections found).`);
-        const loadedData: Partial<DbData> = {};
-        for (const row of res.rows) {
-          loadedData[row.name as keyof DbData] = row.data;
-        }
-        
-        dbData = {
-          users: loadedData.users || [],
-          vehicles: loadedData.vehicles || [],
-          bookings: loadedData.bookings || [],
-          notifications: loadedData.notifications || [],
-          roleRequests: loadedData.roleRequests || [],
-          invitations: loadedData.invitations || [],
-          incidents: loadedData.incidents || [],
-          disputes: loadedData.disputes || [],
-          echallans: loadedData.echallans || [],
-          sentEmails: loadedData.sentEmails || [],
-          pushSubscriptions: loadedData.pushSubscriptions || [],
-        };
-        
-        sanitizeLoadedData();
-        // Also save to local db.json as backup cache
-        try {
-          fs.writeFileSync(DB_PATH, JSON.stringify(dbData, null, 2), 'utf8');
-        } catch (fErr) {
-          // ignore cache write error
-        }
-        return;
-      } else {
-        console.log('[Database] PostgreSQL collections table is empty. Migrating local data to PostgreSQL...');
-        if (fs.existsSync(DB_PATH)) {
-          const content = fs.readFileSync(DB_PATH, 'utf8');
-          dbData = JSON.parse(content);
-        } else {
-          seedInitialDatabase();
-        }
-        sanitizeLoadedData();
-        await saveAllCollectionsToPg();
-        return;
-      }
-    } catch (err) {
-      console.error('[Database] Failed to load database from PostgreSQL, falling back to other methods:', err);
-    }
-  }
-
-  // 2. Try Loading from Supabase first
-  if (supabaseClient) {
-    try {
-      console.log('[Database] Attempting to load collections from Supabase...');
-      const { data: rows, error } = await supabaseClient
-        .from('collections')
-        .select('name, data');
-        
-      if (error) {
-        if (error.code === '42P01' || error.message?.includes('does not exist')) {
-          console.warn(`\n=========================================`);
-          console.warn(`[Supabase] WARNING: Table "collections" does not exist in Supabase.`);
-          console.warn(`Please run the following SQL query in your Supabase SQL Editor to enable persistence:`);
-          console.warn(`\nCREATE TABLE collections (\n  name VARCHAR(50) PRIMARY KEY,\n  data JSONB NOT NULL\n);\n`);
-          console.warn(`ALTER TABLE collections ENABLE ROW LEVEL SECURITY;`);
-          console.warn(`CREATE POLICY "Allow public read" ON collections FOR SELECT USING (true);`);
-          console.warn(`CREATE POLICY "Allow public insert" ON collections FOR INSERT WITH CHECK (true);`);
-          console.warn(`CREATE POLICY "Allow public update" ON collections FOR UPDATE USING (true);`);
-          console.warn(`=========================================\n`);
-        } else {
-          throw error;
-        }
-      } else if (rows && rows.length > 0) {
-        console.log(`[Database] Successfully loaded state from Supabase (${rows.length} collections found).`);
-        const loadedData: Partial<DbData> = {};
-        for (const row of rows) {
-          loadedData[row.name as keyof DbData] = row.data;
-        }
-        
-        dbData = {
-          users: loadedData.users || [],
-          vehicles: loadedData.vehicles || [],
-          bookings: loadedData.bookings || [],
-          notifications: loadedData.notifications || [],
-          roleRequests: loadedData.roleRequests || [],
-          invitations: loadedData.invitations || [],
-          incidents: loadedData.incidents || [],
-          disputes: loadedData.disputes || [],
-          echallans: loadedData.echallans || [],
-          sentEmails: loadedData.sentEmails || [],
-          pushSubscriptions: loadedData.pushSubscriptions || [],
-        };
-        
-        sanitizeLoadedData();
-        // Also save to local db.json as immediate cache backup
-        try {
-          fs.writeFileSync(DB_PATH, JSON.stringify(dbData, null, 2), 'utf8');
-        } catch (fErr) {}
-        return;
-      } else {
-        console.log('[Database] Supabase collections table is empty. Migrating local data to Supabase...');
-        if (fs.existsSync(DB_PATH)) {
-          const content = fs.readFileSync(DB_PATH, 'utf8');
-          dbData = JSON.parse(content);
-        } else {
-          seedInitialDatabase();
-        }
-        sanitizeLoadedData();
-        await saveAllCollectionsToSupabase();
-        return;
-      }
-    } catch (err: any) {
-      console.error('[Database] Failed to load database from Supabase, falling back:', err.message || err);
-    }
-  }
-
-  // 3. Fallback to local db.json file
   try {
-    if (fs.existsSync(DB_PATH)) {
-      const content = fs.readFileSync(DB_PATH, 'utf8');
-      dbData = JSON.parse(content);
+    const sqliteData = loadCollectionsFromSqlite(SQLITE_DB_PATH);
+    if (Object.keys(sqliteData).length > 0) {
+      const loadedData: Partial<DbData> = {};
+      for (const [name, data] of Object.entries(sqliteData)) {
+        loadedData[name as keyof DbData] = data as any;
+      }
+
+      dbData = {
+        users: loadedData.users || [],
+        vehicles: loadedData.vehicles || [],
+        bookings: loadedData.bookings || [],
+        notifications: loadedData.notifications || [],
+        roleRequests: loadedData.roleRequests || [],
+        invitations: loadedData.invitations || [],
+        incidents: loadedData.incidents || [],
+        disputes: loadedData.disputes || [],
+        echallans: loadedData.echallans || [],
+        sentEmails: loadedData.sentEmails || [],
+        pushSubscriptions: loadedData.pushSubscriptions || [],
+      };
+
       sanitizeLoadedData();
+      ensureSeedUsers(dbData as any);
       saveDatabase();
-    } else {
-      seedInitialDatabase();
-      saveDatabase();
+      console.log(`[Database] Loaded persisted data from SQLite at ${SQLITE_DB_PATH}`);
+      return;
     }
   } catch (err) {
-    console.error('[Database] Failed to load local database. Using memory state.', err);
-    seedInitialDatabase();
+    console.error('[Database] Failed to load from SQLite:', err);
   }
+
+  console.log('[Database] No persisted data found in SQLite. Seeding default admin and manager accounts.');
+  seedInitialDatabase();
 }
 
 let isSaving = false;
@@ -719,7 +621,6 @@ function saveDatabase() {
         pushSubscriptions: dbData.pushSubscriptions,
       };
       saveCollectionsToSqlite(payload, SQLITE_DB_PATH);
-      return fs.promises.writeFile(DB_PATH, JSON.stringify(dbData, null, 2), 'utf8');
     })
     .catch(err => {
       console.error('[Database] Async save error:', err);
@@ -814,7 +715,7 @@ function seedInitialDatabase() {
     pushSubscriptions: [],
   };
 
-  ensureSeedUsers(dbData);
+  ensureSeedUsers(dbData as any);
   saveDatabase();
 }
 
@@ -975,6 +876,112 @@ async function startServer() {
     res.json(userResponse);
   });
 
+  // EMAIL VERIFICATION ENDPOINTS
+  app.post('/api/auth/send-verification', (req: any, res) => {
+    let email = req.body.email;
+    let name = req.body.name || 'Valued Member';
+
+    if (!email && req.headers.authorization) {
+      try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+        if (token) {
+          const userId = verifyToken(token);
+          if (userId) {
+            const userObj = dbData.users.find(u => u.id === userId);
+            if (userObj) {
+              email = userObj.email;
+              name = userObj.name;
+            }
+          }
+        }
+      } catch (err) {
+        // Ignore token decode errors
+      }
+    }
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required for sending verification' });
+    }
+
+    // Generate random 6-digit OTP code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store in DB
+    const userObj = dbData.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    if (userObj) {
+      userObj.emailVerificationCode = verificationCode;
+    } else {
+      dbData.transientVerificationCodes = dbData.transientVerificationCodes || {};
+      dbData.transientVerificationCodes[email.toLowerCase()] = verificationCode;
+    }
+    saveDatabase();
+
+    const emailHtml = getEmailTemplate(
+      'Verify Your EliteDrive Account',
+      `
+      <p>Dear ${name},</p>
+      <p>Thank you for choosing <strong>EliteDrive Pakistan</strong>. To complete your account verification, please use the following 6-digit verification code:</p>
+      
+      <div style="text-align: center; margin: 30px 0;">
+        <span style="font-size: 36px; font-weight: 900; letter-spacing: 0.2em; background-color: #f1f5f9; padding: 15px 30px; border-radius: 12px; color: #1e293b; border: 1px solid #e2e8f0; display: inline-block;">
+          ${verificationCode}
+        </span>
+      </div>
+      
+      <p>This verification code is valid for 15 minutes. Please do not share this code with anyone.</p>
+      <p>If you did not request this code, please secure your account or ignore this email.</p>
+      <p>Best regards,<br>The EliteDrive Team</p>
+      `
+    );
+
+    sendEmail({
+      to: email,
+      subject: `🔑 EliteDrive Verification Code: ${verificationCode}`,
+      html: emailHtml,
+      text: `Dear ${name},\n\nYour EliteDrive account verification code is: ${verificationCode}\n\nBest regards,\nEliteDrive Team`
+    })
+      .then(() => {
+        res.json({ success: true, message: 'Verification email sent successfully!', email });
+      })
+      .catch((err: any) => {
+        res.status(500).json({ error: `Failed to send email: ${err.message}` });
+      });
+  });
+
+  app.post('/api/auth/verify-email', (req: any, res) => {
+    const { email, code } = req.body;
+    if (!email || !code) {
+      return res.status(400).json({ error: 'Email and verification code are required' });
+    }
+
+    const userObj = dbData.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    let verified = false;
+
+    if (userObj) {
+      if (userObj.emailVerificationCode === code) {
+        userObj.emailVerified = true;
+        delete userObj.emailVerificationCode;
+        saveDatabase();
+        verified = true;
+      }
+    } else {
+      const storedCode = dbData.transientVerificationCodes?.[email.toLowerCase()];
+      if (storedCode === code) {
+        dbData.transientVerificationCodes = dbData.transientVerificationCodes || {};
+        delete dbData.transientVerificationCodes[email.toLowerCase()];
+        saveDatabase();
+        verified = true;
+      }
+    }
+
+    if (verified) {
+      res.json({ success: true, message: 'Email address verified successfully!' });
+    } else {
+      res.status(400).json({ error: 'Invalid or expired verification code' });
+    }
+  });
+
   // SUBSCRIBE TO DESKTOP PUSH NOTIFICATIONS
   app.post('/api/notifications/subscribe', authenticateToken, (req: any, res) => {
     const { subscription } = req.body;
@@ -1026,8 +1033,59 @@ async function startServer() {
     delete updates.email;
     delete updates.id;
 
+    const originalUser = dbData.users[userIndex];
+    const hasNewDocs = 
+      (updates.cnicFront && updates.cnicFront !== originalUser.cnicFront) ||
+      (updates.cnicBack && updates.cnicBack !== originalUser.cnicBack) ||
+      (updates.license && updates.license !== originalUser.license);
+
     dbData.users[userIndex] = { ...dbData.users[userIndex], ...updates };
     saveDatabase();
+
+    if (hasNewDocs) {
+      // Find admins and managers
+      dbData.users.filter(u => u.role === 'admin' || u.role === 'manager').forEach(staff => {
+        const docEmailHtml = getEmailTemplate(
+          'Customer Document Verification Required',
+          `
+          <p>Dear ${staff.name},</p>
+          <p>A customer has updated or uploaded their identity credentials (CNIC or Driving License) and is waiting for document verification:</p>
+          
+          <table class="details-table" style="width: 100%; border-collapse: collapse; margin: 20px 0; border: 1px solid #e2e8f0;">
+            <tr style="background-color: #f8fafc;">
+              <td class="label" style="padding: 12px; font-weight: bold; border: 1px solid #e2e8f0; width: 30%;">Customer Name</td>
+              <td class="value" style="padding: 12px; border: 1px solid #e2e8f0;">${originalUser.name}</td>
+            </tr>
+            <tr>
+              <td class="label" style="padding: 12px; font-weight: bold; border: 1px solid #e2e8f0;">Customer Email</td>
+              <td class="value" style="padding: 12px; border: 1px solid #e2e8f0;">${originalUser.email}</td>
+            </tr>
+            <tr style="background-color: #f8fafc;">
+              <td class="label" style="padding: 12px; font-weight: bold; border: 1px solid #e2e8f0;">Submitted Documents</td>
+              <td class="value" style="padding: 12px; border: 1px solid #e2e8f0;">
+                ${updates.cnicFront ? '✓ CNIC Front Card<br/>' : ''}
+                ${updates.cnicBack ? '✓ CNIC Back Card<br/>' : ''}
+                ${updates.license ? '✓ Driving License Card' : ''}
+              </td>
+            </tr>
+          </table>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.APP_URL || 'http://localhost:3000'}/${staff.role === 'admin' ? 'admin-dashboard' : 'manager-dashboard'}?view=users" class="button" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">Go to Verification Panel</a>
+          </div>
+          
+          <p>Best regards,<br>EliteDrive System</p>
+          `
+        );
+
+        sendEmail({
+          to: staff.email,
+          subject: `🪪 ACTION REQUIRED: Customer Document Verification Required - ${originalUser.name}`,
+          html: docEmailHtml,
+          text: `Dear ${staff.name},\n\nCustomer ${originalUser.name} has uploaded their documents for verification. Please review them on the dashboard.\n\nBest regards,\nEliteDrive System`
+        });
+      });
+    }
 
     const { passwordHash, ...userResponse } = dbData.users[userIndex];
     res.json(userResponse);
@@ -1625,7 +1683,57 @@ CRITICAL RULE FOR IDS: The "recommendedVehicleIds" and "vehicleId" values in you
         createdAt: new Date().toISOString(),
         link: staff.role === 'admin' ? '/admin-dashboard?view=bookings' : '/manager-dashboard?view=bookings'
       });
+
+      // Send actual email notification to Admins and Managers
+      const staffEmailHtml = getEmailTemplate(
+        'New Booking Approval Required',
+        `
+        <p>Dear ${staff.name},</p>
+        <p>A new booking has been placed and is currently <strong>Pending Approval</strong>. Please review the details in the management portal to approve or reject the request:</p>
+        
+        <table class="details-table" style="width: 100%; border-collapse: collapse; margin: 20px 0; border: 1px solid #e2e8f0;">
+          <tr style="background-color: #f8fafc;">
+            <td class="label" style="padding: 12px; font-weight: bold; border: 1px solid #e2e8f0; width: 30%;">Booking ID</td>
+            <td class="value" style="padding: 12px; border: 1px solid #e2e8f0;">${newBooking.id}</td>
+          </tr>
+          <tr>
+            <td class="label" style="padding: 12px; font-weight: bold; border: 1px solid #e2e8f0;">Customer</td>
+            <td class="value" style="padding: 12px; border: 1px solid #e2e8f0;">${userProfile?.name || 'Customer'} (${userProfile?.email || ''})</td>
+          </tr>
+          <tr style="background-color: #f8fafc;">
+            <td class="label" style="padding: 12px; font-weight: bold; border: 1px solid #e2e8f0;">Vehicle</td>
+            <td class="value" style="padding: 12px; border: 1px solid #e2e8f0;">${vehicle.name} (${vehicle.type})</td>
+          </tr>
+          <tr>
+            <td class="label" style="padding: 12px; font-weight: bold; border: 1px solid #e2e8f0;">Duration</td>
+            <td class="value" style="padding: 12px; border: 1px solid #e2e8f0;">${newBooking.startDate} to ${newBooking.endDate}</td>
+          </tr>
+          <tr style="background-color: #f8fafc;">
+            <td class="label" style="padding: 12px; font-weight: bold; border: 1px solid #e2e8f0;">Total Price</td>
+            <td class="value" style="padding: 12px; border: 1px solid #e2e8f0;">PKR ${newBooking.totalPrice.toLocaleString()}</td>
+          </tr>
+        </table>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.APP_URL || 'http://localhost:3000'}/${staff.role === 'admin' ? 'admin-dashboard' : 'manager-dashboard'}?view=bookings" class="button" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">Go to Admin Portal</a>
+        </div>
+        
+        <p>Best regards,<br>EliteDrive System</p>
+        `
+      );
+
+      sendEmail({
+        to: staff.email,
+        subject: `🔔 ACTION REQUIRED: New Booking Approval Needed [ID: ${newBooking.id}]`,
+        html: staffEmailHtml,
+        text: `Dear ${staff.name},\n\nA new booking for ${vehicle.name} by ${userProfile?.name || 'Customer'} is pending approval. Please review it on the dashboard.\n\nBest regards,\nEliteDrive System`
+      });
     });
+
+    // Run active fraud-alerts scan for this new booking
+    if (userProfile) {
+      checkForBookingFraudThreats(newBooking, userProfile, vehicle);
+    }
 
     saveDatabase();
     res.json(newBooking);

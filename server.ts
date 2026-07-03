@@ -9,6 +9,8 @@ import webPush from 'web-push';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import { INITIAL_VEHICLES, User, Vehicle, Booking, Notification, RoleRequest, Invitation, Incident, Dispute, EChallan } from './src/types';
+import { getSqliteDatabasePath, loadCollectionsFromSqlite, saveCollectionsToSqlite } from './src/utils/sqliteStore';
+import { ensureSeedUsers } from './src/utils/seedUsers';
 
 import { createServer as createHttpServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -328,6 +330,9 @@ let dbData: DbData = {
   pushSubscriptions: [],
 };
 
+const RESET_DATABASE_ON_START = false;
+const SQLITE_DB_PATH = getSqliteDatabasePath();
+
 function hashPassword(password: string): string {
   return crypto.pbkdf2Sync(password, 'elitedrivesalt', 1000, 64, 'sha512').toString('hex');
 }
@@ -435,7 +440,7 @@ function sanitizeLoadedData() {
   dbData.echallans = dbData.echallans || [];
   dbData.sentEmails = dbData.sentEmails || [];
   dbData.pushSubscriptions = dbData.pushSubscriptions || [];
-  
+
   dbData.users.forEach(u => {
     if (u.outstandingBalance === undefined) u.outstandingBalance = 0;
     if (u.isBlacklisted === undefined) u.isBlacklisted = false;
@@ -454,6 +459,78 @@ function sanitizeLoadedData() {
 }
 
 async function loadDatabase() {
+  const loadFromPersistence = async () => {
+    try {
+      const sqliteData = loadCollectionsFromSqlite(SQLITE_DB_PATH);
+      if (Object.keys(sqliteData).length > 0) {
+        const loadedData: Partial<DbData> = {};
+        for (const [name, data] of Object.entries(sqliteData)) {
+          loadedData[name as keyof DbData] = data as any;
+        }
+
+        dbData = {
+          users: loadedData.users || [],
+          vehicles: loadedData.vehicles || [],
+          bookings: loadedData.bookings || [],
+          notifications: loadedData.notifications || [],
+          roleRequests: loadedData.roleRequests || [],
+          invitations: loadedData.invitations || [],
+          incidents: loadedData.incidents || [],
+          disputes: loadedData.disputes || [],
+          echallans: loadedData.echallans || [],
+          sentEmails: loadedData.sentEmails || [],
+          pushSubscriptions: loadedData.pushSubscriptions || [],
+        };
+
+        sanitizeLoadedData();
+        ensureSeedUsers(dbData as any);
+        saveDatabase();
+        console.log(`[Database] Loaded persisted data from SQLite at ${SQLITE_DB_PATH}`);
+        return;
+      }
+    } catch (err) {
+      console.error('[Database] Failed to load from SQLite, continuing with fallback:', err);
+    }
+
+    if (fs.existsSync(DB_PATH)) {
+      try {
+        const content = fs.readFileSync(DB_PATH, 'utf8');
+        dbData = JSON.parse(content);
+        sanitizeLoadedData();
+        saveCollectionsToSqlite({
+          users: dbData.users,
+          vehicles: dbData.vehicles,
+          bookings: dbData.bookings,
+          notifications: dbData.notifications,
+          roleRequests: dbData.roleRequests,
+          invitations: dbData.invitations,
+          incidents: dbData.incidents,
+          disputes: dbData.disputes,
+          echallans: dbData.echallans,
+          sentEmails: dbData.sentEmails,
+          pushSubscriptions: dbData.pushSubscriptions,
+        }, SQLITE_DB_PATH);
+        console.log(`[Database] Loaded from local db.json fallback and mirrored to SQLite at ${SQLITE_DB_PATH}.`);
+        return;
+      } catch (err) {
+        console.error('[Database] Failed to read local db.json fallback:', err);
+      }
+    }
+
+    console.log('[Database] No persisted data found. Seeding default admin and manager accounts.');
+    seedInitialDatabase();
+    return;
+  };
+
+  if (RESET_DATABASE_ON_START) {
+    console.log('[Database] RESET_DATABASE_ON_START is enabled. Starting from a clean empty dataset.');
+    await loadFromPersistence();
+    return;
+  }
+
+  await loadFromPersistence();
+  return;
+
   // 1. Try Loading from PostgreSQL if configured (Best for automatic table creation & direct connection)
   if (pgPool) {
     try {
@@ -626,13 +703,23 @@ function saveDatabase() {
   }
   isSaving = true;
 
-  fs.promises.writeFile(DB_PATH, JSON.stringify(dbData, null, 2), 'utf8')
+  Promise.resolve()
     .then(() => {
-      if (pgPool) {
-        return saveAllCollectionsToPg();
-      } else if (supabaseClient) {
-        return saveAllCollectionsToSupabase();
-      }
+      const payload = {
+        users: dbData.users,
+        vehicles: dbData.vehicles,
+        bookings: dbData.bookings,
+        notifications: dbData.notifications,
+        roleRequests: dbData.roleRequests,
+        invitations: dbData.invitations,
+        incidents: dbData.incidents,
+        disputes: dbData.disputes,
+        echallans: dbData.echallans,
+        sentEmails: dbData.sentEmails,
+        pushSubscriptions: dbData.pushSubscriptions,
+      };
+      saveCollectionsToSqlite(payload, SQLITE_DB_PATH);
+      return fs.promises.writeFile(DB_PATH, JSON.stringify(dbData, null, 2), 'utf8');
     })
     .catch(err => {
       console.error('[Database] Async save error:', err);
@@ -715,7 +802,7 @@ function enqueueJob(type: string, bookingId: string, task: () => Promise<any>): 
 function seedInitialDatabase() {
   dbData = {
     users: [],
-    vehicles: INITIAL_VEHICLES.map((v) => ({ ...v, createdAt: new Date().toISOString() })),
+    vehicles: [],
     bookings: [],
     notifications: [],
     roleRequests: [],
@@ -727,43 +814,7 @@ function seedInitialDatabase() {
     pushSubscriptions: [],
   };
 
-  // Seed default admin and bypassed accounts
-  const adminEmails = ['ahmed@gmail.com', 'test@test.com', 'inotfarhan@gmail.com', 'testingdaflow@test.com'];
-  const bypassedEmails = ['ahmed12@gmail.com', 'tj334767@gmail.com'];
-  const defaultPassHash = hashPassword('password');
-
-  adminEmails.forEach((email) => {
-    dbData.users.push({
-      id: `usr_seed_${email.replace(/[@.]/g, '')}`,
-      name: email === 'inotfarhan@gmail.com' ? 'Muhammad Farhan' : email === 'ahmed@gmail.com' ? 'Ahmed' : 'System Admin',
-      email: email.toLowerCase(),
-      phone: '03001234567',
-      role: 'admin',
-      rewardPoints: 100,
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100',
-      passwordHash: defaultPassHash,
-      emailVerified: true,
-      phoneVerified: true,
-      createdAt: new Date().toISOString(),
-    });
-  });
-
-  bypassedEmails.forEach((email) => {
-    dbData.users.push({
-      id: `usr_seed_${email.replace(/[@.]/g, '')}`,
-      name: email === 'ahmed12@gmail.com' ? 'Ahmed' : 'Test User',
-      email: email.toLowerCase(),
-      phone: '03009876543',
-      role: 'customer',
-      rewardPoints: 50,
-      avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=100',
-      passwordHash: defaultPassHash,
-      emailVerified: true,
-      phoneVerified: true,
-      createdAt: new Date().toISOString(),
-    });
-  });
-
+  ensureSeedUsers(dbData);
   saveDatabase();
 }
 
@@ -2763,7 +2814,14 @@ CRITICAL RULE FOR IDS: The "recommendedVehicleIds" and "vehicleId" values in you
   // --- STATIC FILES / VITE SERVING ---
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      configFile: path.resolve(process.cwd(), 'vite.config.ts'),
+      server: {
+        middlewareMode: true,
+        hmr: false,
+        watch: {
+          ignored: ['**/db.json', '**/server.ts', '**/server.tsx'],
+        },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

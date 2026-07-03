@@ -199,22 +199,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // On mount
+  // On mount, load the initial data once.
   useEffect(() => {
     const init = async () => {
       await refreshData();
       setIsAuthReady(true);
     };
     init();
-
-    // Small polling loop for updates (every 5 seconds)
-    const interval = setInterval(() => {
-      if (localStorage.getItem('elitedrive_token')) {
-        refreshData();
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
   }, []);
 
   // --- REAL-TIME WEBSOCKET NOTIFICATION LISTENER ---

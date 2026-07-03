@@ -48,6 +48,31 @@ function sendLiveNotification(userId: string, notification: Notification) {
   }
 }
 
+function listenWithPortFallback(server: any, initialPort: number, host = '0.0.0.0', maxRetries = 10): Promise<number> {
+  return new Promise((resolve, reject) => {
+    let port = initialPort;
+
+    const onError = (err: any) => {
+      if (err && err.code === 'EADDRINUSE' && port < initialPort + maxRetries) {
+        const nextPort = port + 1;
+        console.warn(`[Server] Port ${port} is already in use. Trying ${nextPort}...`);
+        port = nextPort;
+        server.listen(port, host);
+        return;
+      }
+
+      server.off('error', onError);
+      reject(err);
+    };
+
+    server.on('error', onError);
+    server.listen(port, host, () => {
+      server.off('error', onError);
+      resolve(port);
+    });
+  });
+}
+
 // --- WEB PUSH NOTIFICATION SYSTEM ---
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "BHC5We6pu82m84b2AiBtAanxxzMvORuswuq6bIdqHIrEkhEP95igPuuGMUxdmYmh9fctVsAcCEET1RYAZNt2_oE";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "khEP95igPuuGMUxdmYmh9fctVsAcCEET1RYAZNt2_oE";
@@ -533,6 +558,8 @@ function sanitizeLoadedData() {
 }
 
 async function loadDatabase() {
+  const dbFileExists = fs.existsSync(SQLITE_DB_PATH);
+
   try {
     const sqliteData = loadCollectionsFromSqlite(SQLITE_DB_PATH);
     if (Object.keys(sqliteData).length > 0) {
@@ -556,13 +583,16 @@ async function loadDatabase() {
       };
 
       sanitizeLoadedData();
-      ensureSeedUsers(dbData as any);
-      saveDatabase();
       console.log(`[Database] Loaded persisted data from SQLite at ${SQLITE_DB_PATH}`);
       return;
     }
   } catch (err) {
     console.error('[Database] Failed to load from SQLite:', err);
+  }
+
+  if (dbFileExists) {
+    console.log(`[Database] SQLite file exists at ${SQLITE_DB_PATH} but contains no persisted collections. Preserving the existing database file and continuing without reseeding.`);
+    return;
   }
 
   console.log('[Database] No persisted data found in SQLite. Seeding default admin and manager accounts.');
@@ -769,7 +799,7 @@ function checkRole(roles: string[]) {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = parseInt(process.env.PORT || '3000', 10);
 
   await loadDatabase();
 
@@ -904,42 +934,40 @@ async function startServer() {
       return res.status(400).json({ error: 'Email address is required for sending verification' });
     }
 
-    // Generate random 6-digit OTP code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate a one-time verification token
+    const token = crypto.randomBytes(24).toString('hex');
 
-    // Store in DB
-    const userObj = dbData.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (userObj) {
-      userObj.emailVerificationCode = verificationCode;
-    } else {
-      dbData.transientVerificationCodes = dbData.transientVerificationCodes || {};
-      dbData.transientVerificationCodes[email.toLowerCase()] = verificationCode;
-    }
+    // Store token -> email mapping in transient store (expires handled implicitly for this demo)
+    dbData.transientVerificationCodes = dbData.transientVerificationCodes || {};
+    dbData.transientVerificationCodes[token] = email.toLowerCase();
     saveDatabase();
+
+    const confirmUrlBase = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const confirmUrl = `${confirmUrlBase}/api/auth/confirm-email?token=${token}`;
 
     const emailHtml = getEmailTemplate(
       'Verify Your EliteDrive Account',
       `
       <p>Dear ${name},</p>
-      <p>Thank you for choosing <strong>EliteDrive Pakistan</strong>. To complete your account verification, please use the following 6-digit verification code:</p>
-      
+      <p>Thank you for choosing <strong>EliteDrive Pakistan</strong>. Please verify your email by clicking the button below:</p>
+
       <div style="text-align: center; margin: 30px 0;">
-        <span style="font-size: 36px; font-weight: 900; letter-spacing: 0.2em; background-color: #f1f5f9; padding: 15px 30px; border-radius: 12px; color: #1e293b; border: 1px solid #e2e8f0; display: inline-block;">
-          ${verificationCode}
-        </span>
+        <a href="${confirmUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 700; display: inline-block;">Verify Email</a>
       </div>
-      
-      <p>This verification code is valid for 15 minutes. Please do not share this code with anyone.</p>
-      <p>If you did not request this code, please secure your account or ignore this email.</p>
+
+      <p>If the button above does not work, copy and paste the following link into your browser:</p>
+      <p><a href="${confirmUrl}">${confirmUrl}</a></p>
+
+      <p>If you did not request this verification, please ignore this email.</p>
       <p>Best regards,<br>The EliteDrive Team</p>
       `
     );
 
     sendEmail({
       to: email,
-      subject: `🔑 EliteDrive Verification Code: ${verificationCode}`,
+      subject: `🔑 Verify your EliteDrive account`,
       html: emailHtml,
-      text: `Dear ${name},\n\nYour EliteDrive account verification code is: ${verificationCode}\n\nBest regards,\nEliteDrive Team`
+      text: `Please verify your EliteDrive account by visiting: ${confirmUrl}`
     })
       .then(() => {
         res.json({ success: true, message: 'Verification email sent successfully!', email });
@@ -947,6 +975,37 @@ async function startServer() {
       .catch((err: any) => {
         res.status(500).json({ error: `Failed to send email: ${err.message}` });
       });
+  });
+
+  // Email confirmation endpoint for one-click verification links
+  app.get('/api/auth/confirm-email', (req: any, res) => {
+    const token = String(req.query.token || '');
+    if (!token) return res.status(400).send('Missing token');
+
+    const mapping = dbData.transientVerificationCodes || {};
+    const email = mapping[token];
+    if (!email) {
+      // Token not found or expired
+      const redirectTo = (process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`) + '/profile?email_verified=0';
+      return res.redirect(redirectTo);
+    }
+
+    // Mark user as verified if present
+    const userObj = dbData.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    if (userObj) {
+      userObj.emailVerified = true;
+      // remove any legacy code field
+      delete (userObj as any).emailVerificationCode;
+    }
+
+    // Remove token mapping
+    delete mapping[token];
+    dbData.transientVerificationCodes = mapping;
+    saveDatabase();
+
+    // Redirect back to profile with success flag
+    const redirectTo = (process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`) + '/profile?email_verified=1';
+    return res.redirect(redirectTo);
   });
 
   app.post('/api/auth/verify-email', (req: any, res) => {
@@ -3003,9 +3062,11 @@ CRITICAL RULE FOR IDS: The "recommendedVehicleIds" and "vehicleId" values in you
     });
   });
 
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`[EliteDrive] Fullstack server (HTTP & WS) listening on http://localhost:${PORT}`);
-  });
+  const actualPort = await listenWithPortFallback(server, PORT, '0.0.0.0');
+  console.log(`[EliteDrive] Fullstack server (HTTP & WS) listening on http://localhost:${actualPort}`);
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('[Server] Failed to start:', err);
+  process.exit(1);
+});

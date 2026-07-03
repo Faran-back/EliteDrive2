@@ -15,6 +15,50 @@ function ensureParentDir(filePath: string) {
   }
 }
 
+function getCorruptBackupPath(dbPath: string): string {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `${dbPath}.corrupt.${timestamp}`;
+}
+
+function cleanupOldCorruptBackups(dbPath: string, keep = 5): void {
+  const dir = path.dirname(dbPath);
+  const baseName = path.basename(dbPath);
+  const corruptFiles = fs.readdirSync(dir)
+    .filter((name) => name.startsWith(`${baseName}.corrupt.`))
+    .map((name) => ({
+      name,
+      time: fs.statSync(path.join(dir, name)).mtime.getTime(),
+    }))
+    .sort((a, b) => b.time - a.time);
+
+  for (let i = keep; i < corruptFiles.length; i += 1) {
+    const oldFile = path.join(dir, corruptFiles[i].name);
+    try {
+      fs.unlinkSync(oldFile);
+      console.info(`[SQLite] Removed old corrupt backup file: ${oldFile}`);
+    } catch (err) {
+      console.error('[SQLite] Failed to remove old corrupt backup file:', err);
+    }
+  }
+}
+
+function backupCorruptedDatabase(dbPath: string): void {
+  if (!fs.existsSync(dbPath)) return;
+
+  const backupPath = getCorruptBackupPath(dbPath);
+  try {
+    fs.renameSync(dbPath, backupPath);
+    console.warn(`[SQLite] Corrupt database file moved to ${backupPath}`);
+    cleanupOldCorruptBackups(dbPath);
+  } catch (err) {
+    console.error('[SQLite] Failed to back up corrupt database file:', err);
+  }
+}
+
+function isSqliteCorruptionError(error: any): boolean {
+  return error && (error.code === 'SQLITE_CORRUPT' || error.message?.includes('disk image is malformed'));
+}
+
 export function getSqliteDatabasePath(): string {
   return process.env.SQLITE_DB_PATH || DEFAULT_DB_PATH;
 }
@@ -22,8 +66,22 @@ export function getSqliteDatabasePath(): string {
 export function saveCollectionsToSqlite(collections: SqliteCollectionMap, dbPath = getSqliteDatabasePath()): boolean {
   ensureParentDir(dbPath);
 
-  const db = new Database(dbPath);
+  let db: Database | undefined;
   try {
+    try {
+      db = new Database(dbPath);
+    } catch (err: any) {
+      if (isSqliteCorruptionError(err)) {
+        backupCorruptedDatabase(dbPath);
+        db = new Database(dbPath);
+      } else {
+        throw err;
+      }
+    }
+
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = NORMAL');
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS collections (
         name TEXT PRIMARY KEY,
@@ -49,7 +107,7 @@ export function saveCollectionsToSqlite(collections: SqliteCollectionMap, dbPath
     })));
     return true;
   } finally {
-    db.close();
+    db?.close();
   }
 }
 
@@ -58,8 +116,26 @@ export function loadCollectionsFromSqlite(dbPath = getSqliteDatabasePath()): Sql
     return {};
   }
 
-  const db = new Database(dbPath);
+  let db: Database | undefined;
   try {
+    try {
+      db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    } catch (err: any) {
+      if (isSqliteCorruptionError(err)) {
+        backupCorruptedDatabase(dbPath);
+        return {};
+      }
+      throw err;
+    }
+
+    const integrityRaw = db.pragma('integrity_check', { simple: true });
+    const integrity = Array.isArray(integrityRaw) ? integrityRaw[0] : integrityRaw;
+    if (integrity !== 'ok') {
+      db.close();
+      backupCorruptedDatabase(dbPath);
+      return {};
+    }
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS collections (
         name TEXT PRIMARY KEY,
@@ -73,7 +149,14 @@ export function loadCollectionsFromSqlite(dbPath = getSqliteDatabasePath()): Sql
       result[row.name] = JSON.parse(row.data);
     }
     return result;
+  } catch (err: any) {
+    if (isSqliteCorruptionError(err)) {
+      db?.close();
+      backupCorruptedDatabase(dbPath);
+      return {};
+    }
+    throw err;
   } finally {
-    db.close();
+    db?.close();
   }
 }

@@ -40,6 +40,7 @@ const Profile: React.FC = () => {
     setupRecaptcha, 
     sendPhoneVerificationCode, 
     verifyPhoneCode,
+    refreshData,
     bookings
   } = useStore();
   const navigate = useNavigate();
@@ -66,6 +67,27 @@ const Profile: React.FC = () => {
   useEffect(() => {
     setupRecaptcha('recaptcha-container');
   }, []);
+
+  useEffect(() => {
+    const qp = new URLSearchParams(location.search);
+    const ev = qp.get('email_verified');
+    if (!ev) return;
+
+    (async () => {
+      if (ev === '1') {
+        showToast('Email verified successfully!', 'success');
+        try {
+          await refreshData();
+        } catch (err) {
+          console.error('Failed to refresh data after email verification:', err);
+        }
+        navigate(location.pathname, { replace: true });
+      } else {
+        showToast('Email verification failed or expired.', 'error');
+        navigate(location.pathname, { replace: true });
+      }
+    })();
+  }, [location.search, refreshData, navigate, showToast, location.pathname]);
 
   const {
     register,

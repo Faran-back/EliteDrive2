@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+const VERBOSE_LOGS = process.env.VERBOSE_LOGS === 'true' || process.env.DEBUG === 'true';
+
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -21,9 +23,13 @@ const debugLogs: string[] = [];
 
 function addDebugLog(msg: string) {
   const logStr = `${new Date().toISOString()} - ${msg}`;
-  console.log(logStr);
+  if (VERBOSE_LOGS) console.log(logStr);
   debugLogs.push(logStr);
   if (debugLogs.length > 500) debugLogs.shift();
+}
+
+function infoLog(msg: string) {
+  if (VERBOSE_LOGS) console.log(msg);
 }
 
 function sendLiveNotification(userId: string, notification: Notification) {
@@ -133,7 +139,7 @@ let pgPool: pg.Pool | null = null;
 const DATABASE_URL = process.env.DATABASE_URL;
 
 if (DATABASE_URL) {
-  console.log('[Database] DATABASE_URL is configured. Initializing PostgreSQL pool...');
+  infoLog('[Database] DATABASE_URL is configured. Initializing PostgreSQL pool...');
   pgPool = new Pool({
     connectionString: DATABASE_URL,
     ssl: DATABASE_URL.includes('localhost') || DATABASE_URL.includes('127.0.0.1')
@@ -141,7 +147,7 @@ if (DATABASE_URL) {
       : { rejectUnauthorized: false }
   });
 } else {
-  console.log('[Database] No DATABASE_URL found.');
+  infoLog('[Database] No DATABASE_URL found.');
 }
 
 // Initialize Supabase client if credentials are provided
@@ -151,10 +157,10 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process
 let supabaseClient: any = null;
 
 if (SUPABASE_URL && SUPABASE_KEY) {
-  console.log('[Database] Supabase credentials provided. Initializing Supabase client...');
+  infoLog('[Database] Supabase credentials provided. Initializing Supabase client...');
   supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 } else {
-  console.log('[Database] No Supabase credentials found.');
+  infoLog('[Database] No Supabase credentials found.');
 }
 
 
@@ -583,7 +589,7 @@ async function loadDatabase() {
       };
 
       sanitizeLoadedData();
-      console.log(`[Database] Loaded persisted data from SQLite at ${SQLITE_DB_PATH}`);
+      infoLog(`[Database] Loaded persisted data from SQLite at ${SQLITE_DB_PATH}`);
       return;
     }
   } catch (err) {
@@ -591,11 +597,11 @@ async function loadDatabase() {
   }
 
   if (dbFileExists) {
-    console.log(`[Database] SQLite file exists at ${SQLITE_DB_PATH} but contains no persisted collections. Preserving the existing database file and continuing without reseeding.`);
+    infoLog(`[Database] SQLite file exists at ${SQLITE_DB_PATH} but contains no persisted collections. Preserving the existing database file and continuing without reseeding.`);
     return;
   }
 
-  console.log('[Database] No persisted data found in SQLite. Seeding default admin and manager accounts.');
+  infoLog('[Database] No persisted data found in SQLite. Seeding default admin and manager accounts.');
   seedInitialDatabase();
 }
 
@@ -3063,7 +3069,7 @@ CRITICAL RULE FOR IDS: The "recommendedVehicleIds" and "vehicleId" values in you
   });
 
   const actualPort = await listenWithPortFallback(server, PORT, '0.0.0.0');
-  console.log(`[EliteDrive] Fullstack server (HTTP & WS) listening on http://localhost:${actualPort}`);
+  infoLog(`[EliteDrive] Fullstack server (HTTP & WS) listening on http://localhost:${actualPort}`);
 }
 
 startServer().catch((err) => {

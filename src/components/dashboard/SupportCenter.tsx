@@ -370,14 +370,14 @@ ELITEDRIVE COMPLIANCE POLICIES:
 
                         {/* Expandable action zone */}
                         {selectedIncidentId === inc.id ? (
-                          <div className="p-4 bg-slate-50 border border-slate-150 rounded-2xl space-y-3 animate-in slide-in-from-top-2 duration-200">
-                            <div className="grid grid-cols-2 gap-3">
+                          <div className="p-6 bg-slate-50 border border-slate-150 rounded-2xl space-y-4 animate-in slide-in-from-top-2 duration-200 shadow-inner">
+                            <div className="grid grid-cols-2 gap-4">
                               <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1">Assigned Status</label>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">Assigned Status</label>
                                 <select 
                                   value={incidentStatusField}
                                   onChange={(e) => setIncidentStatusField(e.target.value)}
-                                  className="w-full text-xs bg-white border border-slate-200 h-10 px-3 rounded-lg font-bold text-slate-800"
+                                  className="w-full text-xs bg-white border border-slate-200 h-11 px-4 rounded-xl font-bold text-slate-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 hover:border-slate-300 transition-all cursor-pointer"
                                 >
                                   <option value="under_review">Under Review</option>
                                   <option value="action_taken">Action Taken (Deducted/Logged)</option>
@@ -385,11 +385,11 @@ ELITEDRIVE COMPLIANCE POLICIES:
                                 </select>
                               </div>
                               <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1">Resolution Category</label>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">Resolution Category</label>
                                 <select 
                                   value={incidentActionType}
                                   onChange={(e) => setIncidentActionType(e.target.value)}
-                                  className="w-full text-xs bg-white border border-slate-200 h-10 px-3 rounded-lg font-bold text-slate-800"
+                                  className="w-full text-xs bg-white border border-slate-200 h-11 px-4 rounded-xl font-bold text-slate-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 hover:border-slate-300 transition-all cursor-pointer"
                                 >
                                   <option value="insurance_claim">Insurance Claim Processing</option>
                                   <option value="deposit_deduction">Security Deposit Chargeback</option>
@@ -400,27 +400,27 @@ ELITEDRIVE COMPLIANCE POLICIES:
                             </div>
 
                             <div>
-                              <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1">Resolving Notes / Memo</label>
+                              <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">Resolving Notes / Memo</label>
                               <textarea 
                                 value={incidentNotes}
                                 onChange={(e) => setIncidentNotes(e.target.value)}
                                 placeholder="Describe final verdict or details on penalties/deductions..."
-                                className="w-full text-xs bg-white border border-slate-200 rounded-lg p-3 h-16 font-medium text-slate-800"
+                                className="w-full text-xs bg-white border border-slate-200 rounded-xl p-4 h-24 font-medium text-slate-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 hover:border-slate-300 transition-all resize-none"
                               />
                             </div>
 
-                            <div className="flex gap-2">
+                            <div className="flex gap-2.5">
                               <button
                                 type="button"
                                 onClick={() => setSelectedIncidentId(null)}
-                                className="px-4 py-2 text-xs font-black uppercase border border-slate-200 text-slate-600 rounded-lg"
+                                className="px-5 py-2.5 text-xs font-black uppercase border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl shadow-xs transition-all active:scale-95"
                               >
                                 Cancel
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleIncidentStatusUpdate(inc.id)}
-                                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase rounded-lg"
+                                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95"
                               >
                                 Commit Status
                               </button>

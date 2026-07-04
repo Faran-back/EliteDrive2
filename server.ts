@@ -2817,7 +2817,8 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
     if (idx === -1) return res.status(404).json({ error: 'Incident not found' });
 
     dbData.incidents[idx].status = status || dbData.incidents[idx].status;
-    dbData.incidents[idx].actionType = actionType || dbData.incidents[idx].actionType;
+    dbData.incidents[idx].actionType = actionType !== undefined ? actionType : dbData.incidents[idx].actionType;
+    dbData.incidents[idx].notes = notes !== undefined ? notes : dbData.incidents[idx].notes;
 
     // Send status notification to customer
     dbData.notifications.push({

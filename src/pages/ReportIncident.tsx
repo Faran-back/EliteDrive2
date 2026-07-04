@@ -652,17 +652,17 @@ const ReportIncident: React.FC = () => {
                               )}
                             </div>
                             <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                              <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Police FIR Registration Entry No</span>
-                              {inc.firNumber ? (
-                                <p className="text-xs font-extrabold text-blue-700 mt-1 font-mono uppercase">{inc.firNumber}</p>
-                              ) : (
-                                <p className="text-xs font-medium text-slate-400 mt-1">No police report attached</p>
-                              )}
-                            </div>
+                            <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Police FIR Registration Entry No</span>
+                            {inc.firNumber ? (
+                              <p className="text-xs font-extrabold text-blue-700 mt-1 font-mono uppercase">{inc.firNumber}</p>
+                            ) : (
+                              <p className="text-xs font-medium text-slate-400 mt-1">No police report attached</p>
+                            )}
                           </div>
+                        </div>
 
-                          {/* Damage Photos */}
-                          {inc.photos && inc.photos.length > 0 && (
+                        {/* Damage Photos */}
+                        {inc.photos && inc.photos.length > 0 && (
                             <div>
                               <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Damage Scan Attachments ({inc.photos.length})</span>
                               <div className="flex gap-3 overflow-x-auto py-1">
@@ -676,6 +676,26 @@ const ReportIncident: React.FC = () => {
                           )}
                         </div>
                       </div>
+
+                      {/* Administrative Action Log / Verdict */}
+                      {inc.actionType && (
+                        <div className="mt-6 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in duration-300">
+                          <div>
+                            <span className="text-[9px] font-black uppercase text-indigo-500 tracking-wider block mb-1">Administrative Action log</span>
+                            <h4 className="text-sm font-extrabold text-slate-800">
+                              Resolved Category: <span className="text-indigo-700 font-black">{(inc.actionType || '').replace('_', ' ').toUpperCase()}</span>
+                            </h4>
+                            {inc.notes && (
+                              <p className="text-xs text-slate-600 mt-1 font-medium italic">
+                                "{inc.notes}"
+                              </p>
+                            )}
+                          </div>
+                          <span className="px-3 py-1 bg-white text-indigo-700 border border-indigo-200 text-[10px] font-black uppercase rounded-lg shadow-2xs self-start md:self-auto">
+                            Updated by Admin
+                          </span>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

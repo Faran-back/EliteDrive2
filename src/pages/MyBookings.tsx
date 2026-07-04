@@ -804,6 +804,21 @@ const MyBookings: React.FC = () => {
                                     {inc.firNumber && (
                                       <p className="text-[10px] font-mono text-blue-700 bg-blue-50 py-1 px-2 rounded-md mt-2 w-fit">Police FIR Reference: {inc.firNumber}</p>
                                     )}
+
+                                    {/* Administrative Action Log / Verdict */}
+                                    {inc.actionType && (
+                                      <div className="mt-4 p-3.5 bg-indigo-50 border border-indigo-100 rounded-xl space-y-1">
+                                        <span className="text-[9px] font-black uppercase text-indigo-500 tracking-wider block">Administrative Action log</span>
+                                        <h4 className="text-xs font-extrabold text-slate-800">
+                                          Resolved Category: <span className="text-indigo-700 font-black">{(inc.actionType || '').replace('_', ' ').toUpperCase()}</span>
+                                        </h4>
+                                        {inc.notes && (
+                                          <p className="text-[11px] text-slate-600 font-medium italic mt-0.5">
+                                            "{inc.notes}"
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
 

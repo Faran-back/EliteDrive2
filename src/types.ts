@@ -152,6 +152,7 @@ export interface Incident {
   firNumber?: string;
   status: 'filed' | 'under_review' | 'action_taken' | 'closed';
   actionType?: 'charge' | 'approve' | 'reject' | 'none';
+  notes?: string;
   filedByAdmin?: boolean;
   insuranceTier?: 'none' | 'basic' | 'premium';
   insuranceCoverageDetails?: string;

@@ -319,7 +319,7 @@ async function sendEmail({ to, subject, html, text }: { to: string; subject: str
         text,
         html,
       });
-      console.log(`[Email Service] Actual email sent to ${to} successfully.`);
+      console.log(`[Email Service] Email sent to ${to} successfully.`);
     } catch (err: any) {
       console.error(`[Email Service] Failed to send actual SMTP email to ${to}:`, err.message);
       sentEmailObj.status = 'failed';
@@ -3144,7 +3144,7 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
   });
 
   const actualPort = await listenWithPortFallback(server, PORT, '0.0.0.0');
-  infoLog(`[EliteDrive] Fullstack server (HTTP & WS) listening on http://localhost:${actualPort}`);
+  console.log(`[EliteDrive] Fullstack server (HTTP & WS) listening on http://localhost:${actualPort}`);
 }
 
 startServer().catch((err) => {

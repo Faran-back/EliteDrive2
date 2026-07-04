@@ -15,6 +15,7 @@ interface CustomSelectProps {
   placeholder?: string;
   icon?: React.ReactNode;
   className?: string;
+  buttonClassName?: string;
 }
 
 const CustomSelect: React.FC<CustomSelectProps> = ({
@@ -24,7 +25,8 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
   label,
   placeholder = 'Select option...',
   icon,
-  className = ''
+  className = '',
+  buttonClassName = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -41,6 +43,10 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const defaultButtonClass = `w-full flex items-center justify-between px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold transition-all hover:bg-slate-100 focus:ring-2 focus:ring-blue-600/20 ${
+    isOpen ? 'ring-2 ring-blue-600/20 bg-white shadow-sm' : ''
+  }`;
+
   return (
     <div className={`space-y-2 relative ${className}`} ref={containerRef}>
       {label && (
@@ -51,9 +57,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold transition-all hover:bg-slate-100 focus:ring-2 focus:ring-blue-600/20 ${
-          isOpen ? 'ring-2 ring-blue-600/20 bg-white shadow-sm' : ''
-        }`}
+        className={buttonClassName || defaultButtonClass}
       >
         <div className="flex items-center gap-3">
           {icon && <div className="text-slate-400">{icon}</div>}

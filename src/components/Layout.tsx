@@ -32,7 +32,7 @@ import NotificationDropdown from './NotificationDropdown';
 import SupportChatWidget from './SupportChatWidget';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, logout, acceptInvitation, declineInvitation, notifications, markNotificationAsRead, allBookings, roleRequests, allUsers, vehicles } = useStore();
+  const { user, logout, acceptInvitation, declineInvitation, notifications, markNotificationAsRead, allBookings, roleRequests, allUsers, vehicles, disputes } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
@@ -131,6 +131,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { icon: Car, label: 'Fleet Inventory', path: '/admin-dashboard?view=inventory' },
     { icon: History, label: 'Bookings', path: '/admin-dashboard?view=bookings', badge: pendingBookingsCount },
     { icon: Scale, label: 'E-Challans', path: '/admin-dashboard?view=e-challans' },
+    { icon: Scale, label: 'Formal Disputes', path: '/admin-dashboard?view=disputes', badge: disputes ? disputes.filter(d => d.status === 'pending').length : 0 },
     { icon: ShieldCheck, label: 'Role Requests', path: '/admin-dashboard?view=role-requests', badge: pendingRoleRequestsCount },
     { icon: Users, label: 'Assign Roles', path: '/admin-dashboard?view=role-assignment' },
     { icon: FileText, label: 'Reports', path: '/admin-dashboard?view=reports' },
@@ -143,6 +144,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { icon: BarChart3, label: 'Overview', path: '/manager-dashboard' },
     { icon: Car, label: 'Fleet Inventory', path: '/manager-dashboard?view=inventory' },
     { icon: History, label: 'Bookings', path: '/manager-dashboard?view=bookings', badge: pendingBookingsCount },
+    { icon: Scale, label: 'Formal Disputes', path: '/manager-dashboard?view=disputes', badge: disputes ? disputes.filter(d => d.status === 'pending').length : 0 },
     { icon: FileText, label: 'Reports', path: '/manager-dashboard?view=reports' },
     { icon: ShieldCheck, label: 'Rules & Policies', path: '/rules-policies' },
     { icon: AlertCircle, label: 'Penalty & Charges', path: '/penalty-charges' },

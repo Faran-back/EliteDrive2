@@ -536,6 +536,17 @@ async function saveAllCollectionsToSupabase() {
 function sanitizeLoadedData() {
   dbData.users = dbData.users || [];
   dbData.vehicles = dbData.vehicles || [];
+
+  // Filter out default pre-seeded vehicles from INITIAL_VEHICLES
+  const defaultVehicleIds = new Set(INITIAL_VEHICLES.map(v => v.id));
+  const initialLength = dbData.vehicles.length;
+  dbData.vehicles = dbData.vehicles.filter(v => !defaultVehicleIds.has(v.id));
+  if (dbData.vehicles.length !== initialLength) {
+    console.log(`[Database] Removed ${initialLength - dbData.vehicles.length} pre-seeded default vehicles. Starting with zero default vehicle listings.`);
+    process.nextTick(() => {
+      saveDatabase();
+    });
+  }
   dbData.bookings = dbData.bookings || [];
   dbData.notifications = dbData.notifications || [];
   dbData.roleRequests = dbData.roleRequests || [];

@@ -15,7 +15,8 @@ import {
   Plus,
   RefreshCw,
   Calendar,
-  Sparkles
+  Sparkles,
+  Scale
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useStore } from '../context/StoreContext';
@@ -330,6 +331,23 @@ const Dashboard: React.FC = () => {
                 <ChevronRight className="text-slate-300 group-hover:text-primary transition-all pt-2" size={20} />
               </div>
             </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-[32px] p-8 text-white border border-slate-800 shadow-xl">
+            <div className="flex items-center gap-3 mb-4 text-amber-500">
+              <Scale size={24} />
+              <h4 className="text-xs font-black uppercase tracking-widest text-slate-300">Disputes Mediation Desk</h4>
+            </div>
+            <h3 className="text-lg font-black mb-2 uppercase">Lodge Formal Dispute</h3>
+            <p className="text-xs text-slate-400 leading-relaxed mb-6">
+              File formal disputes regarding traffic e-challans, damage charges, collisions, or return penalties for rapid administrative adjudication.
+            </p>
+            <button 
+              onClick={() => navigate('/report-incident')}
+              className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl transition-all text-xs uppercase tracking-wider"
+            >
+              Lodge Dispute / Appeal
+            </button>
           </div>
 
           <div className="flex flex-col gap-5 px-4 pt-2">

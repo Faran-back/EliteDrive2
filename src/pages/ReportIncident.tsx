@@ -13,6 +13,7 @@ import {
   Phone, 
   Send,
   Save,
+  Scale,
   Wrench,
   Headphones,
   Info,
@@ -80,7 +81,7 @@ const renderStatusTracker = (status: string) => {
 };
 
 const ReportIncident: React.FC = () => {
-  const { user, bookings, allBookings, allUsers, vehicles, createIncident, incidents, updateIncidentStatus, showToast } = useStore();
+  const { user, bookings, allBookings, allUsers, vehicles, createIncident, incidents, updateIncidentStatus, showToast, disputes, createDispute } = useStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -92,8 +93,8 @@ const ReportIncident: React.FC = () => {
 
   // Toggle mode for user:
   // For staff: 'view' (View Customer Incidents) vs 'file' (File Incident On Behalf)
-  // For customer: 'file' (File New Incident) vs 'my_incidents' (My Reported Incidents)
-  const [activeTab, setActiveTab] = useState<'view' | 'file' | 'my_incidents'>(isStaff ? 'view' : 'file');
+  // For customer: 'file' (File New Incident) vs 'my_incidents' (My Reported Incidents) vs 'disputes' (Formal Disputes)
+  const [activeTab, setActiveTab] = useState<'view' | 'file' | 'my_incidents' | 'disputes'>(isStaff ? 'view' : 'file');
   const fileOnBehalf = isStaff && activeTab === 'file';
 
   // States
@@ -108,7 +109,39 @@ const ReportIncident: React.FC = () => {
   const [firNumber, setFirNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Disputes states
+  const [disputeBookingId, setDisputeBookingId] = useState('');
+  const [disputeType, setDisputeType] = useState('damage_charges');
+  const [disputeTitle, setDisputeTitle] = useState('');
+  const [disputeDescription, setDisputeDescription] = useState('');
+  const [isFilingDispute, setIsFilingDispute] = useState(false);
+
   const [gapAlert, setGapAlert] = useState<string | null>(null);
+
+  const handleDisputeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!disputeTitle.trim() || !disputeDescription.trim()) {
+      showToast('Please fill out all required dispute fields.', 'error');
+      return;
+    }
+    setIsFilingDispute(true);
+    try {
+      await createDispute({
+        title: disputeTitle,
+        description: disputeDescription,
+        bookingId: disputeBookingId || undefined,
+        type: disputeType
+      });
+      setDisputeTitle('');
+      setDisputeDescription('');
+      setDisputeBookingId('');
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || 'Failed to file dispute.', 'error');
+    } finally {
+      setIsFilingDispute(false);
+    }
+  };
 
   useEffect(() => {
     if (incidentDate) {
@@ -295,20 +328,27 @@ const ReportIncident: React.FC = () => {
               </button>
             </div>
           ) : (
-            <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+            <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200 gap-1 overflow-x-auto">
               <button 
                 type="button"
                 onClick={() => setActiveTab('file')}
-                className={`px-4 py-2 text-xs font-black uppercase rounded-lg transition-all ${activeTab === 'file' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                className={`px-4 py-2 text-xs font-black uppercase rounded-lg transition-all shrink-0 ${activeTab === 'file' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
               >
                 File New Incident
               </button>
               <button 
                 type="button"
                 onClick={() => setActiveTab('my_incidents')}
-                className={`px-4 py-2 text-xs font-black uppercase rounded-lg transition-all ${activeTab === 'my_incidents' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                className={`px-4 py-2 text-xs font-black uppercase rounded-lg transition-all shrink-0 ${activeTab === 'my_incidents' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
               >
                 My Reported Incidents ({incidents.filter(inc => inc.userId === user?.id).length})
+              </button>
+              <button 
+                type="button"
+                onClick={() => setActiveTab('disputes')}
+                className={`px-4 py-2 text-xs font-black uppercase rounded-lg transition-all shrink-0 ${activeTab === 'disputes' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                Disputes ({disputes ? disputes.filter(d => d.userId === user?.id).length : 0})
               </button>
             </div>
           )}
@@ -365,28 +405,29 @@ const ReportIncident: React.FC = () => {
                         {/* Status update select selector */}
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-black uppercase text-slate-400">Status:</span>
-                          <select
+                          <CustomSelect
+                            options={[
+                              { value: 'filed', label: 'Filed' },
+                              { value: 'under_review', label: 'Under Review' },
+                              { value: 'action_taken', label: 'Action Taken' },
+                              { value: 'closed', label: 'Closed' }
+                            ]}
                             value={inc.status}
-                            onChange={async (e) => {
+                            onChange={async (val) => {
                               try {
-                                await updateIncidentStatus(inc.id, e.target.value);
-                                showToast(`Incident state set to ${e.target.value.toUpperCase()}`, 'success');
+                                await updateIncidentStatus(inc.id, val);
+                                showToast(`Incident state set to ${val.toUpperCase()}`, 'success');
                               } catch (err: any) {
                                 showToast('Error updating incident state', 'error');
                               }
                             }}
-                            className={`text-xs h-9 px-3 rounded-xl border font-bold text-slate-800 ${
-                              inc.status === 'closed' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
-                              inc.status === 'action_taken' ? 'bg-indigo-50 border-indigo-200 text-indigo-800' :
-                              inc.status === 'under_review' ? 'bg-amber-50 border-amber-200 text-amber-800' :
-                              'bg-red-50 border-red-200 text-red-800'
+                            buttonClassName={`w-36 text-xs h-9 px-3 flex items-center justify-between rounded-xl border font-bold transition-all shadow-sm ${
+                              inc.status === 'closed' ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100' :
+                              inc.status === 'action_taken' ? 'bg-indigo-50 border-indigo-200 text-indigo-800 hover:bg-indigo-100' :
+                              inc.status === 'under_review' ? 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100' :
+                              'bg-red-50 border-red-200 text-red-800 hover:bg-red-100'
                             }`}
-                          >
-                            <option value="filed">Filed</option>
-                            <option value="under_review">Under Review</option>
-                            <option value="action_taken">Action Taken</option>
-                            <option value="closed">Closed</option>
-                          </select>
+                          />
                         </div>
                       </div>
 
@@ -640,6 +681,197 @@ const ReportIncident: React.FC = () => {
                 })}
               </div>
             )}
+          </div>
+        ) : activeTab === 'disputes' ? (
+          <div className="space-y-8">
+            {/* Disputes Header */}
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900 uppercase">My Formal Disputes Desk</h2>
+                <p className="text-xs text-slate-500 mt-1">Lodge formal disputes regarding damage charges, late return fees, traffic violations (e-challans), and payment/document audits.</p>
+              </div>
+              <span className="bg-blue-50 text-blue-700 px-3 py-1 text-xs font-black rounded-xl border border-blue-100">
+                Active Disputes: {disputes ? disputes.filter(d => d.userId === user?.id).length : 0}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Left Side: Dispute Form */}
+              <div className="lg:col-span-5">
+                <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-950 uppercase tracking-wider flex items-center gap-2">
+                      <Scale size={18} className="text-blue-600" />
+                      Lodge New Formal Dispute
+                    </h3>
+                    <p className="text-slate-400 text-[11px] mt-1">Our mediation desk reviews and replies to all disputes within 24 working hours.</p>
+                  </div>
+
+                  <form onSubmit={handleDisputeSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-xs uppercase font-extrabold text-slate-500 tracking-wider mb-2">Select Booking to Dispute</label>
+                      <CustomSelect
+                        options={allBookings.filter(b => b.userId === user?.id && b.status === 'active').map((b) => {
+                          const v = vehicles.find(veh => veh.id === b.vehicleId);
+                          return {
+                            value: b.id,
+                            label: `${v?.name || 'Vehicle'} (ID: ${b.id.slice(0, 8)}) — ${b.startDate} to ${b.endDate}`
+                          };
+                        })}
+                        value={disputeBookingId}
+                        onChange={(val) => setDisputeBookingId(val)}
+                        placeholder="-- Choose Your Current Active Booking --"
+                        buttonClassName="w-full flex items-center justify-between px-3.5 h-11 border border-slate-200 bg-white rounded-xl text-xs font-bold text-slate-800 shadow-sm transition-all hover:bg-slate-50 focus:ring-2 focus:ring-blue-600/20"
+                      />
+                      {allBookings.filter(b => b.userId === user?.id && b.status === 'active').length === 0 && (
+                        <p className="text-[10px] text-rose-600 font-bold mt-1">
+                          ⚠️ You can only file a dispute if you have an active current booking.
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-extrabold text-slate-500 tracking-wider mb-2">Dispute Category</label>
+                      <CustomSelect
+                        options={[
+                          { value: 'damage_charges', label: 'Damage Charges Dispute' },
+                          { value: 'late_return', label: 'Late Return Penalty' },
+                          { value: 'traffic_violation', label: 'Traffic Violation / E-Challan' },
+                          { value: 'payment_issue', label: 'Payment Issue' },
+                          { value: 'document_issue', label: 'Document / KYC Issue' }
+                        ]}
+                        value={disputeType}
+                        onChange={(val) => setDisputeType(val)}
+                        placeholder="Select Dispute Category"
+                        buttonClassName="w-full flex items-center justify-between px-3.5 h-11 border border-slate-200 bg-white rounded-xl text-xs font-bold text-slate-800 shadow-sm transition-all hover:bg-slate-50 focus:ring-2 focus:ring-blue-600/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-extrabold text-slate-500 tracking-wider mb-2">Dispute Title / Subject *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Disputing E-Challan ticket on Lahore Motorway"
+                        value={disputeTitle}
+                        onChange={(e) => setDisputeTitle(e.target.value)}
+                        className="w-full text-xs rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:ring-blue-600 h-11 px-4"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-extrabold text-slate-500 tracking-wider mb-2">Detailed Grievance Statement *</label>
+                      <textarea
+                        required
+                        placeholder="Explain precisely why you are disputing this charge or penalty. Provide relevant context, timestamps, or state facts clearly so we can adjudicate."
+                        value={disputeDescription}
+                        onChange={(e) => setDisputeDescription(e.target.value)}
+                        className="w-full text-xs rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:ring-blue-600 p-4 min-h-[140px] resize-none"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isFilingDispute}
+                      className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:bg-slate-300"
+                    >
+                      {isFilingDispute ? 'Submitting Dispute...' : 'Submit Dispute Request'}
+                    </button>
+                  </form>
+                </section>
+              </div>
+
+              {/* Right Side: Existing Disputes List */}
+              <div className="lg:col-span-7 space-y-4">
+                {(!disputes || disputes.filter(d => d.userId === user?.id).length === 0) ? (
+                  <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-md mx-auto">
+                    <ShieldCheck className="text-slate-300 mx-auto mb-4 animate-bounce" size={48} />
+                    <h3 className="text-sm font-bold text-slate-700 uppercase mb-1">No Active Disputes</h3>
+                    <p className="text-slate-400 text-xs">
+                      You do not have any logged formal dispute records. Outstanding clean balance sheet!
+                    </p>
+                  </div>
+                ) : (
+                  disputes.filter(d => d.userId === user?.id).map((dispute) => {
+                    const booking = allBookings.find(b => b.id === dispute.bookingId);
+                    const vehicle = booking ? vehicles.find(v => v.id === booking.vehicleId) : null;
+                    
+                    const getStatusStyle = (status: string) => {
+                      switch (status) {
+                        case 'pending': 
+                          return 'bg-amber-50 text-amber-700 border-amber-200';
+                        case 'under_review': 
+                          return 'bg-blue-50 text-blue-700 border-blue-200';
+                        case 'resolved': 
+                          return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                        case 'rejected': 
+                          return 'bg-rose-50 text-rose-700 border-rose-200';
+                        default: 
+                          return 'bg-slate-50 text-slate-700 border-slate-200';
+                      }
+                    };
+
+                    const getHumanType = (type: string) => {
+                      switch (type) {
+                        case 'damage_charges': return 'Damage Charges Dispute';
+                        case 'late_return': return 'Late Return Penalty';
+                        case 'traffic_violation': return 'Traffic Violation / E-Challan';
+                        case 'payment_issue': return 'Payment Issue';
+                        case 'document_issue': return 'Document / KYC Issue';
+                        default: return type.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+                      }
+                    };
+
+                    return (
+                      <div key={dispute.id} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="space-y-1">
+                            <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 font-bold uppercase text-[8px] rounded-md">
+                              {getHumanType(dispute.type)}
+                            </span>
+                            <h4 className="text-sm font-extrabold text-slate-900 pt-1">{dispute.title}</h4>
+                            <span className="text-[10px] font-mono text-slate-400 block">Dispute Ref: {dispute.id}</span>
+                          </div>
+                          
+                          <span className={`inline-flex items-center px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-md border ${getStatusStyle(dispute.status)}`}>
+                            {dispute.status.replace('_', ' ')}
+                          </span>
+                        </div>
+
+                        {booking && (
+                          <div className="text-[10px] bg-slate-50 border border-slate-100 p-2.5 rounded-xl flex items-center justify-between">
+                            <div>
+                              <span className="text-slate-400 font-black uppercase block text-[8px]">Associated Vehicle & Booking</span>
+                              <span className="font-extrabold text-slate-700">{vehicle?.name || 'Vehicle'} ({booking.id.slice(0, 8).toUpperCase()})</span>
+                            </div>
+                            <span className="font-mono text-slate-400 font-semibold">{booking.startDate} to {booking.endDate}</span>
+                          </div>
+                        )}
+
+                        <div className="text-xs text-slate-600 font-medium leading-relaxed italic border-l-2 border-slate-200 pl-3">
+                          "{dispute.description}"
+                        </div>
+
+                        {dispute.resolutionDetails && (
+                          <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl space-y-1">
+                            <span className="block text-[9px] font-black text-emerald-800 uppercase tracking-widest">Adjudication / Resolution Terms:</span>
+                            <p className="text-xs text-slate-700 font-medium leading-relaxed">{dispute.resolutionDetails}</p>
+                          </div>
+                        )}
+
+                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider pt-2 border-t border-slate-100 flex justify-between">
+                          <span>Filed: {new Date(dispute.createdAt).toLocaleDateString()}</span>
+                          {dispute.status === 'pending' && <span className="text-amber-600 flex items-center gap-1"><Clock size={10} /> Pending Admin Adjudication</span>}
+                          {dispute.status === 'under_review' && <span className="text-blue-600 flex items-center gap-1"><Clock size={10} /> Case Under Active Auditing</span>}
+                          {dispute.status === 'resolved' && <span className="text-emerald-600 flex items-center gap-1">✓ Adjudication Decided & Settled</span>}
+                          {dispute.status === 'rejected' && <span className="text-rose-600 flex items-center gap-1">✗ Settle Request Declined</span>}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
         ) : usableBookings.length === 0 ? (
             <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-2xl mx-auto">

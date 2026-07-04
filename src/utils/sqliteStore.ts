@@ -66,7 +66,7 @@ export function getSqliteDatabasePath(): string {
 export function saveCollectionsToSqlite(collections: SqliteCollectionMap, dbPath = getSqliteDatabasePath()): boolean {
   ensureParentDir(dbPath);
 
-  let db: Database | undefined;
+  let db: Database.Database | undefined;
   try {
     try {
       db = new Database(dbPath);
@@ -116,7 +116,7 @@ export function loadCollectionsFromSqlite(dbPath = getSqliteDatabasePath()): Sql
     return {};
   }
 
-  let db: Database | undefined;
+  let db: Database.Database | undefined;
   try {
     try {
       db = new Database(dbPath, { readonly: true, fileMustExist: true });

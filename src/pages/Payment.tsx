@@ -25,6 +25,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { paymentSchema, PaymentFormData } from '../schemas/payment';
 import LoadingSpinner from '../components/LoadingSpinner';
 import CustomCalendar from '../components/ui/CustomCalendar';
+import CustomSelect from '../components/ui/CustomSelect';
 import { fileToBase64, validateImage } from '../lib/imageUtils';
 
 const Payment: React.FC = () => {
@@ -256,9 +257,10 @@ const Payment: React.FC = () => {
       }
     }
 
-    const total = base + insurance + chauffeurCost - discountAmount;
+    const securityDeposit = 10000;
+    const total = base + insurance + chauffeurCost + securityDeposit - discountAmount;
     
-    return { base, insurance, chauffeurCost, discount: discountAmount, total };
+    return { base, insurance, chauffeurCost, discount: discountAmount, securityDeposit, total };
   }, [vehicle, rentalDuration, rentalType, isCouponApplied, coupon, insuranceType, chauffeurSelected, calendarDays]);
 
   const unitLabel = useMemo(() => {
@@ -492,6 +494,8 @@ const Payment: React.FC = () => {
         chauffeurPrice: prices.chauffeurCost,
         discountPrice: prices.discount,
         insuranceType: insuranceType,
+        securityDepositAmount: prices.securityDeposit,
+        securityDepositStatus: 'pending',
         
         createdAt: new Date().toISOString(), // date-based sorting/filtering support!
         paymentType: paymentType,
@@ -798,6 +802,20 @@ const Payment: React.FC = () => {
                           </div>
                         </div>
                       )}
+
+                      {/* Refundable Security Deposit */}
+                      <div className="bg-blue-50/45 rounded-xl p-3.5 border border-blue-100/70 flex flex-col gap-1 text-xs">
+                        <div className="flex justify-between font-bold text-slate-900 font-sans">
+                          <span className="flex items-center gap-1">
+                            🛡️ Refundable Security Deposit
+                          </span>
+                          <span className="text-[#2563EB] font-black">PKR {prices.securityDeposit.toLocaleString()}</span>
+                        </div>
+                        <div className="text-slate-500 font-medium text-[11px] flex flex-col gap-0.5">
+                          <span>• 100% Refundable after rental return</span>
+                          <span>• Collected to cover potential damage or traffic violations</span>
+                        </div>
+                      </div>
 
                       {/* Promo Coupon discount */}
                       {isCouponApplied && (
@@ -1443,22 +1461,23 @@ const Payment: React.FC = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-150">
                               <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Your Issuing Bank (Sender)</label>
-                                <select 
+                                <CustomSelect
+                                  options={[
+                                    { value: 'Meezan Bank', label: 'Meezan Bank' },
+                                    { value: 'HBL', label: 'Habib Bank Limited (HBL)' },
+                                    { value: 'UBL', label: 'United Bank Limited (UBL)' },
+                                    { value: 'MCB', label: 'MCB Bank Limited' },
+                                    { value: 'Bank of Punjab', label: 'Bank of Punjab (BOP)' },
+                                    { value: 'Bank Alfalah', label: 'Bank Alfalah' },
+                                    { value: 'Standard Chartered', label: 'Standard Chartered' },
+                                    { value: 'NayaPay', label: 'NayaPay' },
+                                    { value: 'SadaPay', label: 'SadaPay' }
+                                  ]}
                                   value={senderBank}
-                                  onChange={(e) => setSenderBank(e.target.value)}
-                                  className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:ring-2 focus:ring-[#2563EB] focus:border-[#2563EB] outline-none font-bold text-xs"
-                                >
-                                  <option value="">-- Choose Your Bank --</option>
-                                  <option value="Meezan Bank">Meezan Bank</option>
-                                  <option value="HBL">Habib Bank Limited (HBL)</option>
-                                  <option value="UBL">United Bank Limited (UBL)</option>
-                                  <option value="MCB">MCB Bank Limited</option>
-                                  <option value="Bank of Punjab">Bank of Punjab (BOP)</option>
-                                  <option value="Bank Alfalah">Bank Alfalah</option>
-                                  <option value="Standard Chartered">Standard Chartered</option>
-                                  <option value="NayaPay">NayaPay</option>
-                                  <option value="SadaPay">SadaPay</option>
-                                </select>
+                                  onChange={(val) => setSenderBank(val)}
+                                  placeholder="-- Choose Your Bank --"
+                                  buttonClassName="w-full flex items-center justify-between px-3 h-11 border border-slate-200 bg-white rounded-xl text-xs font-bold text-slate-800 shadow-sm transition-all hover:bg-slate-50 focus:ring-2 focus:ring-[#2563EB] focus:border-[#2563EB] outline-none"
+                                />
                               </div>
 
                               <div className="space-y-1.5">

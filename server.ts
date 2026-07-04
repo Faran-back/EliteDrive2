@@ -1546,60 +1546,124 @@ CRITICAL RULE FOR IDS: The "recommendedVehicleIds" and "vehicleId" values in you
     try {
       const client = getGeminiClient();
       if (!client) {
-        throw new Error("Gemini API Client missing");
+        throw new Error("Gemini API Client not initialized");
       }
 
-      // Format conversation history for Gemini contents array
+      // Build context-aware system instruction based on user query
+      const userRole = req.user?.role || 'customer';
+      const userName = req.user?.name || 'Guest';
+      
+      // Build fleet list
+      const fleetList = (dbData.vehicles || []).map(v => 
+        `• ${v.name} (${v.type}, ${v.transmission}, ${v.fuel}, ${v.seats} seats, PKR ${v.pricePerDay}/day, Status: ${v.status})`
+      ).join('\n');
+
+      // Build role-specific system instruction
+      const systemInstructions = userRole === 'admin' || userRole === 'manager' 
+        ? `You are EliteDrive's expert compliance and operations support assistant helping managers/admins resolve disputes, manage incidents, issue e-challans, and handle customer complaints.
+
+CRITICAL: Provide DIRECT, ACTIONABLE answers based on these exact policies:
+- 6-HOUR INCIDENT WINDOW: Incidents MUST be filed within 6 hours or trigger admin flags
+- 7-DAY E-CHALLAN DISPUTE: Customers have 7 days to dispute traffic fines after issuance
+- SECURITY DEPOSIT: PKR 10,000 refundable upon return inspection
+- OUTSTANDING BALANCE: Blocks all new bookings and payment gateway access
+- BLACKLISTING: Applied for fraud, multiple damages, or policy violations
+
+Always reference specific incident/dispute IDs when discussing cases. Keep responses concise and actionable.`
+        : `You are EliteDrive's friendly and knowledgeable customer support assistant. Help customers with booking questions, incident reporting, dispute resolution, and general inquiries.
+
+CRITICAL POLICIES TO ALWAYS MENTION:
+- Report incidents WITHIN 6 HOURS or lose coverage eligibility
+- Dispute e-challans (traffic fines) WITHIN 7 DAYS of receiving notice
+- Security deposit is PKR 10,000 and fully refundable
+- Outstanding balance will block your next booking
+
+FLEET AVAILABLE (recommend ONLY from this list):
+${fleetList}
+
+Be friendly, professional, and provide clear step-by-step guidance for their specific question.`;
+
+      // Format conversation history - ONLY include last 4 messages for context
+      const recentMessages = messages ? messages.slice(-4) : [];
       const contents: any[] = [];
       
-      // Map historical messages (mapping 'assistant' role to 'model' for Gemini spec)
-      if (messages && Array.isArray(messages)) {
-        messages.forEach((msg: any) => {
+      // Add historical context
+      recentMessages.forEach((msg: any) => {
+        if (msg.content && msg.content.trim()) {
           contents.push({
             role: msg.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: msg.content }]
           });
-        });
-      }
+        }
+      });
 
-      // Add final input message
-      if (inputMessage) {
+      // Add current user message
+      if (inputMessage && inputMessage.trim()) {
         contents.push({
           role: 'user',
           parts: [{ text: inputMessage }]
         });
       }
 
-      const fleetList = (dbData.vehicles || []).map(v => `- ${v.name} (Type: ${v.type || 'Standard'}, PKR ${v.pricePerDay}/day, Status: ${v.status || (v.available ? 'available' : 'rented')})`).join('\n');
+      // If no contents, something is wrong
+      if (contents.length === 0) {
+        return res.json({ 
+          text: "I didn't receive your message. Please try again with a clear question." 
+        });
+      }
 
+      addDebugLog(`[Support Chat] User (${userName}, ${userRole}): "${inputMessage}"`);
+
+      // Call Gemini with conversation context
       const response = await client.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.0-flash-exp',
         contents,
-        config: {
-          systemInstruction: `You are a helpful, professional support assistant for EliteDrive, Pakistan's premier luxury car rental management system.
-          The user you are speaking to is ${req.user?.name || 'Guest'}, whose role is ${req.user?.role || 'customer'}.
-          System features they can access: Explore Fleet, Booking, My Bookings, Profile, Favorites, and Incident Reporting.
-          
-          Our active fleet of vehicles consists ONLY of the following items:
-          ${fleetList}
-          
-          CRITICAL DIRECTIVE: You must ONLY talk about, mention, or recommend vehicles from the EliteDrive fleet list above. Under no circumstances should you mention any other car models (such as the Audi e-tron GT, Audi Etron, BMW, or any cars not explicitly listed above). If a user asks for recommendations, select strictly from the vehicles above.
-          
-          Provide clean, structured, and highly professional responses in English:
-          - Use **bold** for key terms, UI pages, or buttons.
-          - Use bullet points for steps or options.
-          - Keep paragraphs short, elegant, and readable.
-          - Be polite, supportive, and efficient.
-          - For incident reports, remind them that reports must be filed within the 6-hour policy window.`
+        systemPrompt: systemInstructions,
+        generationConfig: {
+          temperature: 0.7,
+          topP: 0.9,
+          topK: 40,
+          maxOutputTokens: 500
         }
       });
 
-      res.json({ text: response.text || "I'm sorry, I couldn't process that. Please try again." });
+      // Extract response text
+      const responseText = response.text ? response.text.trim() : null;
+      
+      if (!responseText) {
+        addDebugLog(`[Support Chat] Empty response from Gemini for: "${inputMessage}"`);
+        return res.json({ 
+          text: "I'm processing your request. Please try rephrasing your question more specifically, and I'll provide a detailed answer." 
+        });
+      }
+
+      addDebugLog(`[Support Chat] Response generated for ${userName}`);
+      res.json({ text: responseText });
+
     } catch (error: any) {
-      console.log('Support chat Gemini fallback triggered:', error.message || error);
-      res.json({ 
-        text: "I am happy to assist you! If you have queries about bookings, pricing, or rentals, please let me know. Note that active booking records can be managed in **My Bookings**, and emergency incidents can be filed under **Report Incident** immediately." 
-      });
+      const errorMsg = error.message || String(error);
+      addDebugLog(`[Support Chat Error] ${errorMsg}`);
+      console.error('[Support Chat] Detailed Error:', error);
+      
+      // More specific error messages
+      if (errorMsg.includes('API key') || errorMsg.includes('authentication')) {
+        return res.json({ 
+          text: "⚠️ Support system configuration error. Please contact support team. (API Auth Issue)" 
+        });
+      }
+      
+      if (errorMsg.includes('rate')) {
+        return res.json({ 
+          text: "The support system is experiencing high traffic. Please try again in a moment." 
+        });
+      }
+
+      // Fallback with context-aware response
+      const fallbackResponse = req.user?.role === 'admin' || req.user?.role === 'manager'
+        ? "I'm having trouble connecting to the AI backend. For immediate assistance:\n• **Check Incidents**: Go to Damage Incidents tab to review reports\n• **Manage Disputes**: Use Client Disputes tab for formal cases\n• **Issue E-Challan**: Use E-Challan desk to create traffic citations\n• **System Status**: Verify GEMINI_API_KEY is configured"
+        : "I'm experiencing a temporary connection issue. What specific question can I help with? I can assist with:\n• **Booking questions** - How to reserve a vehicle\n• **Incident reporting** - Accidents or damage (within 6 hours!)\n• **Dispute resolution** - Payment or traffic fine disputes\n• **General policies** - Rules, pricing, or insurance info";
+
+      res.json({ text: fallbackResponse });
     }
   });
 

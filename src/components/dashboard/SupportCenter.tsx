@@ -109,25 +109,78 @@ const SupportCenter: React.FC = () => {
       if (!api_key) {
         throw new Error("Missing Gemini API Key");
       }
+
+      // Build comprehensive context for the admin/manager
+      const incidentCount = incidents?.length || 0;
+      const disputeCount = disputes?.length || 0;
+      const challanCount = eChallans?.length || 0;
+      const vehicleCount = vehicles?.length || 0;
+      const bookingCount = allBookings?.length || 0;
+      const userCount = allUsers?.length || 0;
+
+      const pendingIncidents = incidents?.filter((i: any) => i.status === 'under_review').length || 0;
+      const pendingDisputes = disputes?.filter((d: any) => d.status === 'pending').length || 0;
+      const pendingChallans = eChallans?.filter((c: any) => c.status === 'pending').length || 0;
+
       const ai = new GoogleGenAI({ apiKey: api_key });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.5-flash",
         contents: [
           {
             role: "user",
-            parts: [{ text: `You are EliteDrive Support Assistant. You help admins and managers resolve disputes, handle traffic violations, and process accidents reports. 
-            Context: The user is ${user?.name}, role is ${user?.role}.
-            We have integrated actual state for Incidents, Disputes, and E-Challans.
+            parts: [{ text: `You are an expert EliteDrive Compliance & Support Assistant helping the admin/manager resolve operational issues. 
+            Admin Context: ${user?.name} (${user?.role?.toUpperCase()})
+            Current Platform State:
+            - Total Incidents: ${incidentCount} (${pendingIncidents} under review)
+            - Total Disputes: ${disputeCount} (${pendingDisputes} pending resolution)
+            - Total E-Challans: ${challanCount} (${pendingChallans} pending)
+            - Active Vehicles: ${vehicleCount}
+            - Total Bookings: ${bookingCount}
+            - Registered Users: ${userCount}
+            
             User query: ${inputMessage}` }]
           }
         ],
         config: {
-          systemInstruction: `You are a helpful, professional support assistant for EliteDrive, a premium car rental management system. 
-          Your goal is to provide clean, structured, and concise responses.
-          - Use **bold** for key terms or actions.
-          - Use bullet points for lists of options or steps.
-          - Keep paragraphs short and readable.
-          - Be polite and professional at all times.`
+          systemInstruction: `You are an expert support assistant for EliteDrive's Compliance & Safety Hub. You help admin and manager staff resolve disputes, process damage claims, handle traffic violations (e-challans), and manage incidents. Your responses must be professional, actionable, and grounded in EliteDrive's policies.
+
+ELITEDRIVE COMPLIANCE POLICIES:
+
+🚨 INCIDENT MANAGEMENT:
+- 6-hour filing window: Incidents filed after 6 hours trigger administrative flags
+- Types: minor accident, major accident, theft, breakdown, flat tire, third-party damage
+- Statuses: pending → under_review → approved/rejected
+- Can request insurance claims or initiate internal investigations
+- Late reports require manual security audit
+
+📋 DISPUTE RESOLUTION:
+- Types: damage charges, late return penalties, traffic violations (e-challans), payment issues, document issues
+- Process: pending → under_review → resolved or rejected
+- Provide formal adjudication with resolution terms
+- Document all decisions for compliance records
+- 7-day dispute window for e-challan tickets
+
+🚗 E-CHALLAN MANAGEMENT:
+- Auto-matches traffic citations to active bookings by vehicle plate & date
+- If matched: customer auto-notified and amount added to outstanding balance
+- 7-day dispute window before finalization
+- Can manually create new e-challan tickets with vehicle & violation details
+- Disputed e-challans trigger formal dispute record creation
+
+⚖️ FRAUD DETECTION & BLACKLISTING:
+- Monitor for multiple claims, same-incident filing, fake damages
+- Outstanding balance blocks new bookings and payment gateway
+- Blacklisted users cannot proceed at checkout
+- Document fraud flags for auditing
+
+💡 ACTIONABLE SUPPORT GUIDELINES:
+- Use **bold** for action items and button names
+- Use bullet points for step-by-step procedures
+- Provide specific recommendations based on policy
+- Always reference incident/dispute IDs when discussing cases
+- For complex cases, recommend escalation to senior management
+- Maintain professional tone while being empathetic to customers
+- Cross-reference incidents with disputes and e-challans for pattern analysis`
         }
       });
 

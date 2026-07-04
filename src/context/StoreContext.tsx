@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Vehicle, Booking, Notification, RoleRequest, Invitation, Incident, Dispute, EChallan } from '../types';
 import Toast from '../components/Toast';
+import { resolveNotificationBehavior } from '../utils/notifications';
 
 interface StoreContextType {
   user: User | null;
@@ -175,7 +176,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           });
           if (newUnreads.length > 0) {
             newUnreads.forEach((n: Notification) => {
-              showToast(`🔔 ${n.title}: ${n.message}`, 'info');
+              const deliveryMode = resolveNotificationBehavior({
+                supportsBrowserNotifications: 'Notification' in window && 'serviceWorker' in navigator,
+                permission: typeof window !== 'undefined' ? window.Notification?.permission : 'default'
+              });
+
+              if (deliveryMode === 'browser') {
+                const browserNotification = new window.Notification(n.title, {
+                  body: n.message,
+                  icon: '/favicon.ico'
+                });
+                window.setTimeout(() => browserNotification.close(), 5000);
+              }
             });
           }
           return nData;
@@ -248,6 +260,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               return [newNotif, ...prev];
             });
 
+            const deliveryMode = resolveNotificationBehavior({
+              supportsBrowserNotifications: 'Notification' in window && 'serviceWorker' in navigator,
+              permission: typeof window !== 'undefined' ? window.Notification?.permission : 'default'
+            });
+
+            if (deliveryMode === 'browser') {
+              const browserNotification = new window.Notification(newNotif.title, {
+                body: newNotif.message,
+                icon: '/favicon.ico'
+              });
+              window.setTimeout(() => browserNotification.close(), 5000);
+            }
+
             // Play elegant sound chime using the Web Audio API
             try {
               const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -270,8 +295,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               console.log('AudioContext initialization bypassed or blocked by auto-play policies.');
             }
 
-            // Trigger beautiful top toast notification
-            showToast(`🔔 ${newNotif.title}: ${newNotif.message}`, 'info');
           }
         } catch (err) {
           console.error('[WebSocket] Failed to process message payload:', err);

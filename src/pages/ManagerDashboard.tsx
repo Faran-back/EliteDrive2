@@ -42,6 +42,7 @@ import Bookings from '../components/dashboard/Bookings';
 import FleetInventory from '../components/dashboard/FleetInventory';
 import ReturnVerificationWidget from '../components/dashboard/ReturnVerificationWidget';
 import EmailLogsSandbox from '../components/dashboard/EmailLogsSandbox';
+import FormalDisputes from '../components/dashboard/FormalDisputes';
 
 const ManagerDashboard: React.FC = () => {
   const { vehicles, allBookings, allUsers, cancelBooking, showToast, user } = useStore();
@@ -379,6 +380,7 @@ const ManagerDashboard: React.FC = () => {
       {currentView === 'system-config' && <SystemConfig />}
       {currentView === 'support-center' && <SupportCenter />}
       {currentView === 'inventory' && <FleetInventory />}
+      {currentView === 'disputes' && <FormalDisputes />}
       {currentView === 'email-logs' && <EmailLogsSandbox isAdminView={true} />}
     </div>
   );

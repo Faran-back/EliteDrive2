@@ -1618,8 +1618,8 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
       const response = await client.models.generateContent({
         model: 'gemini-2.0-flash-exp',
         contents,
-        systemPrompt: systemInstructions,
-        generationConfig: {
+        config: {
+          systemInstruction: systemInstructions,
           temperature: 0.7,
           topP: 0.9,
           topK: 40,

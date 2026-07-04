@@ -87,6 +87,12 @@ export function downloadReceiptPDF(booking: Booking, vehicle: Vehicle, user: Use
         : calendarDays
   );
 
+  const unitLabel = rentalType === 'hourly'
+    ? (rentalDuration === 1 ? 'Hour' : 'Hours')
+    : rentalType === 'weekly'
+      ? (rentalDuration === 1 ? 'Week' : 'Weeks')
+      : (rentalDuration === 1 ? 'Day' : 'Days');
+
   const config = getVehicleFareConfig(vehicle);
 
   // Re-calculate or fetch values
@@ -168,13 +174,37 @@ export function downloadReceiptPDF(booking: Booking, vehicle: Vehicle, user: Use
   doc.text(formattedDate, 65, y);
   doc.text(booking.id.toUpperCase(), 115, y);
 
-  // Paid status pill with pristine borders
-  doc.setFillColor(52, 199, 89); // Apple safe light green #34C759
-  doc.roundedRect(160, y - 4, 14, 5, 1, 1, 'F');
+  // Dynamic Payment Status Pill with Pristine Borders and Adaptive Width
+  let statusText = 'PAID';
+  let pillColor = [52, 199, 89]; // default Green (#34C759)
+  
+  if (booking.paymentStatus === 'pending') {
+    if (booking.paymentMethod === 'bank_transfer' || booking.paymentMethod === 'transfer') {
+      if (booking.bankReceiptApproved === 'rejected') {
+        statusText = 'REJECTED';
+        pillColor = [255, 59, 48]; // Red (#FF3B30)
+      } else if (booking.bankReceiptApproved === 'pending') {
+        statusText = 'VERIFYING';
+        pillColor = [255, 149, 0]; // Amber (#FF9500)
+      } else {
+        statusText = 'PENDING';
+        pillColor = [255, 149, 0]; // Amber
+      }
+    } else {
+      statusText = 'PENDING';
+      pillColor = [255, 149, 0]; // Amber
+    }
+  }
+
+  const pillWidth = statusText.length > 7 ? 22 : statusText.length > 5 ? 18 : 14;
+  const pillX = 175 - pillWidth; // align right neatly
+
+  doc.setFillColor(pillColor[0], pillColor[1], pillColor[2]);
+  doc.roundedRect(pillX, y - 4, pillWidth, 5, 1, 1, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(255, 255, 255);
-  doc.text('PAID', 167, y - 0.5, { align: 'center' });
+  doc.text(statusText, pillX + (pillWidth / 2), y - 0.5, { align: 'center' });
 
   y += 9;
   doc.setDrawColor(242, 242, 247); // Extra subtle #F2F2F7 line
@@ -211,35 +241,63 @@ export function downloadReceiptPDF(booking: Booking, vehicle: Vehicle, user: Use
 
   y += 8;
 
-  // Render Client Info
+  // Render Client Info & Payment Details
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(134, 134, 139);
   doc.text('Full Name', keyLabelX, y);
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(29, 29, 31);
   doc.text(user?.name || 'Authorized Client', valueColX, y);
 
   doc.setFont('helvetica', 'normal');
+  doc.setTextColor(134, 134, 139);
   doc.text('Contact Email', keyLabelX, y + 6);
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(29, 29, 31);
   doc.text(user?.email || 'N/A', valueColX, y + 6);
 
   doc.setFont('helvetica', 'normal');
+  doc.setTextColor(134, 134, 139);
   doc.text('Primary Contact', keyLabelX, y + 12);
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(29, 29, 31);
   doc.text(user?.phone || 'N/A', valueColX, y + 12);
+
+  // Dynamic Payment Method
+  const payMethodStr = booking.paymentMethod === 'bank_transfer' || booking.paymentMethod === 'transfer'
+    ? 'Bank Transfer'
+    : 'Credit/Debit Card';
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(134, 134, 139);
+  doc.text('Payment Method', keyLabelX, y + 18);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(29, 29, 31);
+  doc.text(payMethodStr, valueColX, y + 18);
+
+  // Dynamic Transaction Reference
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(134, 134, 139);
+  doc.text('Transaction Ref', keyLabelX, y + 24);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(29, 29, 31);
+  const txRef = booking.transactionRef || (booking.paymentMethod === 'card' || booking.paymentMethod === 'credit_card' ? 'ESCROW-CARD-AUTHPAY' : 'DIRECT-PREMIUM-ESCROW');
+  doc.text(txRef.toUpperCase(), valueColX, y + 24);
 
   // Render Itinerary Info
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(134, 134, 139);
   doc.text('Pick-up Spot', itineraryLabelX, y);
   doc.setFont('helvetica', 'bold');
-  doc.text(vehicle.location, itineraryValX, y);
+  doc.setTextColor(29, 29, 31);
+  doc.text(booking.pickupLocation || vehicle.location, itineraryValX, y);
 
   doc.setFont('helvetica', 'normal');
+  doc.setTextColor(134, 134, 139);
   doc.text('Destination', itineraryLabelX, y + 6);
   doc.setFont('helvetica', 'bold');
-  doc.text(booking.destination || vehicle.location, itineraryValX, y + 6);
+  doc.setTextColor(29, 29, 31);
+  doc.text(booking.dropoffLocation || booking.destination || vehicle.location, itineraryValX, y + 6);
 
   const pdfDateFormatOptions: Intl.DateTimeFormatOptions = {
     month: 'short',
@@ -253,11 +311,23 @@ export function downloadReceiptPDF(booking: Booking, vehicle: Vehicle, user: Use
   const endFormatted = new Date(booking.endDate).toLocaleString('en-US', pdfDateFormatOptions);
 
   doc.setFont('helvetica', 'normal');
+  doc.setTextColor(134, 134, 139);
   doc.text('Rental Dates', itineraryLabelX, y + 12);
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(29, 29, 31);
   doc.text(`${startFormatted} to ${endFormatted}`, itineraryValX, y + 12);
 
-  y += 18;
+  const typeStr = rentalType.charAt(0).toUpperCase() + rentalType.slice(1);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(134, 134, 139);
+  doc.text('Duration Selected', itineraryLabelX, y + 18);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(29, 29, 31);
+  doc.text(`${rentalDuration} ${unitLabel} (${typeStr})`, itineraryValX, y + 18);
+
+  // Extra gap to accommodate new rows
+  y += 30;
+  doc.setDrawColor(229, 229, 234);
   doc.line(15, y, 195, y);
 
   y += 8;
@@ -342,12 +412,6 @@ export function downloadReceiptPDF(booking: Booking, vehicle: Vehicle, user: Use
 
   const rows: { label: string; value: string; isNegative?: boolean; isIncluded?: boolean }[] = [];
 
-  const unitLabel = rentalType === 'hourly'
-    ? (rentalDuration === 1 ? 'Hour' : 'Hours')
-    : rentalType === 'weekly'
-      ? (rentalDuration === 1 ? 'Week' : 'Weeks')
-      : (rentalDuration === 1 ? 'Day' : 'Days');
-
   rows.push({
     label: `Base Rent (${rentalType.charAt(0).toUpperCase() + rentalType.slice(1)} - ${rentalDuration} ${unitLabel}):`,
     value: `PKR ${basePrice.toLocaleString()}`
@@ -369,7 +433,9 @@ export function downloadReceiptPDF(booking: Booking, vehicle: Vehicle, user: Use
   }
 
   const isAirportPickup = (booking.destination || '').toLowerCase().includes('airport') || 
-                           (vehicle.location || '').toLowerCase().includes('airport');
+                           (vehicle.location || '').toLowerCase().includes('airport') ||
+                           (booking.pickupLocation || '').toLowerCase().includes('airport') ||
+                           (booking.dropoffLocation || '').toLowerCase().includes('airport');
   if (isAirportPickup) {
     rows.push({
       label: 'Airport Pick-up Surcharge:',
@@ -378,6 +444,16 @@ export function downloadReceiptPDF(booking: Booking, vehicle: Vehicle, user: Use
     });
   }
 
+  // Add Refundable Security Deposit
+  const securityDepositAmount = booking.securityDepositAmount !== undefined
+    ? booking.securityDepositAmount
+    : 10000;
+  if (securityDepositAmount > 0) {
+    rows.push({
+      label: 'Refundable Security Deposit (Held in Escrow):',
+      value: `PKR ${securityDepositAmount.toLocaleString()}`
+    });
+  }
 
   if (discountPrice > 0) {
     rows.push({
@@ -389,7 +465,12 @@ export function downloadReceiptPDF(booking: Booking, vehicle: Vehicle, user: Use
 
   const rowCount = rows.length;
   const lineHeight = 6;
-  const boxHeight = (rowCount * lineHeight) + 20;
+  
+  // Calculate dynamic card heights to perfectly contain partial split layouts
+  let boxHeight = (rowCount * lineHeight) + 20;
+  if (booking.paymentType === 'partial') {
+    boxHeight += 12;
+  }
 
   doc.setFillColor(250, 250, 250); // Apple-like subtle light background #FAFAFA
   doc.roundedRect(15, y, 180, boxHeight, 1.5, 1.5, 'F');
@@ -422,14 +503,47 @@ export function downloadReceiptPDF(booking: Booking, vehicle: Vehicle, user: Use
 
   // Total Summary bottom row
   currentY += 9;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(29, 29, 31);
-  doc.text('GRAND TOTAL AMOUNT PAID:', 25, currentY);
   
-  doc.setFontSize(13);
-  doc.setTextColor(0, 102, 204); // Genuine Apple premium blue link style #0066CC
-  doc.text(`PKR ${booking.totalPrice.toLocaleString()}`, 185, currentY, { align: 'right' });
+  if (booking.paymentType === 'partial') {
+    // Total Booking Value
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('TOTAL BOOKING VALUE:', 25, currentY);
+    doc.setFontSize(10);
+    doc.setTextColor(29, 29, 31);
+    doc.text(`PKR ${booking.totalPrice.toLocaleString()}`, 185, currentY, { align: 'right' });
+
+    currentY += 6;
+    // Upfront Amount Paid
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(16, 185, 129); // Green for paid amount
+    doc.text('AMOUNT PAID UPFRONT (50% ESCROW):', 25, currentY);
+    doc.setFontSize(11);
+    const upfront = booking.upfrontAmountPaid || (booking.totalPrice * 0.5);
+    doc.text(`PKR ${upfront.toLocaleString()}`, 185, currentY, { align: 'right' });
+
+    currentY += 6;
+    // Remaining balance
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(245, 158, 11); // Amber for remaining balance
+    doc.text('REMAINING DUE AT HANDOVER:', 25, currentY);
+    doc.setFontSize(10);
+    const remaining = booking.remainingAmount || (booking.totalPrice * 0.5);
+    doc.text(`PKR ${remaining.toLocaleString()}`, 185, currentY, { align: 'right' });
+  } else {
+    // Standard Grand Total Paid in Full
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(29, 29, 31);
+    doc.text('GRAND TOTAL AMOUNT PAID:', 25, currentY);
+    
+    doc.setFontSize(13);
+    doc.setTextColor(0, 102, 204); // Genuine Apple premium blue link style #0066CC
+    doc.text(`PKR ${booking.totalPrice.toLocaleString()}`, 185, currentY, { align: 'right' });
+  }
 
   y += boxHeight + 10;
 

@@ -324,7 +324,7 @@ ELITEDRIVE COMPLIANCE POLICIES:
                               {matchedVehicle ? `${matchedVehicle.name} (${matchedVehicle.licensePlate})` : 'Unknown Vehicle'}
                             </h4>
                             <p className="text-xs text-slate-400 mt-0.5 font-bold">
-                              Reported by: <span className="text-slate-700">{matchedUser?.name || 'Customer'}</span> on {new Date(inc.reportedAt).toLocaleString()}
+                              Reported by: <span className="text-slate-700">{matchedUser?.name || 'Customer'}</span> on {new Date(inc.submittedAt || inc.occurredAt).toLocaleString()}
                             </p>
                           </div>
 
@@ -340,7 +340,7 @@ ELITEDRIVE COMPLIANCE POLICIES:
 
                         {/* Statement/Narrative */}
                         <div className="p-4 bg-slate-50 rounded-2xl text-xs text-slate-700 font-medium">
-                          <p className="font-bold text-slate-900 mb-1">Incident Event Date: {new Date(inc.eventDate).toLocaleString()}</p>
+                          <p className="font-bold text-slate-900 mb-1">Incident Event Date: {new Date(inc.occurredAt).toLocaleString()}</p>
                           <p className="italic">"{inc.statement}"</p>
                           <p className="mt-2 text-[10px] text-slate-430">Location: {inc.location}</p>
                           {inc.firNumber && (

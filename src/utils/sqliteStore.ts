@@ -79,8 +79,8 @@ export function saveCollectionsToSqlite(collections: SqliteCollectionMap, dbPath
       }
     }
 
-    db.pragma('journal_mode = WAL');
-    db.pragma('synchronous = NORMAL');
+    db.pragma('journal_mode = DELETE');
+    db.pragma('synchronous = FULL');
 
     db.exec(`
       CREATE TABLE IF NOT EXISTS collections (
@@ -119,7 +119,7 @@ export function loadCollectionsFromSqlite(dbPath = getSqliteDatabasePath()): Sql
   let db: Database.Database | undefined;
   try {
     try {
-      db = new Database(dbPath, { readonly: true, fileMustExist: true });
+      db = new Database(dbPath);
     } catch (err: any) {
       if (isSqliteCorruptionError(err)) {
         backupCorruptedDatabase(dbPath);
@@ -127,6 +127,9 @@ export function loadCollectionsFromSqlite(dbPath = getSqliteDatabasePath()): Sql
       }
       throw err;
     }
+
+    db.pragma('journal_mode = DELETE');
+    db.pragma('synchronous = FULL');
 
     const integrityRaw = db.pragma('integrity_check', { simple: true });
     const integrity = Array.isArray(integrityRaw) ? integrityRaw[0] : integrityRaw;

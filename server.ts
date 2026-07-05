@@ -442,6 +442,25 @@ function hashPassword(password: string): string {
   return crypto.pbkdf2Sync(password, 'elitedrivesalt', 1000, 64, 'sha512').toString('hex');
 }
 
+function getEffectiveOutstandingBalance(user: any): number {
+  if (!user) return 0;
+  const baseBalance = user.outstandingBalance || 0;
+  
+  // Find all non-cancelled bookings of this user that have partial payment and pending remaining payment status
+  const partialBookings = (dbData.bookings || []).filter(
+    b => b.userId === user.id && 
+         b.paymentType === 'partial' && 
+         b.remainingPaymentStatus === 'pending' && 
+         b.status !== 'cancelled'
+  );
+  
+  const pendingBookingBalance = partialBookings.reduce((sum, b) => {
+    return sum + (b.remainingAmount || 0);
+  }, 0);
+  
+  return baseBalance + pendingBookingBalance;
+}
+
 async function initPgDatabase() {
   if (!pgPool) return;
   try {
@@ -572,6 +591,9 @@ function sanitizeLoadedData() {
       u.outstandingBalance = Math.max(0, u.outstandingBalance - totalIncorrectCancellationPenalty);
     }
   });
+
+  // Ensure seed users are always present in the database
+  ensureSeedUsers(dbData as any);
 }
 
 async function loadDatabase() {
@@ -894,7 +916,7 @@ async function startServer() {
 
     const token = generateToken(userId);
     const { passwordHash, ...userResponse } = newUser;
-    res.json({ token, user: userResponse });
+    res.json({ token, user: { ...userResponse, outstandingBalance: getEffectiveOutstandingBalance(newUser) } });
   });
 
   app.post('/api/auth/login', (req, res) => {
@@ -915,12 +937,12 @@ async function startServer() {
 
     const token = generateToken(user.id);
     const { passwordHash, ...userResponse } = user;
-    res.json({ token, user: userResponse });
+    res.json({ token, user: { ...userResponse, outstandingBalance: getEffectiveOutstandingBalance(user) } });
   });
 
   app.get('/api/auth/me', authenticateToken, (req: any, res) => {
     const { passwordHash, ...userResponse } = req.user;
-    res.json(userResponse);
+    res.json({ ...userResponse, outstandingBalance: getEffectiveOutstandingBalance(req.user) });
   });
 
   // EMAIL VERIFICATION ENDPOINTS
@@ -1685,10 +1707,13 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
     
     // 1. Outstanding Balance check
     const userProfile = dbData.users.find(u => u.id === req.user.id);
-    if (userProfile && (userProfile.outstandingBalance || 0) > 0) {
-      return res.status(400).json({ 
-        error: `Outstanding balance detected! You cannot make a new booking until you clear your outstanding charges of Rs. ${userProfile.outstandingBalance}.` 
-      });
+    if (userProfile) {
+      const effectiveBalance = getEffectiveOutstandingBalance(userProfile);
+      if (effectiveBalance > 0) {
+        return res.status(400).json({ 
+          error: `Outstanding balance detected! You cannot make a new booking until you clear your outstanding charges of Rs. ${effectiveBalance}.` 
+        });
+      }
     }
 
     // 2. Blacklisted User check
@@ -2410,7 +2435,10 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
 
   // USERS MANAGEMENT
   app.get('/api/users', authenticateToken, checkRole(['admin', 'manager']), (req, res) => {
-    res.json(dbData.users.map(({ passwordHash, ...u }) => u));
+    res.json(dbData.users.map(({ passwordHash, ...u }) => ({
+      ...u,
+      outstandingBalance: getEffectiveOutstandingBalance(u)
+    })));
   });
 
   app.put('/api/users/:id/role', authenticateToken, checkRole(['admin']), (req: any, res) => {

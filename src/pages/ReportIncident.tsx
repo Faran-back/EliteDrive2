@@ -29,6 +29,30 @@ import { useStore } from '../context/StoreContext';
 import CustomSelect from '../components/ui/CustomSelect';
 import CustomCalendar from '../components/ui/CustomCalendar';
 
+const formatHumanDateTime = (dateStr: string) => {
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = d.getDate();
+    const getOrdinal = (n: number) => {
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
+    const dayStr = getOrdinal(day);
+    const monthStr = d.toLocaleString('en-US', { month: 'short' });
+    const year = d.getFullYear();
+    const timeStr = d.toLocaleString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+    return `${dayStr} ${monthStr}, ${year} at ${timeStr}`;
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 const renderStatusTracker = (status: string) => {
   const stages = [
     { key: 'filed', label: 'Filed' },
@@ -731,23 +755,18 @@ const ReportIncident: React.FC = () => {
                     <div>
                       <label className="block text-xs uppercase font-extrabold text-slate-500 tracking-wider mb-2">Select Booking to Dispute</label>
                       <CustomSelect
-                        options={allBookings.filter(b => b.userId === user?.id && b.status === 'active').map((b) => {
+                        options={allBookings.filter(b => b.userId === user?.id).map((b) => {
                           const v = vehicles.find(veh => veh.id === b.vehicleId);
                           return {
                             value: b.id,
-                            label: `${v?.name || 'Vehicle'} (ID: ${b.id.slice(0, 8)}) — ${b.startDate} to ${b.endDate}`
+                            label: `${v?.name || 'Vehicle'} (ID: ${b.id.slice(0, 8)}) — ${b.startDate} to ${b.endDate} [Status: ${b.status}]`
                           };
                         })}
                         value={disputeBookingId}
                         onChange={(val) => setDisputeBookingId(val)}
-                        placeholder="-- Choose Your Current Active Booking --"
+                        placeholder="-- Choose Your Booking --"
                         buttonClassName="w-full flex items-center justify-between px-3.5 h-11 border border-slate-200 bg-white rounded-xl text-xs font-bold text-slate-800 shadow-sm transition-all hover:bg-slate-50 focus:ring-2 focus:ring-blue-600/20"
                       />
-                      {allBookings.filter(b => b.userId === user?.id && b.status === 'active').length === 0 && (
-                        <p className="text-[10px] text-rose-600 font-bold mt-1">
-                          ⚠️ You can only file a dispute if you have an active current booking.
-                        </p>
-                      )}
                     </div>
 
                     <div>
@@ -864,7 +883,7 @@ const ReportIncident: React.FC = () => {
                               <span className="text-slate-400 font-black uppercase block text-[8px]">Associated Vehicle & Booking</span>
                               <span className="font-extrabold text-slate-700">{vehicle?.name || 'Vehicle'} ({booking.id.slice(0, 8).toUpperCase()})</span>
                             </div>
-                            <span className="font-mono text-slate-400 font-semibold">{booking.startDate} to {booking.endDate}</span>
+                            <span className="text-slate-500 font-bold">{formatHumanDateTime(booking.startDate)} to {formatHumanDateTime(booking.endDate)}</span>
                           </div>
                         )}
 

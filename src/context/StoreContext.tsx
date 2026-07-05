@@ -432,10 +432,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const toggleFavorite = async (vehicleId: string) => {
-    const updated = await apiFetch(`/api/auth/toggle-favorite/${vehicleId}`, {
-      method: 'PUT'
-    });
-    setUser(updated);
+    if (!user) {
+      showToast('Please sign in to add favorites', 'error');
+      return;
+    }
+    const isFav = user.favorites?.includes(vehicleId);
+    try {
+      const updated = await apiFetch(`/api/auth/toggle-favorite/${vehicleId}`, {
+        method: 'PUT'
+      });
+      setUser(updated);
+      if (isFav) {
+        showToast('Removed from favorites', 'info');
+      } else {
+        showToast('Added to favorites!', 'success');
+      }
+    } catch (err) {
+      showToast('Failed to update favorites', 'error');
+    }
   };
 
   const addNotification = async (notification: Omit<Notification, 'id'>) => {

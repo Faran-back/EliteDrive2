@@ -36,6 +36,7 @@ import ReturnVerificationWidget from '../components/dashboard/ReturnVerification
 import EChallanManagement from '../components/dashboard/EChallanManagement';
 import EmailLogsSandbox from '../components/dashboard/EmailLogsSandbox';
 import FormalDisputes from '../components/dashboard/FormalDisputes';
+import RemainingBalances from '../components/dashboard/RemainingBalances';
 
 const AdminDashboard: React.FC = () => {
   const { allBookings, vehicles, allUsers } = useStore();
@@ -304,6 +305,7 @@ const AdminDashboard: React.FC = () => {
       {currentView === 'fraud-alerts' && <FraudAlerts />}
       {currentView === 'e-challans' && <EChallanManagement />}
       {currentView === 'disputes' && <FormalDisputes />}
+      {currentView === 'balances' && <RemainingBalances />}
       {currentView === 'email-logs' && <EmailLogsSandbox isAdminView={true} />}
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { MapPlacesAutocomplete } from '../components/ui/MapPlacesAutocomplete';
 import { 
   ShieldCheck,
@@ -16,7 +17,8 @@ import {
   Ticket,
   ArrowLeft,
   CheckCircle,
-  HelpCircle
+  HelpCircle,
+  Car
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { calculateBaseFare, getVehicleFareConfig } from '../utils/pricing';
@@ -1800,7 +1802,7 @@ const Payment: React.FC = () => {
                   </div>
                   <div className="space-y-1">
                     <span className="block text-[9px] font-black uppercase text-slate-400">Rental Duration</span>
-                    <span className="font-extrabold text-slate-800">{rentalDays} Day(s) ({startDate?.toLocaleDateString()} - {endDate?.toLocaleDateString()})</span>
+                    <span className="font-extrabold text-slate-800">{calendarDays} Day(s) ({startDate?.toLocaleDateString()} - {endDate?.toLocaleDateString()})</span>
                   </div>
                   {guarantorName && (
                     <div className="space-y-1 md:col-span-2 pt-2 border-t border-slate-100 flex justify-between items-center">

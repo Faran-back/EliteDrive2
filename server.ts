@@ -926,10 +926,10 @@ async function startServer() {
     }
     const user = dbData.users.find(u => u.email.toLowerCase() === email.toLowerCase());
     if (!user) {
-      return res.status(400).json({ error: 'Invalid login details' });
+      return res.status(400).json({ error: 'Invalid email' });
     }
-    if (user.passwordHash !== hashPassword(password)) {
-      return res.status(400).json({ error: 'Invalid login details' });
+    if (user.passwordHash != hashPassword(password)) {
+      return res.status(400).json({ error: 'Invalid password' });
     }
     if (user.isBlacklisted || user.isBlackListed) {
       return res.status(403).json({ error: 'Your account has been blacklisted due to disputed claims or active violations.' });

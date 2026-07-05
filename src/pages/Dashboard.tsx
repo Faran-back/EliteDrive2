@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import CustomCalendar from '../components/ui/CustomCalendar';
 import { MapPlacesAutocomplete } from '../components/ui/MapPlacesAutocomplete';
 import { 
@@ -16,14 +16,20 @@ import {
   RefreshCw,
   Calendar,
   Sparkles,
-  Scale
+  Scale,
+  Wallet,
+  Car,
+  Clock
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useStore } from '../context/StoreContext';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { vehicles, allBookings } = useStore();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const currentView = queryParams.get('view') || 'overview';
+  const { vehicles, allBookings, user, eChallans } = useStore();
   
   // AI Recommendation State
   const [aiBudget, setAiBudget] = useState('');
@@ -128,6 +134,123 @@ const Dashboard: React.FC = () => {
     // Navigate to fleet with applied filters (conceptually)
     navigate('/fleet');
   };
+
+  const outstandingBalance = user?.outstandingBalance || 0;
+
+  const myReasons = useMemo(() => {
+    if (!user) return [];
+    const reasons: { title: string; amount: number; date?: string; icon: any }[] = [];
+    
+    // 1. Get matched e-challans
+    const matchedChallans = eChallans ? eChallans.filter(c => c.matchedUserId === user.id) : [];
+    matchedChallans.forEach(c => {
+      reasons.push({
+        title: `Traffic E-Challan Ticket #${c.challanNumber}`,
+        amount: c.amount,
+        date: c.date || c.createdAt,
+        icon: Scale
+      });
+    });
+
+    // 2. Get bookings with penalty amounts
+    const matchedBookings = allBookings.filter(b => b.userId === user.id && (b.penaltyAmount || 0) > 0);
+    matchedBookings.forEach(b => {
+      const v = vehicles.find(veh => veh.id === b.vehicleId);
+      reasons.push({
+        title: `Late Return / Surcharge Penalty (${v?.name || 'Vehicle'} - ID: ${b.id.slice(0, 8).toUpperCase()})`,
+        amount: b.penaltyAmount || 0,
+        date: b.endDate,
+        icon: Car
+      });
+    });
+
+    // Calculate sum of known penalties
+    const sumPenalties = reasons.reduce((acc, r) => acc + r.amount, 0);
+    
+    if (sumPenalties < outstandingBalance) {
+      reasons.push({
+        title: 'Account Balance Surcharge / Miscellaneous Adjustment',
+        amount: outstandingBalance - sumPenalties,
+        icon: Wallet
+      });
+    }
+
+    return reasons;
+  }, [user, eChallans, allBookings, vehicles, outstandingBalance]);
+
+  if (currentView === 'balance') {
+    return (
+      <div className="animate-in fade-in duration-700 space-y-8">
+        <div>
+          <h2 className="text-3xl font-extrabold text-slate-900 uppercase tracking-tight flex items-center gap-2">
+            <Wallet className="text-blue-600" size={28} />
+            My Outstanding Account Balance
+          </h2>
+          <p className="text-xs text-slate-400 mt-1">
+            Review detailed invoice breakdown of pending penalties, e-challans, and damage surcharges.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Outstanding Balance Banner */}
+          <div className="lg:col-span-1 bg-slate-900 text-white rounded-[32px] p-8 border border-slate-950 flex flex-col justify-between shadow-2xl min-h-[250px]">
+            <div className="space-y-2">
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Total Payable Surcharge</span>
+              <h3 className="text-4xl font-black text-amber-400">PKR {outstandingBalance.toLocaleString()}</h3>
+            </div>
+
+            <div className="space-y-4 pt-6 border-t border-slate-800">
+              <p className="text-xs text-slate-350 leading-relaxed font-medium">
+                Please settle this balance as soon as possible. Unpaid balances will prevent placing new bookings.
+              </p>
+              <div className="flex items-center gap-2.5 text-[10px] text-amber-500 font-bold uppercase tracking-wider">
+                <Clock size={14} />
+                <span>Pending Settlement</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Breakdown Section */}
+          <div className="lg:col-span-2 bg-white rounded-[32px] p-8 border border-slate-200 shadow-xl shadow-slate-200/30 space-y-6">
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Detailed Balance Breakdown</h3>
+            
+            {myReasons.length === 0 ? (
+              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-100">
+                <Wallet className="text-slate-300 mx-auto mb-3" size={32} />
+                <p className="text-xs text-slate-500 font-bold">Your account balance is fully cleared. No penalties are pending.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {myReasons.map((reason, index) => {
+                  const Icon = reason.icon;
+                  return (
+                    <div key={index} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-white border border-slate-100 rounded-xl text-slate-500 mt-0.5">
+                          <Icon size={16} />
+                        </div>
+                        <div>
+                          <span className="font-extrabold text-slate-800 text-xs block">{reason.title}</span>
+                          {reason.date && (
+                            <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">
+                              Logged on: {new Date(reason.date).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="font-extrabold text-slate-900 text-sm whitespace-nowrap ml-4">
+                        PKR {reason.amount.toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-in fade-in duration-700">

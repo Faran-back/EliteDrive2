@@ -23,8 +23,9 @@ const VehicleDetails: React.FC = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { vehicles, user, showToast, allBookings } = useStore();
+  const { vehicles, user, showToast, allBookings, toggleFavorite } = useStore();
   const vehicle = vehicles.find(v => v.id === id);
+  const isFavorite = vehicle ? user?.favorites?.includes(vehicle.id) : false;
 
   const [selectedImage, setSelectedImage] = React.useState('');
   const lastVehicleId = React.useRef<string | undefined>(undefined);
@@ -92,8 +93,15 @@ const VehicleDetails: React.FC = () => {
           <button className="w-9 h-9 bg-white border border-[#E2E8F0] rounded-full flex items-center justify-center text-[#64748B] hover:text-[#2563EB] transition-all">
             <Share2 size={16} />
           </button>
-          <button className="w-9 h-9 bg-white border border-[#E2E8F0] rounded-full flex items-center justify-center text-[#64748B] hover:text-red-500 transition-all">
-            <Heart size={16} />
+          <button 
+            onClick={() => vehicle && toggleFavorite(vehicle.id)}
+            className={`w-9 h-9 border rounded-full flex items-center justify-center transition-all ${
+              isFavorite 
+                ? 'bg-red-500 border-red-500 text-white hover:bg-red-600 hover:border-red-600' 
+                : 'bg-white border-[#E2E8F0] text-[#64748B] hover:text-red-500 hover:border-red-500'
+            }`}
+          >
+            <Heart size={16} fill={isFavorite ? "currentColor" : "none"} />
           </button>
         </div>
       </div>

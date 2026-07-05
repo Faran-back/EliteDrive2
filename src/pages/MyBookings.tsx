@@ -27,6 +27,7 @@ import { downloadReceiptPDF } from '../utils/receiptGenerator';
 import { motion } from 'motion/react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import ModifyBookingModal from '../components/ModifyBookingModal';
+import CustomSelect from '../components/ui/CustomSelect';
 import { Booking } from '../types';
 
 const renderStatusTracker = (status: string) => {
@@ -84,14 +85,21 @@ const formatBookingDate = (dateStr: string) => {
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+    const day = d.getDate();
+    const getOrdinal = (n: number) => {
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
+    const dayStr = getOrdinal(day);
+    const monthStr = d.toLocaleString('en-US', { month: 'short' });
+    const year = d.getFullYear();
+    const timeStr = d.toLocaleString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true
     });
+    return `${dayStr} ${monthStr}, ${year} at ${timeStr}`;
   } catch (e) {
     return dateStr;
   }
@@ -927,16 +935,18 @@ const MyBookings: React.FC = () => {
             <form onSubmit={handleDisputeSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs uppercase font-extrabold text-slate-500 tracking-wider mb-1">Dispute Reason Category</label>
-                <select
+                <CustomSelect
+                  options={[
+                    { value: 'overcharge', label: 'Billing Overcharge / Payment dispute' },
+                    { value: 'damage_charge', label: 'Condition / Penalty charge dispute' },
+                    { value: 'service_issue', label: 'Service / Driver Negligence issue' },
+                    { value: 'e_challan', label: 'Traffic violation citation dispute' }
+                  ]}
                   value={disputeType}
-                  onChange={(e) => setDisputeType(e.target.value)}
-                  className="w-full text-xs rounded-xl border border-slate-200 h-11 px-4 font-bold text-slate-800 bg-white"
-                >
-                  <option value="overcharge">Billing Overcharge / Payment dispute</option>
-                  <option value="damage_charge">Condition / Penalty charge dispute</option>
-                  <option value="service_issue">Service / Driver Negligence issue</option>
-                  <option value="e_challan">Traffic violation citation dispute</option>
-                </select>
+                  onChange={(val) => setDisputeType(val)}
+                  placeholder="Select Dispute Category"
+                  buttonClassName="w-full flex items-center justify-between px-3.5 h-11 border border-slate-200 bg-white rounded-xl text-xs font-bold text-slate-800 shadow-sm transition-all hover:bg-slate-50 focus:ring-2 focus:ring-blue-600/20"
+                />
               </div>
 
               <div>

@@ -164,6 +164,23 @@ const Dashboard: React.FC = () => {
       });
     });
 
+    // 3. Get bookings with pending remaining payments (partial payment bookings)
+    const partialBookings = allBookings.filter(
+      b => b.userId === user.id && 
+           b.paymentType === 'partial' && 
+           b.remainingPaymentStatus === 'pending' && 
+           b.status !== 'cancelled'
+    );
+    partialBookings.forEach(b => {
+      const v = vehicles.find(veh => veh.id === b.vehicleId);
+      reasons.push({
+        title: `Pending 50% Remaining Payment (${v?.name || 'Vehicle'} - ID: ${b.id.slice(0, 8).toUpperCase()})`,
+        amount: b.remainingAmount || (b.totalPrice * 0.5),
+        date: b.startDate,
+        icon: Wallet
+      });
+    });
+
     // Calculate sum of known penalties
     const sumPenalties = reasons.reduce((acc, r) => acc + r.amount, 0);
     

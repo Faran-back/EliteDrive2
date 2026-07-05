@@ -277,208 +277,244 @@ const Auth: React.FC = () => {
               )}
             </AnimatePresence>
 
-            <form 
-              onSubmit={mode === 'signin' ? handleSubmitLogin(onLoginSubmit) : handleSubmitSignup(onSignupSubmit)} 
-              className="space-y-6"
-            >
-              <AnimatePresence mode="wait">
-                {mode === 'signup' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="space-y-2"
-                  >
-                    <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Full Name</label>
-                    <div className="relative">
-                      <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <input 
-                        type="text"
-                        {...registerSignup('name')}
-                        className={`w-full bg-slate-50 border ${signupErrors.name ? 'border-red-500' : 'border-slate-100'} rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-bold text-slate-900 placeholder:text-slate-300`} 
-                        placeholder="John Doe"
-                      />
-                    </div>
-                    {signupErrors.name && <p className="text-[10px] text-red-500 font-bold ml-1">{signupErrors.name.message}</p>}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <AnimatePresence mode="wait">
-                {mode === 'signup' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="space-y-2 relative"
-                  >
-                    <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Select Role</label>
-                    
-                    <div className="relative">
-                      <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10" size={18} />
-                      <button
-                        type="button"
-                        onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-                        className={`w-full bg-[#f8faff] border ${signupErrors.requestedRole ? 'border-red-500' : 'border-slate-100'} rounded-2xl py-4 pl-12 pr-4 flex items-center justify-between focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-bold text-slate-900 shadow-sm relative`}
-                      >
-                        <span className="capitalize">{requestedRole}</span>
-                        {isRoleDropdownOpen ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
-                      </button>
-
-                      <AnimatePresence>
-                        {isRoleDropdownOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                            className="absolute z-50 top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden p-2"
-                          >
-                            {(['admin', 'customer', 'manager'] as const).map((role) => (
-                              <button
-                                key={role}
-                                type="button"
-                                onClick={() => {
-                                  setValueSignup('requestedRole', role);
-                                  setIsRoleDropdownOpen(false);
-                                }}
-                                className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-between ${
-                                  requestedRole === role 
-                                    ? 'bg-blue-50 text-blue-600' 
-                                    : 'text-slate-600 hover:bg-slate-50'
-                                }`}
-                              >
-                                <span className="capitalize">{role}</span>
-                                {requestedRole === role && (
-                                  <div className="size-1.5 bg-blue-600 rounded-full" />
-                                )}
-                              </button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                    
-                    {signupErrors.requestedRole && <p className="text-[10px] text-red-500 font-bold ml-1">{signupErrors.requestedRole.message}</p>}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-
-              <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Email Address</label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input 
-                    type="email"
-                    {...(mode === 'signin' ? registerLogin('email') : registerSignup('email'))}
-                    className={`w-full bg-slate-50 border ${(mode === 'signin' ? loginErrors.email : signupErrors.email) ? 'border-red-500' : 'border-slate-100'} rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-bold text-slate-900 placeholder:text-slate-300`} 
-                    placeholder="name@example.com"
-                  />
-                </div>
-                {(mode === 'signin' ? loginErrors.email : signupErrors.email) && (
-                  <p className="text-[10px] text-red-500 font-bold ml-1">
-                    {(mode === 'signin' ? loginErrors.email : signupErrors.email)?.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center ml-1">
-                  <label className="text-xs font-black uppercase tracking-widest text-slate-400">Password</label>
-                  {mode === 'signin' && (
-                    <button type="button" className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700">Forgot?</button>
+            {mode === 'signin' ? (
+              <form 
+                onSubmit={handleSubmitLogin(onLoginSubmit)} 
+                className="space-y-6"
+              >
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                      type="email"
+                      key="signin-email"
+                      {...registerLogin('email')}
+                      className={`w-full bg-slate-50 border ${loginErrors.email ? 'border-red-500' : 'border-slate-100'} rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-bold text-slate-900 placeholder:text-slate-300`} 
+                      placeholder="name@example.com"
+                    />
+                  </div>
+                  {loginErrors.email && (
+                    <p className="text-[10px] text-red-500 font-bold ml-1">
+                      {loginErrors.email.message}
+                    </p>
                   )}
                 </div>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input 
-                    type="password"
-                    {...(mode === 'signin' ? registerLogin('password') : registerSignup('password'))}
-                    className={`w-full bg-slate-50 border ${(mode === 'signin' ? loginErrors.password : signupErrors.password) ? 'border-red-500' : 'border-slate-100'} rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-bold text-slate-900 placeholder:text-slate-300`} 
-                    placeholder="••••••••"
-                  />
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center ml-1">
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-400">Password</label>
+                    <button type="button" className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700">Forgot?</button>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                      type="password"
+                      key="signin-password"
+                      {...registerLogin('password')}
+                      className={`w-full bg-slate-50 border ${loginErrors.password ? 'border-red-500' : 'border-slate-100'} rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-bold text-slate-900 placeholder:text-slate-300`} 
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  {loginErrors.password && (
+                    <p className="text-[10px] text-red-500 font-bold ml-1">
+                      {loginErrors.password.message}
+                    </p>
+                  )}
                 </div>
-                {(mode === 'signin' ? loginErrors.password : signupErrors.password) && (
-                  <p className="text-[10px] text-red-500 font-bold ml-1">
-                    {(mode === 'signin' ? loginErrors.password : signupErrors.password)?.message}
-                  </p>
-                )}
-              </div>
 
-              <AnimatePresence mode="wait">
-                {mode === 'signup' && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="space-y-4 pt-2"
-                  >
-                    <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Identity Documents</label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { id: 'cnicFront', label: 'CNIC FRONT', icon: <IdCard size={24} /> },
-                        { id: 'cnicBack', label: 'CNIC BACK', icon: <IdCard size={24} /> },
-                        { id: 'license', label: 'DRIVING LICENSE', icon: <FileBadge size={24} /> },
-                      ].map((doc) => (
-                        <div key={doc.id} className="relative group">
-                          <input 
-                            type="file" 
-                            id={`file-${doc.id}`}
-                            className="hidden" 
-                            accept="image/*"
-                            onChange={(e) => handleFileChange(e, doc.id)}
-                          />
-                          <label 
-                            htmlFor={`file-${doc.id}`}
-                            className={`h-24 border-2 border-dashed ${docImages[doc.id] ? 'border-blue-600 bg-blue-50/20' : 'border-slate-100 bg-slate-50/30'} rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-blue-50/50 hover:border-blue-200 transition-all cursor-pointer overflow-hidden relative`}
-                          >
-                            {docImages[doc.id] ? (
-                              <img src={docImages[doc.id]!} alt={doc.label} className="w-full h-full object-cover" />
-                            ) : (
-                              <>
-                                <div className="text-slate-400 group-hover:text-blue-600 transition-colors">
-                                  {doc.icon}
-                                </div>
-                                <span className="text-[8px] font-black uppercase tracking-tight text-slate-500 text-center px-1">{doc.label}</span>
-                              </>
-                            )}
-                            
-                            {docImages[doc.id] && (
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <span className="text-[8px] font-black text-white uppercase tracking-widest">Change</span>
-                              </div>
-                            )}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <div className="bg-blue-50/50 border-l-4 border-blue-600 p-4 rounded-xl flex items-start gap-3">
-                      <div className="p-1.5 bg-blue-100 rounded-lg shrink-0">
-                        <Info className="text-blue-600" size={14} />
-                      </div>
-                      <p className="text-[10px] font-bold text-slate-600 leading-relaxed pt-0.5">
-                        Your documents will be verified within 24 hours. You can browse but cannot book until verified.
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <button 
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-5 px-6 rounded-3xl transition-all shadow-xl shadow-blue-100 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3 group"
+                <button 
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-5 px-6 rounded-3xl transition-all shadow-xl shadow-blue-100 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3 group"
+                >
+                  {loading ? (
+                    <LoadingSpinner size="sm" color="white" />
+                  ) : (
+                    <>
+                      <span>Sign In</span>
+                      <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
+                    </>
+                  )}
+                </button>
+              </form>
+            ) : (
+              <form 
+                onSubmit={handleSubmitSignup(onSignupSubmit)} 
+                className="space-y-6"
               >
-                {loading ? (
-                  <LoadingSpinner size="sm" color="white" />
-                ) : (
-                  <>
-                    <span>{mode === 'signin' ? 'Sign In' : 'Create Account'}</span>
-                    <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
-                  </>
-                )}
-              </button>
-            </form>
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Full Name</label>
+                  <div className="relative">
+                    <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                      type="text"
+                      key="signup-name"
+                      {...registerSignup('name')}
+                      className={`w-full bg-slate-50 border ${signupErrors.name ? 'border-red-500' : 'border-slate-100'} rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-bold text-slate-900 placeholder:text-slate-300`} 
+                      placeholder="John Doe"
+                    />
+                  </div>
+                  {signupErrors.name && <p className="text-[10px] text-red-500 font-bold ml-1">{signupErrors.name.message}</p>}
+                </div>
+
+                <div className="space-y-2 relative">
+                  <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Select Role</label>
+                  
+                  <div className="relative">
+                    <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10" size={18} />
+                    <button
+                      type="button"
+                      onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
+                      className={`w-full bg-[#f8faff] border ${signupErrors.requestedRole ? 'border-red-500' : 'border-slate-100'} rounded-2xl py-4 pl-12 pr-4 flex items-center justify-between focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-bold text-slate-900 shadow-sm relative`}
+                    >
+                      <span className="capitalize">{requestedRole}</span>
+                      {isRoleDropdownOpen ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
+                    </button>
+
+                    <AnimatePresence>
+                      {isRoleDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                          className="absolute z-50 top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden p-2"
+                        >
+                          {(['admin', 'customer', 'manager'] as const).map((role) => (
+                            <button
+                              key={role}
+                              type="button"
+                              onClick={() => {
+                                setValueSignup('requestedRole', role);
+                                setIsRoleDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-between ${
+                                requestedRole === role 
+                                  ? 'bg-blue-50 text-blue-600' 
+                                  : 'text-slate-600 hover:bg-slate-50'
+                              }`}
+                            >
+                              <span className="capitalize">{role}</span>
+                              {requestedRole === role && (
+                                <div className="size-1.5 bg-blue-600 rounded-full" />
+                              )}
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                  
+                  {signupErrors.requestedRole && <p className="text-[10px] text-red-500 font-bold ml-1">{signupErrors.requestedRole.message}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                      type="email"
+                      key="signup-email"
+                      {...registerSignup('email')}
+                      className={`w-full bg-slate-50 border ${signupErrors.email ? 'border-red-500' : 'border-slate-100'} rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-bold text-slate-900 placeholder:text-slate-300`} 
+                      placeholder="name@example.com"
+                    />
+                  </div>
+                  {signupErrors.email && (
+                    <p className="text-[10px] text-red-500 font-bold ml-1">
+                      {signupErrors.email.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center ml-1">
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-400">Password</label>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                      type="password"
+                      key="signup-password"
+                      {...registerSignup('password')}
+                      className={`w-full bg-slate-50 border ${signupErrors.password ? 'border-red-500' : 'border-slate-100'} rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all font-bold text-slate-900 placeholder:text-slate-300`} 
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  {signupErrors.password && (
+                    <p className="text-[10px] text-red-500 font-bold ml-1">
+                      {signupErrors.password.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-4 pt-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Identity Documents</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { id: 'cnicFront', label: 'CNIC FRONT', icon: <IdCard size={24} /> },
+                      { id: 'cnicBack', label: 'CNIC BACK', icon: <IdCard size={24} /> },
+                      { id: 'license', label: 'DRIVING LICENSE', icon: <FileBadge size={24} /> },
+                    ].map((doc) => (
+                      <div key={doc.id} className="relative group">
+                        <input 
+                          type="file" 
+                          id={`file-${doc.id}`}
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, doc.id)}
+                        />
+                        <label 
+                          htmlFor={`file-${doc.id}`}
+                          className={`h-24 border-2 border-dashed ${docImages[doc.id] ? 'border-blue-600 bg-blue-50/20' : 'border-slate-100 bg-slate-50/30'} rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-blue-50/50 hover:border-blue-200 transition-all cursor-pointer overflow-hidden relative`}
+                        >
+                          {docImages[doc.id] ? (
+                            <img src={docImages[doc.id]!} alt={doc.label} className="w-full h-full object-cover" />
+                          ) : (
+                            <>
+                              <div className="text-slate-400 group-hover:text-blue-600 transition-colors">
+                                {doc.icon}
+                              </div>
+                              <span className="text-[8px] font-black uppercase tracking-tight text-slate-500 text-center px-1">{doc.label}</span>
+                            </>
+                          )}
+                          
+                          {docImages[doc.id] && (
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-[8px] font-black text-white uppercase tracking-widest">Change</span>
+                            </div>
+                          )}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="bg-blue-50/50 border-l-4 border-blue-600 p-4 rounded-xl flex items-start gap-3">
+                    <div className="p-1.5 bg-blue-100 rounded-lg shrink-0">
+                      <Info className="text-blue-600" size={14} />
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-600 leading-relaxed pt-0.5">
+                      Your documents will be verified within 24 hours. You can browse but cannot book until verified.
+                    </p>
+                  </div>
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-5 px-6 rounded-3xl transition-all shadow-xl shadow-blue-100 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3 group"
+                >
+                  {loading ? (
+                    <LoadingSpinner size="sm" color="white" />
+                  ) : (
+                    <>
+                      <span>Create Account</span>
+                      <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
 
             <div className="relative flex items-center justify-center py-10">
               <div className="absolute inset-0 flex items-center">

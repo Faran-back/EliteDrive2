@@ -15,13 +15,14 @@ import {
   Sparkles, 
   SearchCode,
   Fingerprint,
-  TrendingDown
+  TrendingDown,
+  Trash2
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { motion, AnimatePresence } from 'motion/react';
 
 const EChallanManagement: React.FC = () => {
-  const { eChallans, vehicles, allBookings, allUsers, createEChallan, disputeEChallan, showToast } = useStore();
+  const { eChallans, vehicles, allBookings, allUsers, createEChallan, disputeEChallan, removeEChallan, showToast } = useStore();
   
   // Form states
   const [ticketNumber, setTicketNumber] = useState('');
@@ -231,7 +232,7 @@ const EChallanManagement: React.FC = () => {
                           <div className="space-y-1 flex-1">
                             <h4 className="text-[10px] font-black text-emerald-900 uppercase tracking-wider">Associated Driver Identified!</h4>
                             <p className="text-[11px] text-emerald-700 font-semibold leading-relaxed">
-                              On {violationDate}, the vehicle was rented under booking <span className="font-mono bg-emerald-100 px-1 rounded text-emerald-800">{lookupResult.booking?.id.slice(-6).toUpperCase()}</span>.
+                              On {violationDate}, the vehicle was rented under booking <span className="font-mono bg-emerald-100 px-1 rounded text-emerald-800">{lookupResult.booking?.id ? lookupResult.booking.id.slice(-6).toUpperCase() : 'N/A'}</span>.
                             </p>
                           </div>
                         </div>
@@ -408,14 +409,32 @@ const EChallanManagement: React.FC = () => {
                             <span className="text-sm font-black text-slate-900">PKR {chal.amount.toLocaleString()}</span>
                           </div>
 
-                          {chal.status === 'pending' && (
+                          <div className="flex items-center gap-2">
+                            {chal.status === 'pending' && (
+                              <button
+                                onClick={() => handleDispute(chal.id)}
+                                className="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[9px] font-black uppercase tracking-wider rounded-xl transition-all border border-amber-200 shrink-0 cursor-pointer"
+                              >
+                                File Dispute
+                              </button>
+                            )}
+
                             <button
-                              onClick={() => handleDispute(chal.id)}
-                              className="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[9px] font-black uppercase tracking-wider rounded-xl transition-all border border-amber-200 shrink-0 cursor-pointer"
+                              onClick={async () => {
+                                if (window.confirm(`Are you sure you want to waive and remove this E-Challan ticket (${chal.challanNumber})? This will clear PKR ${chal.amount.toLocaleString()} from the driver's outstanding balance.`)) {
+                                  try {
+                                    await removeEChallan(chal.id);
+                                  } catch (err: any) {
+                                    showToast?.(err.message || 'Failed to waive challan.', 'error');
+                                  }
+                                }
+                              }}
+                              className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[9px] font-black uppercase tracking-wider rounded-xl transition-all border border-rose-200 shrink-0 cursor-pointer flex items-center gap-1"
                             >
-                              File Dispute
+                              <Trash2 size={11} />
+                              Waive Fine
                             </button>
-                          )}
+                          </div>
                         </div>
                       </motion.div>
                     );

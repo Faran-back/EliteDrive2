@@ -41,6 +41,7 @@ const VehicleDetails: React.FC = () => {
   const activeBooking = vehicle ? allBookings.find(b => b.vehicleId === vehicle.id && (b.status === 'active' || b.status === 'pending')) : null;
   const isPastReturn = activeBooking && new Date() >= new Date(activeBooking.endDate);
   const effectiveStatus = vehicle ? (((vehicle.status === 'booked' || vehicle.status === 'rented') && isPastReturn) ? 'available' : vehicle.status) : 'available';
+  const hasPendingBooking = activeBooking && activeBooking.status === 'pending';
   const isVerified = (user?.emailVerified && user?.phoneVerified) || 
                       (user?.email && ['ahmed12@gmail.com', 'tj334767@gmail.com'].includes(user.email.toLowerCase()));
 
@@ -225,7 +226,9 @@ const VehicleDetails: React.FC = () => {
                 </p>
               </div>
               <div className="text-right">
-                {vehicle.status === 'booked' ? (
+                {hasPendingBooking ? (
+                  <p className="text-[10px] font-black text-amber-700 bg-amber-50 px-3 py-1.5 rounded-full inline-block mb-1 shadow-sm border border-amber-250 uppercase tracking-wider">Booking in process</p>
+                ) : vehicle.status === 'booked' ? (
                   <p className="text-[10px] font-black text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full inline-block mb-1 shadow-sm border border-amber-100">Currently Booked</p>
                 ) : vehicle.status === 'rented' ? (
                   <p className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full inline-block mb-1 shadow-sm border border-blue-100">Rented</p>
@@ -275,8 +278,13 @@ const VehicleDetails: React.FC = () => {
               ) : null}
 
               <Link 
-                to={!user ? '/auth?tab=login' : (isVerified && effectiveStatus === 'available' ? `/payment/${vehicle?.id}?days=${rentalDays}` : '#')}
+                to={!user ? '/auth?tab=login' : (isVerified && effectiveStatus === 'available' && !hasPendingBooking && !(user.outstandingBalance && user.outstandingBalance > 0) && !user.isBlacklisted ? `/payment/${vehicle?.id}?days=${rentalDays}` : '#')}
                 onClick={(e) => {
+                  if (hasPendingBooking) {
+                    e.preventDefault();
+                    showToast('This vehicle has a pending booking request under administrative review.', 'error');
+                    return;
+                  }
                   if (effectiveStatus !== 'available') {
                     e.preventDefault();
                     showToast(`This vehicle is currently booked by another user and is not available.`, 'error');
@@ -287,24 +295,36 @@ const VehicleDetails: React.FC = () => {
                     showToast('Welcome to EliteDrive! Please register or log in to secure this vehicle.', 'info');
                     return;
                   }
+                  if (user && (user.outstandingBalance || 0) > 0) {
+                    e.preventDefault();
+                    showToast(`Outstanding balance detected! You cannot make a new booking until you clear your outstanding charges of PKR ${(user.outstandingBalance || 0).toLocaleString()}.`, 'error');
+                    return;
+                  }
+                  if (user && user.isBlacklisted) {
+                    e.preventDefault();
+                    showToast(`Your account is restricted. Please contact support.`, 'error');
+                    return;
+                  }
                   if (!isVerified) {
                     e.preventDefault();
                     showToast('Verification Required: Please verify your email and phone in your profile.', 'error');
                   }
                 }}
                 className={`w-full ${
-                  (!user || isVerified) && effectiveStatus === 'available' 
+                  (!user || isVerified) && effectiveStatus === 'available' && !hasPendingBooking
                     ? 'bg-[#2563EB] hover:bg-blue-700 shadow-xl shadow-blue-100' 
                     : 'bg-gray-100 border border-gray-200 cursor-not-allowed text-gray-400'
                 } text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]`}
               >
-                {effectiveStatus === 'available' 
-                  ? (!user ? 'Sign In to Book' : 'Proceed to Booking')
-                  : effectiveStatus === 'booked' 
-                    ? 'Currently Booked' 
-                    : effectiveStatus === 'rented' 
-                      ? 'Rented' 
-                      : 'Unavailable'}
+                {hasPendingBooking
+                  ? 'Booking Under review'
+                  : effectiveStatus === 'available' 
+                    ? (!user ? 'Sign In to Book' : 'Proceed to Booking')
+                    : effectiveStatus === 'booked' 
+                      ? 'Currently Booked' 
+                      : effectiveStatus === 'rented' 
+                        ? 'Rented' 
+                        : 'Unavailable'}
                 <ShieldCheck size={20} />
               </Link>
             </div>

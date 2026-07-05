@@ -827,7 +827,7 @@ const MyBookings: React.FC = () => {
                                   <div key={dsp.id} className="p-5 rounded-[22px] bg-blue-50/40 border border-blue-100/60 text-xs text-slate-800 shadow-sm hover:shadow-md transition-all">
                                     <div className="flex justify-between items-center mb-1">
                                       <span className="inline-flex px-2 py-0.5 rounded bg-blue-100 text-blue-850 font-black uppercase tracking-wide text-[9px]">LODGED DISPUTE</span>
-                                      <span className="text-[9px] font-black uppercase text-blue-600">{dsp.status?.toUpperCase()}</span>
+                                      <span className="text-[9px] font-black uppercase text-blue-600">{dsp.status?.replace('_', ' ').toUpperCase()}</span>
                                     </div>
                                     <p className="font-bold text-slate-900">{dsp.title}</p>
                                     <p className="text-slate-500 text-[10px] uppercase font-bold mt-0.5">Category: {dsp.type}</p>

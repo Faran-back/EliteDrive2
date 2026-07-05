@@ -478,7 +478,7 @@ ELITEDRIVE COMPLIANCE POLICIES:
                               Subject: "{dsp.title}"
                             </h4>
                             <p className="text-xs text-slate-400 mt-0.5 font-bold">
-                              Booking Ref: <span className="text-blue-600">ID {dsp.bookingId.slice(-6).toUpperCase()}</span> • Filed by: <span className="text-slate-700">{matchedUser?.name || 'Customer'}</span>
+                              Booking Ref: <span className="text-blue-600">ID {dsp.bookingId ? dsp.bookingId.slice(-6).toUpperCase() : 'N/A'}</span> • Filed by: <span className="text-slate-700">{matchedUser?.name || 'Customer'}</span>
                             </p>
                           </div>
 

@@ -48,6 +48,8 @@ const Payment: React.FC = () => {
   const [guarantorPhone, setGuarantorPhone] = useState('');
   const [hasSignedAgreement, setHasSignedAgreement] = useState(false);
   const [gpsTrackingConsent, setGpsTrackingConsent] = useState(false);
+  const [showAgreementModal, setShowAgreementModal] = useState(false);
+  const [agreementSignature, setAgreementSignature] = useState('');
 
   // Premium, interactive Credit/Debit Card state variables
   const [cardNumber, setCardNumber] = useState('');
@@ -174,6 +176,18 @@ const Payment: React.FC = () => {
       setIsCouponApplied(false);
     }
   }, [bookings, isCouponApplied, coupon]);
+
+  // Prevent accessing checkout if user has an outstanding balance or is blacklisted
+  useEffect(() => {
+    if (user && (user.outstandingBalance || 0) > 0) {
+      showToast(`Outstanding balance detected! You cannot book a vehicle until you clear your balance of PKR ${(user.outstandingBalance || 0).toLocaleString()}.`, 'error');
+      navigate(`/vehicle/${id}`);
+    }
+    if (user && user.isBlacklisted) {
+      showToast('Your account has been restricted. Please contact support.', 'error');
+      navigate(`/vehicle/${id}`);
+    }
+  }, [user, id, navigate, showToast]);
 
   const {
     register,
@@ -1020,23 +1034,38 @@ const Payment: React.FC = () => {
                             <span className="block text-[10px] uppercase font-black text-slate-500 tracking-wider">Additional Outstation Requirements</span>
                             
                             {/* Signed Rental Agreement */}
-                            <label className="flex items-start gap-2.5 cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-start gap-2.5" onClick={(e) => e.stopPropagation()}>
                               <input 
                                 type="checkbox" 
                                 checked={hasSignedAgreement} 
                                 onChange={(e) => {
-                                  setHasSignedAgreement(e.target.checked);
                                   if (e.target.checked) {
-                                    setGpsTrackingConsent(false);
+                                    setShowAgreementModal(true);
+                                  } else {
+                                    setHasSignedAgreement(false);
                                   }
                                 }}
-                                className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-4 w-4 mt-0.5"
+                                className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-4 w-4 mt-0.5 cursor-pointer"
                               />
                               <div>
-                                <h5 className="font-bold text-slate-800 text-[11px]">Provide Signed Rental Agreement</h5>
-                                <p className="text-[9px] text-slate-400">Provide/sign physical or digital rental agreement copy</p>
+                                <h5 className="font-bold text-slate-800 text-[11px] flex items-center gap-1">
+                                  Provide{' '}
+                                  <button 
+                                    type="button"
+                                    onClick={() => setShowAgreementModal(true)}
+                                    className="text-blue-600 hover:text-blue-800 underline font-black cursor-pointer bg-transparent border-none p-0 inline"
+                                  >
+                                    Signed Rental Agreement
+                                  </button>
+                                </h5>
+                                <p className="text-[9px] text-slate-400">Review, sign and accept the outstation legal travel agreement</p>
+                                {hasSignedAgreement && (
+                                  <span className="inline-flex items-center gap-1 mt-1.5 text-[8px] font-black uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                    ✓ Digital Agreement Signed
+                                  </span>
+                                )}
                               </div>
-                            </label>
+                            </div>
 
                             {/* GPS Tracking Consent */}
                             <label className="flex items-start gap-2.5 cursor-pointer" onClick={(e) => e.stopPropagation()}>
@@ -1709,6 +1738,173 @@ const Payment: React.FC = () => {
           </footer>
         </div>
       </div>
+      {/* Dynamic Rental Agreement Modal */}
+      <AnimatePresence>
+        {showAgreementModal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/65 backdrop-blur-md flex items-center justify-center p-4 md:p-6" onClick={() => setShowAgreementModal(false)}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-[32px] shadow-2xl border border-slate-100 max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden"
+            >
+              {/* Header: Blue & White Corporate Theme */}
+              <div className="bg-[#1E3A8A] text-white px-8 py-6 flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-white/10 rounded-xl">
+                    <Car size={22} className="text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black tracking-tight leading-none">ELITE<span className="text-blue-300">DRIVE</span> LEGAL</h3>
+                    <p className="text-[10px] uppercase font-black tracking-wider text-blue-200 mt-1">Outstation Travel Agreement</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
+                  >
+                    Print
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAgreementModal(false)}
+                    className="text-white/70 hover:text-white transition-all text-sm font-black uppercase bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-lg cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Agreement Content */}
+              <div className="p-8 overflow-y-auto space-y-6 text-slate-700 text-xs leading-relaxed max-h-[55vh]">
+                <div className="text-center pb-4 border-b border-slate-100">
+                  <h4 className="text-md font-black text-slate-900 uppercase tracking-wide">CAR RENTAL AGREEMENT</h4>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Out-of-City / Outstation Legal Provisions</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-150">
+                  <div className="space-y-1">
+                    <span className="block text-[9px] font-black uppercase text-slate-400">Renter Name</span>
+                    <span className="font-extrabold text-slate-800">{user?.name || 'Authorized Customer'}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="block text-[9px] font-black uppercase text-slate-400">Vehicle Selected</span>
+                    <span className="font-extrabold text-slate-800">{vehicle?.name || 'EliteDrive Fleet Vehicle'} ({vehicle?.licensePlate || 'PLATE N/A'})</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="block text-[9px] font-black uppercase text-slate-400">Outstation Destination</span>
+                    <span className="font-extrabold text-blue-600 uppercase">{outOfCityDestination || '(Destination Unspecified)'}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="block text-[9px] font-black uppercase text-slate-400">Rental Duration</span>
+                    <span className="font-extrabold text-slate-800">{rentalDays} Day(s) ({startDate?.toLocaleDateString()} - {endDate?.toLocaleDateString()})</span>
+                  </div>
+                  {guarantorName && (
+                    <div className="space-y-1 md:col-span-2 pt-2 border-t border-slate-100 flex justify-between items-center">
+                      <div>
+                        <span className="block text-[9px] font-black uppercase text-slate-400">Outstation Guarantor</span>
+                        <span className="font-extrabold text-slate-800">{guarantorName}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="block text-[9px] font-black uppercase text-slate-400">Guarantor Contact</span>
+                        <span className="font-mono text-slate-700 font-extrabold">{guarantorPhone}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <h5 className="font-black text-slate-900 uppercase text-[10px] tracking-wide border-l-2 border-blue-600 pl-2">Terms of Outstation Travel</h5>
+                  
+                  <div className="space-y-3">
+                    <p>
+                      <strong>1. GEOGRAPHICAL BOUNDS & GEO-FENCING:</strong> The Renter is authorized to navigate the leased vehicle strictly to the specified out-of-city location of <strong>{outOfCityDestination || 'the designated destination'}</strong>. Entering restricted high-risk areas, northern ranges, or crossing provincial lines without express, written clearance is strictly forbidden and triggers an automatic remote ignition lock, forfeit of security deposits, and immediate police GPS dispatch.
+                    </p>
+                    <p>
+                      <strong>2. SECURITY DEPOSIT AND DAMAGE WAIVER:</strong> A security escrow of PKR 20,000 will be frozen as collateral. Any bodywork damages, tyre bursts, engine overheating due to negligence, suspension stress, or late return delays will be directly assessed and billed against this deposit at actual local market replacement values.
+                    </p>
+                    <p>
+                      <strong>3. SPEEDING, TRAFFIC FINES & E-CHALLANS:</strong> The Renter agrees to adhere strictly to all national highway speeds (Max 120km/h on Motorways). Any e-challan tickets, camera citations, motorway violation fines, or police tolls incurred during the specified rental duration are the absolute financial responsibility of the Renter. These will automatically debit the renter's outstanding account balance on EliteDrive.
+                    </p>
+                    <p>
+                      <strong>4. MECHANICAL CHECKLIST RESPONSIBILITY:</strong> On long outstation journeys, the Renter assumes basic custodial duty to inspect radiator coolant levels, engine lube levels, and tyre inflation pressures at every major refueling station. Mechanical starvation claims (seized engine blocks) caused by dry oil sumps or dry radiators are fully liable to the Renter.
+                    </p>
+                    <p>
+                      <strong>5. OUTSTATION GUARANTOR CO-SIGNING:</strong> The designated outstation guarantor <strong>{guarantorName || 'as provided'}</strong> is legally and civilly co-liable for any default, criminal non-recovery, or severe damage liabilities incurred during the execution of this rental agreement.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Digital Signature & Action Bar */}
+              <div className="bg-slate-50 border-t border-slate-150 p-8 shrink-0 space-y-4">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="w-full md:max-w-xs space-y-1.5">
+                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Type Your Name to Sign Digitally</label>
+                    <input
+                      type="text"
+                      className="w-full text-xs rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:ring-blue-600 h-10 px-3 font-bold"
+                      placeholder="e.g. MUHAMMAD AHMED"
+                      value={agreementSignature}
+                      onChange={(e) => setAgreementSignature(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-4 bg-white border border-slate-200 p-3 rounded-2xl flex-1 justify-center min-h-[50px]">
+                    {agreementSignature.trim() ? (
+                      <div className="text-center">
+                        <span className="block text-[8px] font-black uppercase text-slate-400">Preview Digital Signature</span>
+                        <p className="font-serif italic text-blue-800 text-lg font-bold tracking-wider py-1 select-none leading-none">
+                          {agreementSignature}
+                        </p>
+                        <span className="block text-[8px] font-mono font-bold text-slate-400 mt-1">
+                          IP SECURE LOGGED • {new Date().toLocaleDateString()}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 font-bold text-[10px] uppercase">Signature Pad Empty</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAgreementSignature('');
+                      setHasSignedAgreement(false);
+                      setShowAgreementModal(false);
+                    }}
+                    className="px-5 py-3 border border-slate-200 rounded-xl text-slate-600 font-black text-xs uppercase tracking-wider bg-white hover:bg-slate-50 cursor-pointer"
+                  >
+                    Clear & Decline
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!agreementSignature.trim()}
+                    onClick={() => {
+                      setHasSignedAgreement(true);
+                      setGpsTrackingConsent(false);
+                      setShowAgreementModal(false);
+                      showToast('Agreement signed successfully. Ready to proceed.', 'success');
+                    }}
+                    className={`px-6 py-3 rounded-xl text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer ${
+                      agreementSignature.trim()
+                        ? 'bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100'
+                        : 'bg-slate-300 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Sign & Accept Agreement
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

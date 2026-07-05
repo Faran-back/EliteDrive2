@@ -575,7 +575,11 @@ const Fleet: React.FC = () => {
                 >
                   <div className="relative h-64 overflow-hidden">
                     <div className="absolute top-6 left-6 z-10 flex gap-2">
-                      {isCurrentlyBooked ? (
+                      {activeBooking && activeBooking.status === 'pending' ? (
+                        <span className="px-5 py-2 bg-amber-600 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-amber-500 shadow-md">
+                          Reviewing
+                        </span>
+                      ) : isCurrentlyBooked ? (
                         <span className="px-5 py-2 bg-amber-500 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-amber-400 shadow-md">
                           Booked
                         </span>

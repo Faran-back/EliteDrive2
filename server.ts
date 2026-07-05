@@ -1282,7 +1282,7 @@ async function startServer() {
       };
 
       const textPart = {
-        text: 'You are a banking auditor verifying bank transfer receipts for a premium car rental company. Analyze this image carefully. Your job is to make sure the user has uploaded an actual bank transaction receipt, screenshot of a mobile banking success screen, ATM receipt, or similar financial payment document. If they uploaded a photo of a car, a person, a scenery, or any random non-financial document, you must set isValidReceipt to false. If it is a valid receipt, extract the sending bank name, the reference/transaction ID, and transaction amount.'
+        text: 'You are a banking auditor verifying bank transfer receipts for a premium car rental company. Analyze this image carefully. Your job is to make sure the user has uploaded an actual bank transaction receipt, screenshot of a mobile banking success screen, ATM receipt, or similar financial payment document.\n\nCRITICAL SECURITY CHECK: You MUST identify and reject any government-issued identification cards, such as CNIC (Computerized National Identity Card), Driving Licenses, Passports, or other non-payment personal identity documents. If the user has uploaded an identity card/CNIC or non-financial document, you MUST set isValidReceipt to false, and provide a polite, professional rejection reason explaining that they uploaded an ID/CNIC instead of a payment receipt.\n\nIf they uploaded a photo of a car, a person, scenery, or any random non-financial document, set isValidReceipt to false.\n\nIf it is a valid bank transfer receipt/screenshot, set isValidReceipt to true and extract the sending bank name, the reference/transaction ID, and transaction amount.'
       };
 
       let response;
@@ -3028,6 +3028,45 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
 
     saveDatabase();
     res.json(challan);
+  });
+
+  // DELETE E-CHALLAN: Waive violation and deduct outstanding balance
+  app.delete('/api/e-challans/:id', authenticateToken, checkRole(['admin', 'manager']), (req: any, res) => {
+    const { id } = req.params;
+    const challanIdx = dbData.echallans.findIndex(c => c.id === id);
+    if (challanIdx === -1) {
+      return res.status(404).json({ error: 'E-Challan not found' });
+    }
+    
+    const challan = dbData.echallans[challanIdx];
+    
+    // If the challan was matched to a customer, deduct from outstanding balance
+    if (challan.matchedUserId) {
+      const userIndex = dbData.users.findIndex(u => u.id === challan.matchedUserId);
+      if (userIndex !== -1) {
+        dbData.users[userIndex].outstandingBalance = Math.max(
+          0,
+          (dbData.users[userIndex].outstandingBalance || 0) - Number(challan.amount)
+        );
+        
+        // Notify user of cleared fine
+        dbData.notifications.push({
+          id: `not_${Math.random().toString(36).substring(2, 11)}`,
+          userId: challan.matchedUserId,
+          title: 'Traffic Fine Cleared / Waived',
+          message: `Your traffic e-challan ticket number ${challan.challanNumber} for PKR ${challan.amount.toLocaleString()} has been waived/removed by administration. Your outstanding balance is updated.`,
+          type: 'success',
+          read: false,
+          createdAt: new Date().toISOString()
+        });
+      }
+    }
+    
+    // Remove from array
+    dbData.echallans.splice(challanIdx, 1);
+    saveDatabase();
+    
+    res.json({ success: true, message: 'E-Challan waived successfully and driver balance updated.' });
   });
 
   // Blacklist Toggle Endpoint

@@ -54,6 +54,7 @@ interface StoreContextType {
   updateDisputeStatus: (id: string, status: string, resolutionDetails?: string) => Promise<void>;
   createEChallan: (challanData: { challanNumber: string; date: string; amount: number; vehicleId: string }) => Promise<void>;
   disputeEChallan: (challanId: string) => Promise<void>;
+  removeEChallan: (challanId: string) => Promise<void>;
   toggleUserBlacklist: (userId: string, isBlacklisted: boolean) => Promise<void>;
   isChatOpen: boolean;
   setIsChatOpen: (isOpen: boolean) => void;
@@ -660,6 +661,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await refreshData();
   };
 
+  const removeEChallan = async (challanId: string) => {
+    await apiFetch(`/api/e-challans/${challanId}`, {
+      method: 'DELETE'
+    });
+    showToast('E-Challan waived and outstanding balance updated.', 'success');
+    await refreshData();
+  };
+
   const toggleUserBlacklist = async (userId: string, isBlacklisted: boolean) => {
     await apiFetch(`/api/users/${userId}/blacklist`, {
       method: 'PUT',
@@ -722,6 +731,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       updateDisputeStatus,
       createEChallan,
       disputeEChallan,
+      removeEChallan,
       toggleUserBlacklist,
       roleRequests,
       refreshData

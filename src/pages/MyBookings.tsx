@@ -30,6 +30,12 @@ import ModifyBookingModal from '../components/ModifyBookingModal';
 import CustomSelect from '../components/ui/CustomSelect';
 import { Booking } from '../types';
 
+const formatDisputeId = (id: string): string => {
+  if (!id) return '';
+  const clean = id.replace(/^(dsp|dispute)[_-]/i, '');
+  return `DISPUTE: ${clean.replace(/[_-]/g, '').toUpperCase()}`;
+};
+
 const renderStatusTracker = (status: string) => {
   const stages = [
     { key: 'filed', label: 'Filed' },
@@ -839,6 +845,7 @@ const MyBookings: React.FC = () => {
                                     </div>
                                     <p className="font-bold text-slate-900">{dsp.title}</p>
                                     <p className="text-slate-500 text-[10px] uppercase font-bold mt-0.5">Category: {dsp.type}</p>
+                                    <p className="text-slate-400 text-[10px] font-mono font-bold mt-0.5">{formatDisputeId(dsp.id)}</p>
                                     <p className="text-slate-600 mt-1 leading-relaxed font-semibold">{dsp.description}</p>
                                     {dsp.resolutionDetails && (
                                       <div className="mt-2 p-2 bg-green-50 text-green-800 border border-green-150 rounded-lg">

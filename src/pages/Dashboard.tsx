@@ -19,7 +19,14 @@ import {
   Scale,
   Wallet,
   Car,
-  Clock
+  Clock,
+  ShieldCheck,
+  Copy,
+  Lock,
+  Upload,
+  Check,
+  ChevronDown,
+  Info
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useStore } from '../context/StoreContext';
@@ -29,7 +36,109 @@ const Dashboard: React.FC = () => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const currentView = queryParams.get('view') || 'overview';
-  const { vehicles, allBookings, user, eChallans } = useStore();
+  const { vehicles, allBookings, user, eChallans, showToast, refreshData } = useStore();
+
+  // Penalty Payment Form State
+  const [payPenaltyType, setPayPenaltyType] = useState('Late return penalty');
+  const [payAmount, setPayAmount] = useState('');
+  const [paySenderBank, setPaySenderBank] = useState('');
+  const [payTid, setPayTid] = useState('');
+  const [payReceiptName, setPayReceiptName] = useState('');
+  const [payReceiptBase64, setPayReceiptBase64] = useState('');
+  const [isSubmittingPay, setIsSubmittingPay] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const [myBalancePayments, setMyBalancePayments] = useState<any[]>([]);
+
+  const fetchMyBalancePayments = async () => {
+    try {
+      const token = localStorage.getItem('elitedrive_token');
+      const res = await fetch('/api/my-balance-payments', {
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMyBalancePayments(data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    if (currentView === 'balance' && user) {
+      fetchMyBalancePayments();
+    }
+  }, [currentView, user]);
+
+  const handleCopyText = (text: string, fieldName: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    showToast(`${fieldName} copied to clipboard!`, 'success');
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handlePayPenaltySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountNum = Number(payAmount);
+    const outstandingBalance = user?.outstandingBalance || 0;
+
+    if (!payAmount || amountNum <= 0) {
+      showToast('Please enter a valid amount to pay.', 'error');
+      return;
+    }
+    if (amountNum > outstandingBalance) {
+      showToast('Payment amount cannot be greater than your total outstanding balance.', 'error');
+      return;
+    }
+    if (!paySenderBank) {
+      showToast('Please select your issuing bank.', 'error');
+      return;
+    }
+    if (!payTid.trim()) {
+      showToast('Please enter your Transaction ID (TID).', 'error');
+      return;
+    }
+
+    setIsSubmittingPay(true);
+    try {
+      const token = localStorage.getItem('elitedrive_token');
+      const res = await fetch('/api/users/pay-penalty', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          penaltyTitle: payPenaltyType,
+          amount: amountNum,
+          senderBank: paySenderBank,
+          transactionRef: payTid,
+          receiptImage: payReceiptBase64
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to submit penalty payment');
+      }
+
+      showToast('Penalty payment submitted successfully for verification! Admin will review it shortly.', 'success');
+      // Reset form
+      setPayAmount('');
+      setPaySenderBank('');
+      setPayTid('');
+      setPayReceiptName('');
+      setPayReceiptBase64('');
+      await refreshData();
+      await fetchMyBalancePayments();
+    } catch (err: any) {
+      showToast(err.message || 'Error submitting payment', 'error');
+    } finally {
+      setIsSubmittingPay(false);
+    }
+  };
   
   // AI Recommendation State
   const [aiBudget, setAiBudget] = useState('');
@@ -195,6 +304,86 @@ const Dashboard: React.FC = () => {
     return reasons;
   }, [user, eChallans, allBookings, vehicles, outstandingBalance]);
 
+  const myPayables = useMemo(() => {
+    if (!user) return [];
+    const list: {
+      booking: any;
+      vehicle: any;
+      type: 'refund' | 'deposit';
+      amount: number;
+      reason: string;
+      status: string;
+    }[] = [];
+
+    allBookings.forEach(b => {
+      if (b.userId !== user.id) return;
+      const vehicle = vehicles.find(v => v.id === b.vehicleId);
+
+      // 1. Cancellation refund
+      if (b.status === 'cancelled' && (b.refundAmount || 0) > 0 && b.refundStatus !== 'processed') {
+        list.push({
+          booking: b,
+          vehicle,
+          type: 'refund',
+          amount: b.refundAmount || 0,
+          reason: `Cancellation refund for Booking ID ${b.id.toUpperCase().slice(0, 8)}`,
+          status: b.refundStatus || 'pending_manual_bank_transfer'
+        });
+      }
+
+      // 2. Security Deposit return
+      const isEligibleForDepositRefund = b.status === 'completed' || b.status === 'cancelled';
+      if (isEligibleForDepositRefund && (b.securityDepositAmount || 0) > 0 && b.securityDepositStatus !== 'refunded') {
+        list.push({
+          booking: b,
+          vehicle,
+          type: 'deposit',
+          amount: b.securityDepositAmount || 0,
+          reason: `Security Deposit return for Booking ID ${b.id.toUpperCase().slice(0, 8)}`,
+          status: b.securityDepositStatus || 'pending'
+        });
+      }
+    });
+
+    return list;
+  }, [allBookings, user, vehicles]);
+
+  const myRefundsReceived = useMemo(() => {
+    if (!user || !allBookings) return [];
+    const userBookings = allBookings.filter(b => b.userId === user.id);
+    const list: {
+      bookingId: string;
+      vehicleName: string;
+      type: 'refund' | 'deposit';
+      amount: number;
+      date: string;
+    }[] = [];
+
+    userBookings.forEach(b => {
+      const v = vehicles.find(car => car.id === b.vehicleId);
+      if (b.status === 'cancelled' && b.refundStatus === 'processed' && (b.refundAmount || 0) > 0) {
+        list.push({
+          bookingId: b.id,
+          vehicleName: v?.name || 'Vehicle',
+          type: 'refund',
+          amount: b.refundAmount || 0,
+          date: (b as any).refundProcessedAt || b.createdAt || b.bookingDate,
+        });
+      }
+      if (b.securityDepositStatus === 'refunded' && (b.securityDepositAmount || 0) > 0) {
+        list.push({
+          bookingId: b.id,
+          vehicleName: v?.name || 'Vehicle',
+          type: 'deposit',
+          amount: b.securityDepositAmount || 0,
+          date: (b as any).securityDepositRefundedAt || b.createdAt || b.bookingDate,
+        });
+      }
+    });
+
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [allBookings, vehicles, user]);
+
   if (currentView === 'balance') {
     return (
       <div className="animate-in fade-in duration-700 space-y-8">
@@ -263,6 +452,395 @@ const Dashboard: React.FC = () => {
                 })}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Settle Outstanding Surcharges Section */}
+        {outstandingBalance > 0 && (
+          <div className="bg-slate-900 text-white rounded-[32px] p-8 lg:p-10 border border-slate-950 shadow-2xl space-y-8 animate-in slide-in-from-bottom duration-500">
+            <div>
+              <span className="text-[10px] font-black uppercase text-amber-500 tracking-widest block mb-2">★ Direct Settlement Desk</span>
+              <h3 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+                <ShieldCheck className="text-amber-500 animate-pulse" size={24} />
+                Settle Outstanding Penalties
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Select your outstanding penalty, review BOP escrow deposit coordinates, and upload your payment receipt to instantly file for settlement review.
+              </p>
+            </div>
+
+            <form onSubmit={handlePayPenaltySubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+              {/* Left Side: Select Penalty, Amount, Bank and Reference ID */}
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">1. Select Penalty Type</label>
+                  <select
+                    value={payPenaltyType}
+                    onChange={(e) => {
+                      setPayPenaltyType(e.target.value);
+                      const matched = myReasons.find(r => r.title.toLowerCase().includes(e.target.value.toLowerCase().split(' ')[0]));
+                      if (matched) {
+                        setPayAmount(String(matched.amount));
+                      }
+                    }}
+                    className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-extrabold text-xs transition-all"
+                  >
+                    <option value="Late return penalty">Late return penalty</option>
+                    <option value="E-challan payment">E-challan payment</option>
+                    <option value="Traffic violation fine">Traffic violation fine</option>
+                    <option value="Accident surcharge">Accident surcharge</option>
+                    <option value="Theft fine">Theft fine</option>
+                    <option value="Miscellaneous penalty">Something else / Miscellaneous penalty</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">2. Enter Settle Amount (PKR) *</label>
+                  <input
+                    type="number"
+                    placeholder="Enter PKR amount you are depositing"
+                    value={payAmount}
+                    onChange={(e) => setPayAmount(e.target.value)}
+                    className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-mono text-xs font-black transition-all"
+                  />
+                  <p className="text-[9px] text-slate-500 font-semibold">Total outstanding: PKR {outstandingBalance.toLocaleString()}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">3. Select Your Issuing Bank (Sender)</label>
+                  <select
+                    value={paySenderBank}
+                    onChange={(e) => setPaySenderBank(e.target.value)}
+                    className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-extrabold text-xs transition-all"
+                  >
+                    <option value="">-- Choose Your Bank --</option>
+                    <option value="Meezan Bank">Meezan Bank</option>
+                    <option value="HBL">Habib Bank Limited (HBL)</option>
+                    <option value="UBL">United Bank Limited (UBL)</option>
+                    <option value="MCB">MCB Bank Limited</option>
+                    <option value="Bank of Punjab">Bank of Punjab (BOP)</option>
+                    <option value="Bank Alfalah">Bank Alfalah</option>
+                    <option value="Standard Chartered">Standard Chartered</option>
+                    <option value="NayaPay">NayaPay</option>
+                    <option value="SadaPay">SadaPay</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">4. Transaction ID (TID) / Reference Number *</label>
+                  <input
+                    type="text"
+                    placeholder="Enter exact TID from receipt"
+                    value={payTid}
+                    onChange={(e) => setPayTid(e.target.value)}
+                    className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-mono text-xs font-black uppercase transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Right Side: Bank coordinates & receipt upload */}
+              <div className="space-y-6">
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4">
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-1.5">
+                      <ShieldCheck size={14} />
+                      Elite Drive BOP Accounts Coordinates
+                    </h4>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {/* Bank Name */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
+                      <div>
+                        <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Beneficiary Bank</p>
+                        <p className="font-extrabold text-slate-200 text-[11px]">Bank of Punjab (BOP)</p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => handleCopyText('Bank of Punjab', 'Bank Name')}
+                        className="text-[9px] font-black text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wider bg-slate-800 px-2 py-1 rounded"
+                      >
+                        {copiedField === 'Bank Name' ? 'Copied ✓' : 'Copy'}
+                      </button>
+                    </div>
+
+                    {/* Account Title */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
+                      <div>
+                        <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Account Title</p>
+                        <p className="font-extrabold text-slate-200 text-[11px]">Elite Drive (Private) Limited</p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => handleCopyText('Elite Drive (Private) Limited', 'Account Title')}
+                        className="text-[9px] font-black text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wider bg-slate-800 px-2 py-1 rounded"
+                      >
+                        {copiedField === 'Account Title' ? 'Copied ✓' : 'Copy'}
+                      </button>
+                    </div>
+
+                    {/* Account Number */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
+                      <div>
+                        <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Account Number</p>
+                        <p className="font-mono text-[11px] font-black text-slate-200">0201-987654-01-3</p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => handleCopyText('0201-987654-01-3', 'Account Number')}
+                        className="text-[9px] font-black text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wider bg-slate-800 px-2 py-1 rounded"
+                      >
+                        {copiedField === 'Account Number' ? 'Copied ✓' : 'Copy'}
+                      </button>
+                    </div>
+
+                    {/* IBAN */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
+                      <div>
+                        <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">IBAN Number</p>
+                        <p className="font-mono text-[10px] font-black text-slate-200">PK42 BOP 0201 0201 9876 5401</p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => handleCopyText('PK42 BOP 0201 0201 9876 5401', 'IBAN')}
+                        className="text-[9px] font-black text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wider bg-slate-800 px-2 py-1 rounded"
+                      >
+                        {copiedField === 'IBAN' ? 'Copied ✓' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Screenshot upload */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">5. Upload Transfer Receipt Screenshot (Optional)</label>
+                  <div className="flex items-center gap-3">
+                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-700 bg-slate-800 hover:border-amber-500 rounded-xl p-3 cursor-pointer transition-colors w-32 h-16 shrink-0 text-center">
+                      <Upload size={18} className="text-slate-400 mb-0.5" />
+                      <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Upload File</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setPayReceiptName(file.name);
+                            const reader = new FileReader();
+                            reader.onload = () => setPayReceiptBase64(reader.result as string);
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                    <div className="text-[10px] text-slate-400 truncate max-w-xs font-semibold">
+                      {payReceiptName ? (
+                        <p className="text-emerald-400 flex items-center gap-1">
+                          <Check size={12} />
+                          {payReceiptName}
+                        </p>
+                      ) : (
+                        'No screenshot selected'
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingPay}
+                  className="w-full h-12 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-black uppercase tracking-wider rounded-xl transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 text-xs"
+                >
+                  {isSubmittingPay ? 'Verifying Coordinates & Submitting...' : 'Submit Penalty Payment Details'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* EliteDrive Payables (Refunds & Deposits Owed to Me) */}
+        <div className="bg-white border-2 border-slate-100 rounded-[32px] p-8 lg:p-10 space-y-6">
+          <div>
+            <h3 className="text-xl font-extrabold text-slate-900 uppercase tracking-tight flex items-center gap-2">
+              <Check className="text-emerald-600" size={24} />
+              Refunds & Security Deposits Owed to Me by EliteDrive
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Outstanding liabilities and security collateral currently queued for return/disbursement to your bank account.
+            </p>
+          </div>
+
+          {myPayables.length === 0 ? (
+            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-100">
+              <Check className="text-slate-300 mx-auto mb-3" size={32} />
+              <p className="text-xs text-slate-500 font-bold">No pending refunds or deposits are owed to you by EliteDrive. All accounts are settled!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {myPayables.map((item, index) => {
+                const isRefund = item.type === 'refund';
+                return (
+                  <div key={index} className="bg-slate-50/50 border-2 border-slate-150 rounded-2xl p-5 flex flex-col justify-between hover:border-emerald-300 hover:bg-white transition-all duration-300">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-start">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${isRefund ? 'bg-amber-50 text-amber-700 border border-amber-150' : 'bg-blue-50 text-blue-700 border border-blue-150'}`}>
+                          {isRefund ? 'Cancellation Refund' : 'Security Deposit'}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-450 font-mono">
+                          ID: {item.booking.id.slice(0, 8).toUpperCase()}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500 font-medium">Vehicle:</span>
+                          <span className="font-extrabold text-slate-800">{item.vehicle?.name || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500 font-medium">Status:</span>
+                          <span className="font-mono text-[10px] uppercase font-extrabold text-slate-500">
+                            {item.status === 'pending_manual_bank_transfer' ? 'Refund Pending (Manual bank transfer)' : 'Awaiting Processing'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between pt-1.5 border-t border-slate-200/60">
+                          <span className="text-emerald-700 font-extrabold">Owed by EliteDrive:</span>
+                          <span className="font-black text-emerald-600 text-sm">PKR {item.amount.toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      <p className="text-[10px] font-medium text-slate-500 bg-emerald-50/20 border border-emerald-100/50 p-2.5 rounded-xl leading-relaxed mt-2">
+                        <strong>Policy Note:</strong> Elite Drive has to pay this amount of <strong>PKR {item.amount.toLocaleString()}</strong> to you as {isRefund ? 'your eligible cancellation refund' : 'your refundable security deposit'} for Booking ID <strong>{item.booking.id.toUpperCase()}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Settlement & Refund History Ledger */}
+        <div className="bg-slate-50 border border-slate-200 rounded-[32px] p-8 lg:p-10 space-y-8">
+          <div>
+            <h3 className="text-xl font-extrabold text-slate-900 uppercase tracking-tight flex items-center gap-2">
+              <Clock className="text-slate-700" size={24} />
+              Financial Settlement & Refund Logs
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Historical audit records of liabilities paid by you, administrative waivers granted, and refund payouts received from EliteDrive.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Column 1: My Liability & Penalty Payments */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200/60 shadow-sm space-y-4">
+              <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                My Penalty & Liability Payments Settle History
+              </h4>
+              <p className="text-[11px] text-slate-400">
+                History of surcharges, fines, or outstanding balances you cleared or was waived.
+              </p>
+
+              {myBalancePayments.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                  <p className="text-xs text-slate-400 font-bold">No payments submitted yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                  {myBalancePayments.map((p) => (
+                    <div key={p.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/40 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-extrabold text-xs text-slate-800 block">{p.penaltyTitle}</span>
+                          <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
+                            {new Date(p.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                          p.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' :
+                          p.status === 'waived' ? 'bg-purple-50 text-purple-700 border border-purple-150' :
+                          'bg-amber-50 text-amber-700 border border-amber-150'
+                        }`}>
+                          {p.status}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-[10px] pt-1.5 border-t border-slate-100 font-medium text-slate-500">
+                        <div>
+                          <span className="block text-[8px] uppercase tracking-wider text-slate-400">Method / Bank</span>
+                          <span className="font-bold text-slate-700">{p.senderBank || 'N/A'}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[8px] uppercase tracking-wider text-slate-400">Ref / TID</span>
+                          <span className="font-bold text-slate-700 truncate block max-w-[120px]">{p.transactionRef || 'N/A'}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center pt-1">
+                        <span className="text-[10px] text-slate-400 font-semibold">
+                          {p.status === 'waived' ? 'Waived Amount:' : 'Amount Paid:'}
+                        </span>
+                        <span className="font-black text-slate-800 text-xs">PKR {p.amount.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Column 2: Refunds & Deposits Received */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200/60 shadow-sm space-y-4">
+              <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                Refunds & Deposits Disbursed to Me
+              </h4>
+              <p className="text-[11px] text-slate-400">
+                Refunds and returned security deposits that have been officially disbursed to you.
+              </p>
+
+              {myRefundsReceived.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                  <p className="text-xs text-slate-400 font-bold">No processed refunds or returned deposits yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                  {myRefundsReceived.map((r, idx) => (
+                    <div key={idx} className="p-4 rounded-xl border border-slate-100 bg-slate-50/40 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-extrabold text-xs text-slate-800 block">
+                            {r.type === 'refund' ? 'Cancellation Refund' : 'Security Deposit Returned'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
+                            Disbursed: {new Date(r.date).toLocaleString()}
+                          </span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-150">
+                          Disbursed
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-[10px] pt-1.5 border-t border-slate-100 font-medium text-slate-500">
+                        <div>
+                          <span className="block text-[8px] uppercase tracking-wider text-slate-400">Vehicle</span>
+                          <span className="font-bold text-slate-700">{r.vehicleName}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[8px] uppercase tracking-wider text-slate-400">Booking Ref</span>
+                          <span className="font-bold text-slate-700 font-mono">{r.bookingId.slice(0, 8).toUpperCase()}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center pt-1">
+                        <span className="text-[10px] text-slate-400 font-semibold">Disbursed Amount:</span>
+                        <span className="font-black text-emerald-600 text-xs">PKR {r.amount.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

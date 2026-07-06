@@ -321,10 +321,6 @@ const ReturnVerificationWidget: React.FC = () => {
       showToast('Please verify customer has signed physical / digital rental agreement form.', 'error');
       return;
     }
-    if (selectedBooking.paymentType === 'partial' && !remainingPaymentCollected) {
-      showToast('Please collect and confirm the remaining 50% handover payment.', 'error');
-      return;
-    }
 
     try {
       const cleanGallery = localGalleryImages.filter(img => !!img);
@@ -341,10 +337,6 @@ const ReturnVerificationWidget: React.FC = () => {
           timestamp: new Date().toISOString()
         }
       };
-
-      if (selectedBooking.paymentType === 'partial') {
-        bookingUpdates.remainingPaymentStatus = remainingPaymentCollected ? 'paid' : 'pending';
-      }
 
       const vehicleUpdates = {
         status: 'rented',
@@ -876,36 +868,6 @@ const ReturnVerificationWidget: React.FC = () => {
                             <p className="text-[9px] text-slate-450 font-medium">As an authorized staff member, you can click on any slot above to upload recent condition photos. These will overwrite the vehicle's official baseline photos to compare against on return.</p>
                           )}
                         </div>
-
-                        {/* 50/50 payment scenario */}
-                        {selectedBooking.paymentType === 'partial' && (
-                          <div className="bg-amber-50 border border-amber-200 p-4 rounded-3xl space-y-3 mt-4">
-                            <div className="flex items-start gap-3">
-                              <div className="p-1.5 bg-amber-500/10 text-amber-600 rounded-lg mt-0.5 shrink-0">
-                                <Info size={14} />
-                              </div>
-                              <div>
-                                <h4 className="text-[10px] font-black text-amber-900 uppercase tracking-wider">50/50 Payment Scenario Detected</h4>
-                                <p className="text-[11px] text-amber-700 font-semibold leading-relaxed">
-                                  This customer has paid 50% upfront. The remaining 50% must be collected in person at checkout/handover.
-                                </p>
-                                <p className="text-xs font-black text-amber-900 mt-1">
-                                  Amount to Collect: <span className="text-sm font-black text-blue-600">PKR {(selectedBooking.remainingAmount || (selectedBooking.totalPrice / 2)).toLocaleString()}</span>
-                                </p>
-                              </div>
-                            </div>
-                            
-                            <label className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-amber-200 cursor-pointer hover:bg-amber-50 transition-all text-xs font-black select-none text-amber-900">
-                              <input 
-                                type="checkbox" 
-                                checked={remainingPaymentCollected}
-                                onChange={(e) => setRemainingPaymentCollected(e.target.checked)}
-                                className="size-5 rounded border-amber-300 text-amber-600 focus:ring-amber-500 focus:ring-offset-0"
-                              />
-                              <span>Confirm Remaining 50% Handover Payment Received (In Person Cash/Card)</span>
-                            </label>
-                          </div>
-                        )}
 
                         {/* Handover checklists */}
                         <div className="space-y-2 pt-2">

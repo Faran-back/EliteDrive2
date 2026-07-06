@@ -345,6 +345,7 @@ interface DbData {
   sentEmails?: any[];
   pushSubscriptions?: any[];
   transientVerificationCodes?: Record<string, string>;
+  balancePayments?: any[];
 }
 
 let dbData: DbData = {
@@ -360,6 +361,7 @@ let dbData: DbData = {
   sentEmails: [],
   pushSubscriptions: [],
   transientVerificationCodes: {},
+  balancePayments: [],
 };
 
 const RESET_DATABASE_ON_START = false;
@@ -446,12 +448,12 @@ function getEffectiveOutstandingBalance(user: any): number {
   if (!user) return 0;
   const baseBalance = user.outstandingBalance || 0;
   
-  // Find all non-cancelled bookings of this user that have partial payment and pending remaining payment status
+  // Find all non-cancelled, active or completed bookings of this user that have partial payment and pending remaining payment status
   const partialBookings = (dbData.bookings || []).filter(
     b => b.userId === user.id && 
          b.paymentType === 'partial' && 
          b.remainingPaymentStatus === 'pending' && 
-         b.status !== 'cancelled'
+         !['pending', 'approved', 'cancelled'].includes(b.status)
   );
   
   const pendingBookingBalance = partialBookings.reduce((sum, b) => {
@@ -575,6 +577,7 @@ function sanitizeLoadedData() {
   dbData.echallans = dbData.echallans || [];
   dbData.sentEmails = dbData.sentEmails || [];
   dbData.pushSubscriptions = dbData.pushSubscriptions || [];
+  dbData.balancePayments = dbData.balancePayments || [];
 
   dbData.users.forEach(u => {
     if (u.outstandingBalance === undefined) u.outstandingBalance = 0;
@@ -619,6 +622,7 @@ async function loadDatabase() {
         echallans: loadedData.echallans || [],
         sentEmails: loadedData.sentEmails || [],
         pushSubscriptions: loadedData.pushSubscriptions || [],
+        balancePayments: loadedData.balancePayments || [],
       };
 
       sanitizeLoadedData();
@@ -689,6 +693,7 @@ function saveDatabase() {
         echallans: dbData.echallans,
         sentEmails: dbData.sentEmails,
         pushSubscriptions: dbData.pushSubscriptions,
+        balancePayments: dbData.balancePayments,
       };
       saveCollectionsToSqlite(payload, SQLITE_DB_PATH);
     })
@@ -1759,12 +1764,16 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
     }
 
     // Create the booking payload
+    const calculatedDeposit = typeof data.securityDepositAmount === 'number' 
+      ? data.securityDepositAmount 
+      : (data.basePrice ? Math.round(data.basePrice * 0.20) : 10000);
+
     const newBooking: Booking = {
       ...data,
       userId: req.user.id, // Securely force the authenticated user ID
       status: data.status || 'pending',
       paymentStatus: data.paymentStatus || 'pending',
-      securityDepositAmount: 10000, // Refundable Rs. 10,000 baseline
+      securityDepositAmount: calculatedDeposit,
       securityDepositStatus: 'pending',
       createdAt: new Date().toISOString()
     };
@@ -1775,7 +1784,7 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
       id: `not_${Math.random().toString(36).substring(2, 11)}`,
       userId: newBooking.userId,
       title: 'Booking Received',
-      message: `Your booking for ${vehicle.name} has been received and is pending approval. Refundable security deposit: Rs. 10,000.`,
+      message: `Your booking for ${vehicle.name} has been received and is pending approval. Refundable security deposit: PKR ${calculatedDeposit.toLocaleString()}.`,
       type: 'info',
       read: false,
       createdAt: new Date().toISOString(),
@@ -1810,7 +1819,7 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
           </tr>
           <tr>
             <td class="label">Security Deposit</td>
-            <td class="value">PKR 10,000 (Refundable)</td>
+            <td class="value">PKR ${calculatedDeposit.toLocaleString()} (Refundable)</td>
           </tr>
           <tr>
             <td class="label">Payment Status</td>
@@ -2434,6 +2443,200 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
     res.json(job);
   });
 
+  // CLEAR CANCELLATION REFUND (Mark refund as paid/cleared by EliteDrive)
+  app.post('/api/bookings/:id/clear-refund', authenticateToken, checkRole(['admin', 'manager']), (req: any, res) => {
+    const { id } = req.params;
+    const bIndex = dbData.bookings.findIndex(b => b.id === id);
+    if (bIndex === -1) return res.status(404).json({ error: 'Booking not found' });
+    
+    dbData.bookings[bIndex].refundStatus = 'processed';
+    (dbData.bookings[bIndex] as any).refundProcessedAt = new Date().toISOString();
+    
+    // Add notification
+    dbData.notifications.push({
+      id: `not_${Math.random().toString(36).substring(2, 11)}`,
+      userId: dbData.bookings[bIndex].userId,
+      title: 'Refund Disbursed',
+      message: `EliteDrive has disbursed your cancellation refund of PKR ${dbData.bookings[bIndex].refundAmount?.toLocaleString() || '0'} for Booking ID ${id.toUpperCase().slice(0, 8)}.`,
+      type: 'info',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
+    saveDatabase();
+    res.json(dbData.bookings[bIndex]);
+  });
+
+  // CLEAR SECURITY DEPOSIT REFUND (Mark security deposit as refunded)
+  app.post('/api/bookings/:id/clear-deposit', authenticateToken, checkRole(['admin', 'manager']), (req: any, res) => {
+    const { id } = req.params;
+    const bIndex = dbData.bookings.findIndex(b => b.id === id);
+    if (bIndex === -1) return res.status(404).json({ error: 'Booking not found' });
+    
+    dbData.bookings[bIndex].securityDepositStatus = 'refunded';
+    (dbData.bookings[bIndex] as any).securityDepositRefundedAt = new Date().toISOString();
+    
+    // Add notification
+    dbData.notifications.push({
+      id: `not_${Math.random().toString(36).substring(2, 11)}`,
+      userId: dbData.bookings[bIndex].userId,
+      title: 'Security Deposit Refunded',
+      message: `EliteDrive has refunded your security deposit of PKR ${(dbData.bookings[bIndex].securityDepositAmount || 0).toLocaleString()} for Booking ID ${id.toUpperCase().slice(0, 8)}.`,
+      type: 'success',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
+    saveDatabase();
+    res.json(dbData.bookings[bIndex]);
+  });
+
+  // WAIVE OUTSTANDING BALANCE & PENALTIES API
+  app.post('/api/users/:id/waive-balance', authenticateToken, checkRole(['admin', 'manager']), (req: any, res) => {
+    const { id } = req.params;
+    const { reason } = req.body;
+    
+    const userIndex = dbData.users.findIndex(u => u.id === id);
+    if (userIndex === -1) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userObj = dbData.users[userIndex];
+    const originalBalance = userObj.outstandingBalance || 0;
+    
+    // Clear the user's base outstandingBalance
+    dbData.users[userIndex].outstandingBalance = 0;
+    
+    // Also waive/resolve e-challans for this user
+    dbData.echallans.forEach(c => {
+      if (c.matchedUserId === id) {
+        c.status = 'finalized'; // Use valid value from "pending" | "finalized" | "disputed"
+      }
+    });
+    
+    // Also clear penaltyAmount and remainingAmount for this user's bookings
+    dbData.bookings.forEach(b => {
+      if (b.userId === id) {
+        b.penaltyAmount = 0;
+        if (b.paymentType === 'partial' && b.remainingPaymentStatus === 'pending') {
+          b.remainingPaymentStatus = 'paid'; // Use valid value from "pending" | "paid"
+          b.remainingAmount = 0;
+        }
+      }
+    });
+    
+    // Log waiver in balancePayments
+    if (originalBalance > 0) {
+      dbData.balancePayments = dbData.balancePayments || [];
+      dbData.balancePayments.push({
+        id: `bal_pay_${Math.random().toString(36).substring(2, 11)}`,
+        userId: userObj.id,
+        userName: userObj.name,
+        userEmail: userObj.email,
+        penaltyTitle: `Waiver: ${reason || 'Administrative Surcharge Relief'}`,
+        amount: originalBalance,
+        senderBank: 'N/A',
+        transactionRef: 'WAIVED_BY_ADMIN',
+        receiptImage: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=400',
+        status: 'waived',
+        resolvedBy: req.user.name || req.user.email,
+        resolvedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      });
+    }
+    
+    // Push notifications
+    dbData.notifications.push({
+      id: `not_${Math.random().toString(36).substring(2, 11)}`,
+      userId: id,
+      title: 'Penalties Released',
+      message: `Admin/Manager has released you from all outstanding penalties & charges! Reason: ${reason || 'Administrative relief'}. Your balance is now PKR 0.`,
+      type: 'info',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+    
+    saveDatabase();
+    res.json({ success: true, user: dbData.users[userIndex] });
+  });
+
+  // SUBMIT PENALTY PAYMENT
+  app.post('/api/users/pay-penalty', authenticateToken, (req: any, res) => {
+    const { penaltyTitle, amount, senderBank, transactionRef, receiptImage } = req.body;
+    
+    // Create a notification for admin
+    dbData.notifications.push({
+      id: `not_${Math.random().toString(36).substring(2, 11)}`,
+      userId: 'admin',
+      title: 'Penalty Payment Submitted',
+      message: `Customer ${req.user.name} has submitted a payment of PKR ${Number(amount).toLocaleString()} for "${penaltyTitle}". TID: ${transactionRef} (Bank: ${senderBank}).`,
+      type: 'payment',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+    
+    // Store in balancePayments collection
+    dbData.balancePayments = dbData.balancePayments || [];
+    dbData.balancePayments.push({
+      id: `bal_pay_${Math.random().toString(36).substring(2, 11)}`,
+      userId: req.user.id,
+      userName: req.user.name,
+      userEmail: req.user.email,
+      penaltyTitle,
+      amount: Number(amount),
+      senderBank,
+      transactionRef,
+      receiptImage: receiptImage || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=400',
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    });
+    
+    saveDatabase();
+    res.json({ success: true, message: 'Penalty payment submitted successfully for administrative review!' });
+  });
+
+  // GET MY BALANCE PAYMENTS LIST (For customers)
+  app.get('/api/my-balance-payments', authenticateToken, (req: any, res) => {
+    const list = (dbData.balancePayments || []).filter(p => p.userId === req.user.id);
+    res.json(list);
+  });
+
+  // GET BALANCE PAYMENTS LIST
+  app.get('/api/balance-payments', authenticateToken, checkRole(['admin', 'manager']), (req, res) => {
+    res.json(dbData.balancePayments || []);
+  });
+
+  // APPROVE BALANCE PAYMENT
+  app.post('/api/balance-payments/:id/approve', authenticateToken, checkRole(['admin', 'manager']), (req: any, res) => {
+    const { id } = req.params;
+    const payment = (dbData.balancePayments || []).find(p => p.id === id);
+    if (!payment) return res.status(404).json({ error: 'Payment record not found' });
+    
+    payment.status = 'approved';
+    payment.resolvedBy = req.user.name || req.user.email;
+    payment.resolvedAt = new Date().toISOString();
+    
+    // Deduct the payment amount from the user's outstandingBalance!
+    const userIndex = dbData.users.findIndex(u => u.id === payment.userId);
+    if (userIndex !== -1) {
+      dbData.users[userIndex].outstandingBalance = Math.max(0, (dbData.users[userIndex].outstandingBalance || 0) - payment.amount);
+      
+      // Also notify the user
+      dbData.notifications.push({
+        id: `not_${Math.random().toString(36).substring(2, 11)}`,
+        userId: payment.userId,
+        title: 'Penalty Payment Approved',
+        message: `Your penalty payment of PKR ${payment.amount.toLocaleString()} for "${payment.penaltyTitle}" has been approved! Your remaining balance has been updated.`,
+        type: 'success',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+    }
+    
+    saveDatabase();
+    res.json({ success: true });
+  });
+
   // USERS MANAGEMENT
   app.get('/api/users', authenticateToken, checkRole(['admin', 'manager']), (req, res) => {
     res.json(dbData.users.map(({ passwordHash, ...u }) => ({
@@ -2916,26 +3119,97 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
 
   app.put('/api/disputes/:id', authenticateToken, checkRole(['admin', 'manager']), (req: any, res) => {
     const { id } = req.params;
-    const { status, resolutionDetails } = req.body;
+    const { status, resolutionDetails, actionType, actionAmount } = req.body;
     const idx = dbData.disputes.findIndex(d => d.id === id);
     if (idx === -1) return res.status(404).json({ error: 'Dispute not found' });
 
-    dbData.disputes[idx].status = status || dbData.disputes[idx].status;
-    dbData.disputes[idx].resolutionDetails = resolutionDetails || dbData.disputes[idx].resolutionDetails;
+    const dispute = dbData.disputes[idx];
+    dispute.status = status || dispute.status;
+    dispute.resolutionDetails = resolutionDetails || dispute.resolutionDetails;
+
+    let actionReceiptMessage = '';
+
+    // Handle Direct Administrative Actions
+    if (actionType && actionType !== 'none') {
+      const userIdx = dbData.users.findIndex(u => u.id === dispute.userId);
+      
+      if (actionType === 'waive_booking_penalty' && dispute.bookingId) {
+        const bookingIdx = dbData.bookings.findIndex(b => b.id === dispute.bookingId);
+        if (bookingIdx !== -1) {
+          const booking = dbData.bookings[bookingIdx];
+          const waivedAmt = booking.penaltyAmount || 0;
+          
+          booking.penaltyAmount = 0;
+          booking.penaltyReason = (booking.penaltyReason || '') + ` (Waived via Dispute ID: ${id})`;
+          
+          if (userIdx !== -1) {
+            const oldBalance = dbData.users[userIdx].outstandingBalance || 0;
+            dbData.users[userIdx].outstandingBalance = Math.max(0, oldBalance - waivedAmt);
+          }
+          actionReceiptMessage = `Waived Booking Penalty of PKR ${waivedAmt.toLocaleString()} and adjusted outstanding balance.`;
+        }
+      } 
+      else if (actionType === 'waive_challan') {
+        const challan = dbData.echallans.find(c => 
+          (dispute.bookingId && c.matchedBookingId === dispute.bookingId) || 
+          (c.matchedUserId === dispute.userId && (dispute.description.includes(c.challanNumber) || dispute.title.includes(c.challanNumber)))
+        );
+        if (challan) {
+          const oldStatus = challan.status;
+          challan.status = 'finalized'; // finalized/waived
+          const waivedAmt = challan.amount || 0;
+          
+          if (userIdx !== -1) {
+            const oldBalance = dbData.users[userIdx].outstandingBalance || 0;
+            dbData.users[userIdx].outstandingBalance = Math.max(0, oldBalance - waivedAmt);
+          }
+          actionReceiptMessage = `Dismissed traffic e-challan ticket ${challan.challanNumber} and waived PKR ${waivedAmt.toLocaleString()} from customer balance.`;
+        } else {
+          actionReceiptMessage = `Admin requested E-Challan waiver but no matching active ticket was found.`;
+        }
+      } 
+      else if (actionType === 'waive_custom_amount' && actionAmount > 0) {
+        if (userIdx !== -1) {
+          const oldBalance = dbData.users[userIdx].outstandingBalance || 0;
+          dbData.users[userIdx].outstandingBalance = Math.max(0, oldBalance - Number(actionAmount));
+          actionReceiptMessage = `Subtracted credit of PKR ${Number(actionAmount).toLocaleString()} from customer outstanding balance.`;
+        }
+      } 
+      else if (actionType === 'clear_outstanding_balance') {
+        if (userIdx !== -1) {
+          dbData.users[userIdx].outstandingBalance = 0;
+          actionReceiptMessage = `Cleared all outstanding balance for the customer.`;
+        }
+      } 
+      else if (actionType === 'refund_security_deposit' && dispute.bookingId) {
+        const bookingIdx = dbData.bookings.findIndex(b => b.id === dispute.bookingId);
+        if (bookingIdx !== -1) {
+          const booking = dbData.bookings[bookingIdx];
+          const oldStatus = booking.securityDepositStatus;
+          booking.securityDepositStatus = 'refunded';
+          actionReceiptMessage = `Set Booking ID ${booking.id} security deposit status from '${oldStatus}' to 'refunded'.`;
+        }
+      }
+
+      // Record the direct action in resolution details
+      if (actionReceiptMessage) {
+        dispute.resolutionDetails = `${dispute.resolutionDetails || ''}\n[Direct Admin Action Executed: ${actionReceiptMessage}]`.trim();
+      }
+    }
 
     // Notify user
     dbData.notifications.push({
       id: `not_${Math.random().toString(36).substring(2, 11)}`,
-      userId: dbData.disputes[idx].userId,
-      title: 'Dispute Resolved',
-      message: `Your dispute (ID: ${id}) status: ${status}. Notes: ${resolutionDetails || 'None'}`,
-      type: 'info',
+      userId: dispute.userId,
+      title: 'Dispute Action Taken',
+      message: `Your dispute (ID: ${id}) has been updated. Status: ${status.toUpperCase()}. Action taken: ${actionReceiptMessage || 'Standard Review'}.`,
+      type: status === 'resolved' ? 'success' : 'info',
       read: false,
       createdAt: new Date().toISOString()
     });
 
     saveDatabase();
-    res.json(dbData.disputes[idx]);
+    res.json(dispute);
   });
 
   // E-CHALLANS API: Log a challan & match active booking by date

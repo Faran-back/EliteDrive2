@@ -18,6 +18,12 @@ import {
 import { useStore } from '../../context/StoreContext';
 import { motion, AnimatePresence } from 'motion/react';
 
+const formatDisputeId = (id: string): string => {
+  if (!id) return '';
+  const clean = id.replace(/^(dsp|dispute)[_-]/i, '');
+  return `DISPUTE: ${clean.replace(/[_-]/g, '').toUpperCase()}`;
+};
+
 const FormalDisputes: React.FC = () => {
   const { disputes, vehicles, allBookings, allUsers, updateDisputeStatus, showToast } = useStore();
   
@@ -30,10 +36,22 @@ const FormalDisputes: React.FC = () => {
   const [selectedDisputeId, setSelectedDisputeId] = useState<string | null>(null);
   const [resolutionDetails, setResolutionDetails] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [actionType, setActionType] = useState<'none' | 'waive_booking_penalty' | 'waive_challan' | 'waive_custom_amount' | 'clear_outstanding_balance' | 'refund_security_deposit'>('none');
+  const [actionAmount, setActionAmount] = useState<number>(0);
 
   const selectedDispute = useMemo(() => {
     return disputes.find(d => d.id === selectedDisputeId);
   }, [disputes, selectedDisputeId]);
+
+  const disputeUser = useMemo(() => {
+    if (!selectedDispute) return null;
+    return allUsers.find(u => u.id === selectedDispute.userId);
+  }, [allUsers, selectedDispute]);
+
+  const disputeBooking = useMemo(() => {
+    if (!selectedDispute) return null;
+    return allBookings.find(b => b.id === selectedDispute.bookingId);
+  }, [allBookings, selectedDispute]);
 
   const stats = useMemo(() => {
     const total = disputes.length;
@@ -47,9 +65,11 @@ const FormalDisputes: React.FC = () => {
   const handleUpdateStatus = async (id: string, newStatus: 'under_review' | 'resolved' | 'rejected') => {
     setActionLoading(true);
     try {
-      await updateDisputeStatus(id, newStatus, resolutionDetails);
+      await updateDisputeStatus(id, newStatus, resolutionDetails, actionType, actionAmount);
       setSelectedDisputeId(null);
       setResolutionDetails('');
+      setActionType('none');
+      setActionAmount(0);
     } catch (err: any) {
       console.error(err);
       showToast(err.message || 'Failed to update dispute status', 'error');
@@ -205,7 +225,7 @@ const FormalDisputes: React.FC = () => {
                       <td className="px-6 py-4">
                         <div className="space-y-1">
                           <span className="font-extrabold text-slate-900 block">{dispute.title}</span>
-                          <span className="text-[10px] text-slate-400 font-mono block">ID: {dispute.id}</span>
+                          <span className="text-[10px] text-slate-400 font-mono block font-bold">{formatDisputeId(dispute.id)}</span>
                           <div className="flex items-center gap-1.5 pt-1 text-[11px] text-slate-600 font-medium">
                             <User size={12} className="text-slate-400" />
                             <span>{dispute.userName}</span>
@@ -292,7 +312,7 @@ const FormalDisputes: React.FC = () => {
                   <div className="space-y-1.5">
                     <span className="block text-slate-400 uppercase font-black text-[9px]">Dispute Type</span>
                     <span className="block font-extrabold text-blue-700 uppercase tracking-wider">{getHumanType(selectedDispute.type)}</span>
-                    <span className="block text-slate-500 font-mono">Dispute ID: {selectedDispute.id}</span>
+                    <span className="block text-slate-500 font-mono font-bold">{formatDisputeId(selectedDispute.id)}</span>
                   </div>
                 </div>
 
@@ -300,6 +320,40 @@ const FormalDisputes: React.FC = () => {
                   <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Statement / Grievance:</h4>
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-700 leading-relaxed italic whitespace-pre-line font-medium">
                     "{selectedDispute.description}"
+                  </div>
+                </div>
+
+                {/* Financial Context & Quick Facts */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50/30 p-4 rounded-2xl border border-blue-100/60 text-xs">
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-blue-600 font-black uppercase tracking-wider block">Customer Financial Snapshot</span>
+                    <div className="flex justify-between font-medium">
+                      <span className="text-slate-500">Outstanding Balance:</span>
+                      <span className="font-extrabold text-slate-900">
+                        PKR {disputeUser?.outstandingBalance ? disputeUser.outstandingBalance.toLocaleString() : '0'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-blue-600 font-black uppercase tracking-wider block">Associated Booking</span>
+                    {disputeBooking ? (
+                      <div className="space-y-1">
+                        <div className="flex justify-between font-medium">
+                          <span className="text-slate-500">Booking Penalty:</span>
+                          <span className="font-extrabold text-red-600">
+                            PKR {disputeBooking.penaltyAmount ? disputeBooking.penaltyAmount.toLocaleString() : '0'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between font-medium text-[11px]">
+                          <span className="text-slate-500">Security Deposit:</span>
+                          <span className="font-extrabold text-slate-700 uppercase">
+                            PKR {disputeBooking.securityDepositAmount ? disputeBooking.securityDepositAmount.toLocaleString() : '0'} ({disputeBooking.securityDepositStatus || 'pending'})
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 italic">No associated booking</span>
+                    )}
                   </div>
                 </div>
 
@@ -311,6 +365,78 @@ const FormalDisputes: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Direct Action Selector */}
+                <div className="space-y-3 pt-4 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="text-blue-600" size={16} />
+                    <label className="block text-xs uppercase font-extrabold text-slate-900 tracking-wider">
+                      Execute Direct Administrative Action
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-normal">
+                    Optionally perform automated ledger/booking adjustments directly as part of this resolution. These actions will update the database immediately when resolving.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Action Type</span>
+                      <select
+                        value={actionType}
+                        onChange={(e: any) => {
+                          const val = e.target.value;
+                          setActionType(val);
+                          if (val === 'waive_booking_penalty' && disputeBooking) {
+                            setActionAmount(disputeBooking.penaltyAmount || 0);
+                          } else if (val === 'waive_custom_amount') {
+                            setActionAmount(0);
+                          } else if (val === 'clear_outstanding_balance' && disputeUser) {
+                            setActionAmount(disputeUser.outstandingBalance || 0);
+                          } else {
+                            setActionAmount(0);
+                          }
+                        }}
+                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white font-medium focus:ring-1 focus:ring-blue-600"
+                      >
+                        <option value="none">No Automatic Action (Text decision only)</option>
+                        {disputeBooking && (disputeBooking.penaltyAmount || 0) > 0 && (
+                          <option value="waive_booking_penalty">Waive Booking Penalty (PKR {(disputeBooking.penaltyAmount || 0).toLocaleString()})</option>
+                        )}
+                        {(selectedDispute.type === 'traffic_violation' || selectedDispute.title.toLowerCase().includes('challan') || selectedDispute.description.toLowerCase().includes('challan')) && (
+                          <option value="waive_challan">Waive E-Challan Traffic Ticket</option>
+                        )}
+                        <option value="waive_custom_amount">Deduct Custom Amount from Balance</option>
+                        {disputeUser && (disputeUser.outstandingBalance || 0) > 0 && (
+                          <option value="clear_outstanding_balance">Clear Entire Outstanding Balance (PKR {(disputeUser.outstandingBalance || 0).toLocaleString()})</option>
+                        )}
+                        {disputeBooking && disputeBooking.securityDepositStatus && disputeBooking.securityDepositStatus !== 'refunded' && (
+                          <option value="refund_security_deposit">Mark Security Deposit as Refunded</option>
+                        )}
+                      </select>
+                    </div>
+
+                    {actionType === 'waive_custom_amount' && (
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Custom Deduction Amount (PKR)</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max={disputeUser?.outstandingBalance || 9999999}
+                          value={actionAmount || ''}
+                          onChange={(e) => setActionAmount(Number(e.target.value))}
+                          placeholder="e.g. 5000"
+                          className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-blue-600"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  
+                  {actionType !== 'none' && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 font-medium">
+                      ⚠️ <strong>Note:</strong> Applying this action will instantly modify the active customer's outstanding balances and booking logs upon resolving or rejecting this claim.
+                    </div>
+                  )}
+                </div>
 
                 {/* Status Resolution Form */}
                 <div className="space-y-3 pt-4 border-t border-slate-100">

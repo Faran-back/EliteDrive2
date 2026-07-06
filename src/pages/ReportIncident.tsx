@@ -53,6 +53,18 @@ const formatHumanDateTime = (dateStr: string) => {
   }
 };
 
+const formatIncidentId = (id: string): string => {
+  if (!id) return '';
+  const clean = id.replace(/^inc[_-]/i, '');
+  return `INCIDENT: ${clean.replace(/[_-]/g, ' ').toUpperCase()}`;
+};
+
+const formatDisputeId = (id: string): string => {
+  if (!id) return '';
+  const clean = id.replace(/^(dsp|dispute)[_-]/i, '');
+  return `DISPUTE: ${clean.replace(/[_-]/g, '').toUpperCase()}`;
+};
+
 const renderStatusTracker = (status: string) => {
   const stages = [
     { key: 'filed', label: 'Filed' },
@@ -422,7 +434,7 @@ const ReportIncident: React.FC = () => {
                             )}
                           </div>
                           <h3 className="text-lg font-extrabold text-slate-900 mt-2">
-                            Folder Reference: <span className="font-mono font-bold text-slate-600">{inc.id}</span>
+                            Folder Reference: <span className="font-mono font-bold text-slate-600">{formatIncidentId(inc.id)}</span>
                           </h3>
                         </div>
 
@@ -497,7 +509,7 @@ const ReportIncident: React.FC = () => {
                                 <span className="block">Timeframe: <strong className="text-slate-900">{new Date(matchedBooking.startDate).toLocaleDateString()} to {new Date(matchedBooking.endDate).toLocaleDateString()}</strong></span>
                                 <span className="block">Route Scope: <strong className="text-slate-900">{matchedBooking.isOutOfCity ? `Out-of-City (${matchedBooking.destination})` : 'In-City Only'}</strong></span>
                                 <span className="block">Chauffeur Service: <strong className="text-slate-900">{matchedBooking.chauffeurSelected ? 'Yes (Driver Assigned)' : 'No (Self-Driven)'}</strong></span>
-                                <span className="block">Security Deposit: <strong className="text-blue-600">PKR {(matchedBooking.securityDepositAmount || 5000).toLocaleString()} ({matchedBooking.securityDepositStatus || 'Collected'})</strong></span>
+                                <span className="block">Security Deposit: <strong className="text-blue-600">PKR {(matchedBooking.securityDepositAmount ?? Math.round((matchedBooking.basePrice ?? 0) * 0.2)).toLocaleString()} ({matchedBooking.securityDepositStatus || 'Collected'})</strong></span>
                               </div>
                             </div>
                           )}
@@ -607,7 +619,7 @@ const ReportIncident: React.FC = () => {
                             )}
                           </div>
                           <h3 className="text-lg font-extrabold text-slate-900 mt-2">
-                            Folder Reference: <span className="font-mono font-bold text-slate-600">{inc.id}</span>
+                            Folder Reference: <span className="font-mono font-bold text-slate-600">{formatIncidentId(inc.id)}</span>
                           </h3>
                         </div>
 
@@ -869,7 +881,7 @@ const ReportIncident: React.FC = () => {
                               {getHumanType(dispute.type)}
                             </span>
                             <h4 className="text-sm font-extrabold text-slate-900 pt-1">{dispute.title}</h4>
-                            <span className="text-[10px] font-mono text-slate-400 block">Dispute Ref: {dispute.id}</span>
+                            <span className="text-[10px] font-mono text-slate-400 block font-bold">{formatDisputeId(dispute.id)}</span>
                           </div>
                           
                           <span className={`inline-flex items-center px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-md border ${getStatusStyle(dispute.status)}`}>
@@ -1006,7 +1018,7 @@ const ReportIncident: React.FC = () => {
                       <div>
                         <span className="block text-[10px] text-slate-400 uppercase font-black">Refundable Security Deposit</span>
                         <span className="text-xs font-black text-blue-600">
-                          PKR {(selectedBooking.securityDepositAmount || 5000).toLocaleString()} — <span className="uppercase text-[9px] font-bold text-slate-500">Status: {selectedBooking.securityDepositStatus || 'Collected'}</span>
+                          PKR {(selectedBooking.securityDepositAmount ?? Math.round((selectedBooking.basePrice ?? 0) * 0.2)).toLocaleString()} — <span className="uppercase text-[9px] font-bold text-slate-500">Status: {selectedBooking.securityDepositStatus || 'Collected'}</span>
                         </span>
                       </div>
                       <div>

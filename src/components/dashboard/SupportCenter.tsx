@@ -35,6 +35,12 @@ interface ChatMessage {
   timestamp: string;
 }
 
+const formatIncidentId = (id: string): string => {
+  if (!id) return '';
+  const clean = id.replace(/^inc[_-]/i, '');
+  return `INCIDENT: ${clean.replace(/[_-]/g, ' ').toUpperCase()}`;
+};
+
 const SupportCenter: React.FC = () => {
   const { 
     user, 
@@ -320,8 +326,11 @@ ELITEDRIVE COMPLIANCE POLICIES:
                                 </span>
                               )}
                             </div>
-                            <h4 className="text-base font-black text-slate-905 mt-2">
+                            <h4 className="text-base font-black text-slate-905 mt-2 flex items-center gap-2">
                               {matchedVehicle ? `${matchedVehicle.name} (${matchedVehicle.licensePlate})` : 'Unknown Vehicle'}
+                              <span className="font-mono font-bold text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded ml-2">
+                                {formatIncidentId(inc.id)}
+                              </span>
                             </h4>
                             <p className="text-xs text-slate-400 mt-0.5 font-bold">
                               Reported by: <span className="text-slate-700">{matchedUser?.name || 'Customer'}</span> on {new Date(inc.submittedAt || inc.occurredAt).toLocaleString()}

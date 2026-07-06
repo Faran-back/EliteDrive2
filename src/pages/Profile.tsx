@@ -52,15 +52,11 @@ const Profile: React.FC = () => {
   const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
-  const [showOtpInput, setShowOtpInput] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isBypassed = user?.email && ['ahmed12@gmail.com', 'tj334767@gmail.com'].includes(user.email.toLowerCase());
-  const isVerified = (user?.emailVerified && user?.phoneVerified) || isBypassed;
+  const isVerified = user?.emailVerified || isBypassed;
   const isEmailVerified = user?.emailVerified || isBypassed;
-  const isPhoneVerified = user?.phoneVerified || isBypassed;
 
   const totalTrips = bookings.filter(b => b.userId === user?.id).length;
 
@@ -200,37 +196,6 @@ const Profile: React.FC = () => {
       await sendVerificationEmail();
     } finally {
       setIsVerifyingEmail(false);
-    }
-  };
-
-  const handleSendPhoneCode = async () => {
-    if (!user?.phone) {
-      showToast('Please save a phone number first', 'error');
-      return;
-    }
-    setIsSendingCode(true);
-    try {
-      const result = await sendPhoneVerificationCode(user.phone);
-      setConfirmationResult(result);
-      setShowOtpInput(true);
-    } catch (error) {
-      console.error('Phone code error:', error);
-    } finally {
-      setIsSendingCode(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (!confirmationResult || !otpCode) return;
-    setIsVerifyingCode(true);
-    try {
-      await verifyPhoneCode(confirmationResult, otpCode);
-      setShowOtpInput(false);
-      setOtpCode('');
-    } catch (error) {
-      console.error('OTP verification error:', error);
-    } finally {
-      setIsVerifyingCode(false);
     }
   };
 
@@ -379,20 +344,6 @@ const Profile: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between ml-1">
                   <label className="text-sm font-black text-[#64748B]">Phone Number</label>
-                  {isPhoneVerified ? (
-                    <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 uppercase tracking-wider">
-                      <CheckCircle size={12} /> Verified
-                    </span>
-                  ) : (
-                    <button 
-                      type="button"
-                      onClick={handleSendPhoneCode}
-                      disabled={isSendingCode || !user?.phone}
-                      className="text-[10px] font-black text-blue-600 uppercase tracking-wider hover:underline disabled:opacity-50"
-                    >
-                      {isSendingCode ? 'Sending...' : 'Verify Now'}
-                    </button>
-                  )}
                 </div>
                 <div className="relative">
                   <Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={20} />
@@ -602,75 +553,6 @@ const Profile: React.FC = () => {
           </div>
         </div>
       </div>
-      
-      <div id="recaptcha-container"></div>
-
-      <AnimatePresence>
-        {showOtpInput && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowOtpInput(false)}
-              className="absolute inset-0 bg-white/60 backdrop-blur-md"
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative bg-white w-full max-w-md rounded-[48px] p-10 shadow-2xl space-y-8"
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center">
-                  <Phone className="text-blue-600" size={28} />
-                </div>
-                <button 
-                  onClick={() => setShowOtpInput(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <X size={24} className="text-gray-400" />
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-2xl font-black text-[#1E293B]">Verify Phone</h3>
-                <p className="text-[#64748B] font-medium">Enter the 6-digit code sent to {user?.phone}</p>
-              </div>
-
-              <div className="space-y-4">
-                <input 
-                  type="text" 
-                  maxLength={6}
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="000000"
-                  className="w-full bg-[#F8FAFC] border border-[#F1F5F9] rounded-[24px] py-6 text-center text-4xl font-black tracking-[0.5em] focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-[#2563EB] transition-all text-[#1E293B]"
-                />
-                
-                <button 
-                  onClick={handleVerifyOtp}
-                  disabled={isVerifyingCode || otpCode.length !== 6}
-                  className="w-full bg-[#2563EB] text-white py-6 rounded-[24px] font-black flex items-center justify-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 disabled:opacity-50"
-                >
-                  {isVerifyingCode ? (
-                    <>
-                      <Loader2 className="animate-spin" size={20} />
-                      Verifying...
-                    </>
-                  ) : (
-                    'Verify Code'
-                  )}
-                </button>
-              </div>
-
-              <p className="text-center text-xs text-[#94A3B8] font-bold">
-                Didn't receive the code? <button className="text-blue-600 hover:underline">Resend</button>
-              </p>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

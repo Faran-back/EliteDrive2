@@ -273,7 +273,7 @@ const Payment: React.FC = () => {
       }
     }
 
-    const securityDeposit = 10000;
+    const securityDeposit = Math.round(base * 0.20);
     const total = base + insurance + chauffeurCost + securityDeposit - discountAmount;
     
     return { base, insurance, chauffeurCost, discount: discountAmount, securityDeposit, total };
@@ -1826,7 +1826,7 @@ const Payment: React.FC = () => {
                       <strong>1. GEOGRAPHICAL BOUNDS & GEO-FENCING:</strong> The Renter is authorized to navigate the leased vehicle strictly to the specified out-of-city location of <strong>{outOfCityDestination || 'the designated destination'}</strong>. Entering restricted high-risk areas, northern ranges, or crossing provincial lines without express, written clearance is strictly forbidden and triggers an automatic remote ignition lock, forfeit of security deposits, and immediate police GPS dispatch.
                     </p>
                     <p>
-                      <strong>2. SECURITY DEPOSIT AND DAMAGE WAIVER:</strong> A security escrow of PKR 20,000 will be frozen as collateral. Any bodywork damages, tyre bursts, engine overheating due to negligence, suspension stress, or late return delays will be directly assessed and billed against this deposit at actual local market replacement values.
+                      <strong>2. SECURITY DEPOSIT AND DAMAGE WAIVER:</strong> A refundable security deposit of PKR {prices.securityDeposit.toLocaleString()} (representing 20% of the base vehicle rental amount) will be frozen as collateral. Any bodywork damages, tyre bursts, engine overheating due to negligence, suspension stress, or late return delays will be directly assessed and billed against this deposit at actual local market replacement values.
                     </p>
                     <p>
                       <strong>3. SPEEDING, TRAFFIC FINES & E-CHALLANS:</strong> The Renter agrees to adhere strictly to all national highway speeds (Max 120km/h on Motorways). Any e-challan tickets, camera citations, motorway violation fines, or police tolls incurred during the specified rental duration are the absolute financial responsibility of the Renter. These will automatically debit the renter's outstanding account balance on EliteDrive.

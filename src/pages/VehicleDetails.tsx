@@ -43,7 +43,7 @@ const VehicleDetails: React.FC = () => {
   const isPastReturn = activeBooking && new Date() >= new Date(activeBooking.endDate);
   const effectiveStatus = vehicle ? (((vehicle.status === 'booked' || vehicle.status === 'rented') && isPastReturn) ? 'available' : vehicle.status) : 'available';
   const hasPendingBooking = activeBooking && activeBooking.status === 'pending';
-  const isVerified = (user?.emailVerified && user?.phoneVerified) || 
+  const isVerified = user?.emailVerified || 
                       (user?.email && ['ahmed12@gmail.com', 'tj334767@gmail.com'].includes(user.email.toLowerCase()));
 
   const startDate = (() => {
@@ -286,7 +286,14 @@ const VehicleDetails: React.FC = () => {
               ) : null}
 
               <Link 
-                to={!user ? '/auth?tab=login' : (isVerified && effectiveStatus === 'available' && !hasPendingBooking && !(user.outstandingBalance && user.outstandingBalance > 0) && !user.isBlacklisted ? `/payment/${vehicle?.id}?days=${rentalDays}` : '#')}
+                to={!user 
+                  ? '/auth?tab=login' 
+                  : (user && (user.outstandingBalance || 0) > 0)
+                    ? '/dashboard?view=balance'
+                    : (isVerified && effectiveStatus === 'available' && !hasPendingBooking && !user.isBlacklisted 
+                      ? `/payment/${vehicle?.id}?days=${rentalDays}` 
+                      : '#')
+                }
                 onClick={(e) => {
                   if (hasPendingBooking) {
                     e.preventDefault();
@@ -304,8 +311,7 @@ const VehicleDetails: React.FC = () => {
                     return;
                   }
                   if (user && (user.outstandingBalance || 0) > 0) {
-                    e.preventDefault();
-                    showToast(`Outstanding balance detected! You cannot make a new booking until you clear your outstanding charges of PKR ${(user.outstandingBalance || 0).toLocaleString()}.`, 'error');
+                    // Allow them to go to dashboard to clear outstanding balance
                     return;
                   }
                   if (user && user.isBlacklisted) {
@@ -319,27 +325,31 @@ const VehicleDetails: React.FC = () => {
                   }
                 }}
                 className={`w-full ${
-                  (!user || isVerified) && effectiveStatus === 'available' && !hasPendingBooking
-                    ? 'bg-[#2563EB] hover:bg-blue-700 shadow-xl shadow-blue-100' 
-                    : 'bg-gray-100 border border-gray-200 cursor-not-allowed text-gray-400'
+                  user && (user.outstandingBalance || 0) > 0
+                    ? 'bg-amber-600 hover:bg-amber-700 shadow-xl shadow-amber-100 cursor-pointer'
+                    : (!user || isVerified) && effectiveStatus === 'available' && !hasPendingBooking
+                      ? 'bg-[#2563EB] hover:bg-blue-700 shadow-xl shadow-blue-100' 
+                      : 'bg-gray-100 border border-gray-200 cursor-not-allowed text-gray-400'
                 } text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]`}
               >
                 {hasPendingBooking
                   ? 'Booking Under review'
-                  : effectiveStatus === 'available' 
-                    ? (!user ? 'Sign In to Book' : 'Proceed to Booking')
-                    : effectiveStatus === 'booked' 
-                      ? 'Currently Booked' 
-                      : effectiveStatus === 'rented' 
-                        ? 'Rented' 
-                        : 'Unavailable'}
+                  : user && (user.outstandingBalance || 0) > 0
+                    ? 'Clear Remaining Balance'
+                    : effectiveStatus === 'available' 
+                      ? (!user ? 'Sign In to Book' : 'Proceed to Booking')
+                      : effectiveStatus === 'booked' 
+                        ? 'Currently Booked' 
+                        : effectiveStatus === 'rented' 
+                          ? 'Rented' 
+                          : 'Unavailable'}
                 <ShieldCheck size={20} />
               </Link>
             </div>
 
             <div className="flex items-start gap-3 text-xs text-[#64748B] bg-white/50 p-5 rounded-[20px] border border-white/50">
               <Info size={18} className="mt-0.5 shrink-0 text-[#2563EB]" />
-              <p className="font-medium leading-relaxed">Free cancellation up to 24 hours before pickup. Security deposit of PKR 20,000 required.</p>
+              <p className="font-medium leading-relaxed">Free cancellation up to 24 hours before pickup. Refundable security deposit of 20% of the vehicle's rental amount is required.</p>
             </div>
           </div>
         </div>

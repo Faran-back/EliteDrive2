@@ -615,7 +615,7 @@ const Bookings: React.FC = () => {
                               )}
                               <div className="flex justify-between items-center text-slate-500 pt-1.5 border-t border-slate-200">
                                 <span className="flex items-center gap-1">Refundable Security Deposit</span>
-                                <span className="font-black text-slate-800">PKR {booking.securityDepositAmount?.toLocaleString() || '10,000'}</span>
+                                <span className="font-black text-slate-800">PKR {(booking.securityDepositAmount ?? Math.round((booking.basePrice ?? 0) * 0.2))?.toLocaleString() || '0'}</span>
                               </div>
                               
                               <div className="flex justify-between items-center text-slate-500">

@@ -72,7 +72,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
     return 'BEST VALUE';
   };
 
-  const isVerified = user?.emailVerified && user?.phoneVerified;
+  const isVerified = user?.emailVerified;
 
   return (
     <motion.div

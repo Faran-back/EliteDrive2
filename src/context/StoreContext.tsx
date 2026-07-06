@@ -51,7 +51,7 @@ interface StoreContextType {
   createIncident: (incidentData: { bookingId: string; type: string; occurredAt: string; location: string; statement: string; witnessName?: string; witnessPhone?: string; photos?: string[]; firNumber?: string; userId?: string }) => Promise<void>;
   updateIncidentStatus: (id: string, status: string, actionType?: string, notes?: string) => Promise<void>;
   createDispute: (disputeData: { title: string; description: string; bookingId?: string; type: string }) => Promise<void>;
-  updateDisputeStatus: (id: string, status: string, resolutionDetails?: string) => Promise<void>;
+  updateDisputeStatus: (id: string, status: string, resolutionDetails?: string, actionType?: string, actionAmount?: number) => Promise<void>;
   createEChallan: (challanData: { challanNumber: string; date: string; amount: number; vehicleId: string }) => Promise<void>;
   disputeEChallan: (challanId: string) => Promise<void>;
   removeEChallan: (challanId: string) => Promise<void>;
@@ -649,10 +649,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await refreshData();
   };
 
-  const updateDisputeStatus = async (id: string, status: string, resolutionDetails?: string) => {
+  const updateDisputeStatus = async (
+    id: string,
+    status: string,
+    resolutionDetails?: string,
+    actionType?: string,
+    actionAmount?: number
+  ) => {
     await apiFetch(`/api/disputes/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ status, resolutionDetails })
+      body: JSON.stringify({ status, resolutionDetails, actionType, actionAmount })
     });
     showToast(`Dispute updated to: ${status}`, 'success');
     await refreshData();

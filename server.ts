@@ -11,7 +11,6 @@ import webPush from 'web-push';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import { INITIAL_VEHICLES, User, Vehicle, Booking, Notification, RoleRequest, Invitation, Incident, Dispute, EChallan } from './src/types';
-import { getSqliteDatabasePath, loadCollectionsFromSqlite, saveCollectionsToSqlite } from './src/utils/sqliteStore';
 import { ensureSeedUsers } from './src/utils/seedUsers';
 
 import { createServer as createHttpServer } from 'http';
@@ -129,39 +128,6 @@ async function sendWebPushNotification(userId: string, payload: { title: string;
 
 
 import nodemailer from 'nodemailer';
-import pg from 'pg';
-import { createClient } from '@supabase/supabase-js';
-
-const { Pool } = pg;
-
-// Initialize PostgreSQL pool if DATABASE_URL is provided in environment variables
-let pgPool: pg.Pool | null = null;
-const DATABASE_URL = process.env.DATABASE_URL;
-
-if (DATABASE_URL) {
-  infoLog('[Database] DATABASE_URL is configured. Initializing PostgreSQL pool...');
-  pgPool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: DATABASE_URL.includes('localhost') || DATABASE_URL.includes('127.0.0.1')
-      ? false
-      : { rejectUnauthorized: false }
-  });
-} else {
-  infoLog('[Database] No DATABASE_URL found.');
-}
-
-// Initialize Supabase client if credentials are provided
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_KEY;
-
-let supabaseClient: any = null;
-
-if (SUPABASE_URL && SUPABASE_KEY) {
-  infoLog('[Database] Supabase credentials provided. Initializing Supabase client...');
-  supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
-} else {
-  infoLog('[Database] No Supabase credentials found.');
-}
 
 
 // --- EMAIL SERVICE & TEMPLATES ---
@@ -331,43 +297,8 @@ async function sendEmail({ to, subject, html, text }: { to: string; subject: str
   }
 }
 
-// --- DATABASE INLINE SYSTEM ---
-interface DbData {
-  users: (User & { passwordHash: string })[];
-  vehicles: Vehicle[];
-  bookings: Booking[];
-  notifications: Notification[];
-  roleRequests: RoleRequest[];
-  invitations: Invitation[];
-  incidents: Incident[];
-  disputes: Dispute[];
-  echallans: EChallan[];
-  sentEmails?: any[];
-  pushSubscriptions?: any[];
-  transientVerificationCodes?: Record<string, string>;
-  balancePayments?: any[];
-}
 
-let dbData: DbData = {
-  users: [],
-  vehicles: [],
-  bookings: [],
-  notifications: [],
-  roleRequests: [],
-  invitations: [],
-  incidents: [],
-  disputes: [],
-  echallans: [],
-  sentEmails: [],
-  pushSubscriptions: [],
-  transientVerificationCodes: {},
-  balancePayments: [],
-};
-
-const RESET_DATABASE_ON_START = false;
-const SQLITE_DB_PATH = getSqliteDatabasePath();
-
-function checkForBookingFraudThreats(booking: Booking, user: any, vehicle: Vehicle) {
+ function checkForBookingFraudThreats(booking: Booking, user: any, vehicle: Vehicle) {
   const threats: string[] = [];
 
   // 1. Rapid Multi-Vehicle Booking Pattern
@@ -463,96 +394,6 @@ function getEffectiveOutstandingBalance(user: any): number {
   return baseBalance + pendingBookingBalance;
 }
 
-async function initPgDatabase() {
-  if (!pgPool) return;
-  try {
-    // Create the collections table to store the database collections
-    await pgPool.query(`
-      CREATE TABLE IF NOT EXISTS collections (
-        name VARCHAR(50) PRIMARY KEY,
-        data JSONB NOT NULL
-      );
-    `);
-    console.log('[Database] PostgreSQL collections table verified or created successfully.');
-  } catch (err) {
-    console.error('[Database] Failed to initialize PostgreSQL tables:', err);
-  }
-}
-
-async function saveAllCollectionsToPg() {
-  if (!pgPool) return;
-  const keys = [
-    'users',
-    'vehicles',
-    'bookings',
-    'notifications',
-    'roleRequests',
-    'invitations',
-    'incidents',
-    'disputes',
-    'echallans',
-    'sentEmails',
-    'pushSubscriptions'
-  ];
-  
-  for (const key of keys) {
-    try {
-      const data = dbData[key as keyof DbData] || [];
-      await pgPool.query(`
-        INSERT INTO collections (name, data)
-        VALUES ($1, $2)
-        ON CONFLICT (name) DO UPDATE SET data = EXCLUDED.data;
-      `, [key, JSON.stringify(data)]);
-    } catch (err) {
-      console.error(`[Database] Failed to save collection ${key} to PostgreSQL:`, err);
-    }
-  }
-}
-
-async function saveAllCollectionsToSupabase() {
-  if (!supabaseClient) return;
-  const keys = [
-    'users',
-    'vehicles',
-    'bookings',
-    'notifications',
-    'roleRequests',
-    'invitations',
-    'incidents',
-    'disputes',
-    'echallans',
-    'sentEmails',
-    'pushSubscriptions'
-  ];
-  
-  for (const key of keys) {
-    try {
-      const data = dbData[key as keyof DbData] || [];
-      const { error } = await supabaseClient
-        .from('collections')
-        .upsert({ name: key, data }, { onConflict: 'name' });
-        
-      if (error) {
-        if (error.code === '42P01' || error.message?.includes('does not exist')) {
-          console.error(`\n=========================================`);
-          console.error(`[Supabase] ERROR: Table "collections" does not exist in your Supabase project!`);
-          console.error(`Please run the following SQL query in your Supabase SQL Editor to create it:`);
-          console.error(`\nCREATE TABLE collections (\n  name VARCHAR(50) PRIMARY KEY,\n  data JSONB NOT NULL\n);\n`);
-          console.error(`ALTER TABLE collections ENABLE ROW LEVEL SECURITY;`);
-          console.error(`CREATE POLICY "Allow public read" ON collections FOR SELECT USING (true);`);
-          console.error(`CREATE POLICY "Allow public insert" ON collections FOR INSERT WITH CHECK (true);`);
-          console.error(`CREATE POLICY "Allow public update" ON collections FOR UPDATE USING (true);`);
-          console.error(`=========================================\n`);
-          break; // Stop other keys to prevent spamming
-        } else {
-          console.error(`[Database] Failed to save collection ${key} to Supabase:`, error.message);
-        }
-      }
-    } catch (err: any) {
-      console.error(`[Database] Error saving collection ${key} to Supabase:`, err.message || err);
-    }
-  }
-}
 
 function sanitizeLoadedData() {
   dbData.users = dbData.users || [];
@@ -597,183 +438,7 @@ function sanitizeLoadedData() {
 
   // Ensure seed users are always present in the database
   ensureSeedUsers(dbData as any);
-}
-
-async function loadDatabase() {
-  const dbFileExists = fs.existsSync(SQLITE_DB_PATH);
-
-  try {
-    const sqliteData = loadCollectionsFromSqlite(SQLITE_DB_PATH);
-    if (Object.keys(sqliteData).length > 0) {
-      const loadedData: Partial<DbData> = {};
-      for (const [name, data] of Object.entries(sqliteData)) {
-        loadedData[name as keyof DbData] = data as any;
-      }
-
-      dbData = {
-        users: loadedData.users || [],
-        vehicles: loadedData.vehicles || [],
-        bookings: loadedData.bookings || [],
-        notifications: loadedData.notifications || [],
-        roleRequests: loadedData.roleRequests || [],
-        invitations: loadedData.invitations || [],
-        incidents: loadedData.incidents || [],
-        disputes: loadedData.disputes || [],
-        echallans: loadedData.echallans || [],
-        sentEmails: loadedData.sentEmails || [],
-        pushSubscriptions: loadedData.pushSubscriptions || [],
-        balancePayments: loadedData.balancePayments || [],
-      };
-
-      sanitizeLoadedData();
-      infoLog(`[Database] Loaded persisted data from SQLite at ${SQLITE_DB_PATH}`);
-      return;
-    }
-  } catch (err) {
-    console.error('[Database] Failed to load from SQLite:', err);
-  }
-
-  if (dbFileExists) {
-    infoLog(`[Database] SQLite file exists at ${SQLITE_DB_PATH} but contains no persisted collections. Seeding default admin and manager accounts to ensure database viability.`);
-    seedInitialDatabase();
-    return;
-  }
-
-  infoLog('[Database] No persisted data found in SQLite. Seeding default admin and manager accounts.');
-  seedInitialDatabase();
-}
-
-let isSaving = false;
-let saveQueued = false;
-
-function saveDatabase() {
-  // Automatically scan for and broadcast unsent real-time notifications
-  if (dbData && dbData.notifications) {
-    dbData.notifications.forEach((n: any) => {
-      if (!n.ws_notified) {
-        n.ws_notified = true;
-        // Broadcast in the next tick to ensure no blocking
-        process.nextTick(() => {
-          sendLiveNotification(n.userId, n);
-        });
-      }
-
-      if (!n.webpush_notified) {
-        n.webpush_notified = true;
-        process.nextTick(() => {
-          sendWebPushNotification(n.userId, {
-            title: n.title,
-            body: n.message,
-            url: n.link || '/'
-          }).catch(err => {
-            addDebugLog(`[WebPush] Error dispatching push notification: ${err.message || String(err)}`);
-          });
-        });
-      }
-    });
-  }
-
-  if (isSaving) {
-    saveQueued = true;
-    return;
-  }
-  isSaving = true;
-
-  Promise.resolve()
-    .then(() => {
-      const payload = {
-        users: dbData.users,
-        vehicles: dbData.vehicles,
-        bookings: dbData.bookings,
-        notifications: dbData.notifications,
-        roleRequests: dbData.roleRequests,
-        invitations: dbData.invitations,
-        incidents: dbData.incidents,
-        disputes: dbData.disputes,
-        echallans: dbData.echallans,
-        sentEmails: dbData.sentEmails,
-        pushSubscriptions: dbData.pushSubscriptions,
-        balancePayments: dbData.balancePayments,
-      };
-      saveCollectionsToSqlite(payload, SQLITE_DB_PATH);
-    })
-    .catch(err => {
-      console.error('[Database] Async save error:', err);
-    })
-    .finally(() => {
-      isSaving = false;
-      if (saveQueued) {
-        saveQueued = false;
-        setTimeout(saveDatabase, 100);
-      }
-    });
-}
-
-// --- BACKGROUND JOB QUEUE SYSTEM ---
-interface BackgroundJob {
-  id: string;
-  type: string;
-  bookingId: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed';
-  progress: number; // 0 to 100
-  statusText: string;
-  error?: string;
-  createdAt: string;
-  completedAt?: string;
-}
-
-const activeJobs: Record<string, BackgroundJob> = {};
-const jobQueue: { jobId: string; task: () => Promise<any> }[] = [];
-let isProcessingQueue = false;
-
-async function runJobQueue() {
-  if (isProcessingQueue || jobQueue.length === 0) return;
-  isProcessingQueue = true;
-
-  const { jobId, task } = jobQueue.shift()!;
-  const job = activeJobs[jobId];
-  if (job) {
-    job.status = 'processing';
-    job.progress = 10;
-    job.statusText = 'Starting transaction execution...';
-  }
-
-  try {
-    await task();
-    if (job) {
-      job.status = 'completed';
-      job.progress = 100;
-      job.statusText = 'Transaction completed and successfully synchronized!';
-      job.completedAt = new Date().toISOString();
-    }
-  } catch (error: any) {
-    console.error(`[JobQueue] Error running job ${jobId}:`, error);
-    if (job) {
-      job.status = 'failed';
-      job.statusText = `Failed: ${error.message || String(error)}`;
-      job.error = error.message || String(error);
-    }
-  } finally {
-    isProcessingQueue = false;
-    setTimeout(runJobQueue, 50);
-  }
-}
-
-function enqueueJob(type: string, bookingId: string, task: () => Promise<any>): string {
-  const jobId = `job_${Math.random().toString(36).substring(2, 11)}`;
-  activeJobs[jobId] = {
-    id: jobId,
-    type,
-    bookingId,
-    status: 'queued',
-    progress: 0,
-    statusText: 'Placed in background queue.',
-    createdAt: new Date().toISOString()
-  };
-  jobQueue.push({ jobId, task });
-  process.nextTick(runJobQueue);
-  return jobId;
-}
+} 
 
 function seedInitialDatabase() {
   dbData = {
@@ -793,6 +458,168 @@ function seedInitialDatabase() {
   ensureSeedUsers(dbData as any);
   saveDatabase();
 }
+
+
+// ==================== MYSQL DATABASE (Fixed) ====================
+
+import mysql from 'mysql2/promise';
+
+interface DbData {
+  users: (User & { passwordHash: string })[];
+  vehicles: Vehicle[];
+  bookings: Booking[];
+  notifications: Notification[];
+  roleRequests: RoleRequest[];
+  invitations: Invitation[];
+  incidents: Incident[];
+  disputes: Dispute[];
+  echallans: EChallan[];
+  sentEmails?: any[];
+  pushSubscriptions?: any[];
+  transientVerificationCodes?: Record<string, string>;
+  balancePayments?: any[];
+}
+
+let dbData: DbData = {
+  users: [],
+  vehicles: [],
+  bookings: [],
+  notifications: [],
+  roleRequests: [],
+  invitations: [],
+  incidents: [],
+  disputes: [],
+  echallans: [],
+  sentEmails: [],
+  pushSubscriptions: [],
+  transientVerificationCodes: {},
+  balancePayments: [],
+};
+
+let mysqlPool: mysql.Pool | null = null;
+let isSaving = false;
+let saveQueued = false;
+
+const RESET_DATABASE_ON_START = false;   // Set to true for fresh start
+
+async function initMySQL() {
+  mysqlPool = mysql.createPool({
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '3306'),
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'elitedrive',
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    charset: 'utf8mb4'
+  });
+
+  console.log('[Database] MySQL Pool Initialized');
+}
+
+async function createTables() {
+  if (!mysqlPool) return;
+  try {
+    await mysqlPool.query(`
+      CREATE TABLE IF NOT EXISTS collections (
+        name VARCHAR(100) PRIMARY KEY,
+        data JSON NOT NULL
+      );
+    `);
+    console.log('[MySQL] Tables ready.');
+  } catch (err) {
+    console.error('[MySQL] Schema error:', err);
+  }
+}
+
+async function loadDatabase() {
+  if (!mysqlPool) {
+    console.error('[Database] MySQL not initialized');
+    seedInitialDatabase();
+    return;
+  }
+
+  if (RESET_DATABASE_ON_START) {
+    console.log('[Database] RESET mode enabled → Starting fresh...');
+    seedInitialDatabase();
+    return;
+  }
+
+  try {
+    const [rows] = await mysqlPool.query<any[]>('SELECT name, data FROM collections');
+    const loaded: any = {};
+    rows.forEach(row => loaded[row.name] = row.data);
+
+    dbData = {
+      users: loaded.users || [],
+      vehicles: loaded.vehicles || [],
+      bookings: loaded.bookings || [],
+      notifications: loaded.notifications || [],
+      roleRequests: loaded.roleRequests || [],
+      invitations: loaded.invitations || [],
+      incidents: loaded.incidents || [],
+      disputes: loaded.disputes || [],
+      echallans: loaded.echallans || [],
+      sentEmails: loaded.sentEmails || [],
+      pushSubscriptions: loaded.pushSubscriptions || [],
+      balancePayments: loaded.balancePayments || [],
+      transientVerificationCodes: loaded.transientVerificationCodes || {},
+    };
+
+    sanitizeLoadedData();
+    console.log(`[Database] Loaded from MySQL`);
+  } catch (err) {
+    console.error('[MySQL] Load failed:', err);
+    seedInitialDatabase();
+  }
+}
+
+async function saveDatabase() {
+  if (!mysqlPool) return;
+
+  if (isSaving) {
+    saveQueued = true;
+    return;
+  }
+  isSaving = true;
+
+  try {
+    const payload = {
+      users: dbData.users,
+      vehicles: dbData.vehicles,
+      bookings: dbData.bookings,
+      notifications: dbData.notifications,
+      roleRequests: dbData.roleRequests,
+      invitations: dbData.invitations,
+      incidents: dbData.incidents,
+      disputes: dbData.disputes,
+      echallans: dbData.echallans,
+      sentEmails: dbData.sentEmails,
+      pushSubscriptions: dbData.pushSubscriptions,
+      balancePayments: dbData.balancePayments,
+      transientVerificationCodes: dbData.transientVerificationCodes || {},
+    };
+
+    for (const [name, data] of Object.entries(payload)) {
+      await mysqlPool.query(
+        `INSERT INTO collections (name, data) VALUES (?, ?) 
+         ON DUPLICATE KEY UPDATE data = VALUES(data)`,
+        [name, JSON.stringify(data)]
+      );
+    }
+  } catch (err) {
+    console.error('[MySQL] Save error:', err);
+  } finally {
+    isSaving = false;
+    if (saveQueued) {
+      saveQueued = false;
+      setTimeout(saveDatabase, 100);
+    }
+  }
+}
+
+
 
 // --- TOKEN SIGNATURE HELPERS ---
 const TOKEN_SECRET = 'elitedrivesharedtokensecretkeyforperfectauth';
@@ -846,6 +673,8 @@ async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000', 10);
 
+  await initMySQL();
+  await createTables();
   await loadDatabase();
 
   app.use(express.json({ limit: '50mb' }));
@@ -1254,24 +1083,33 @@ async function startServer() {
 
   // --- GEMINI ESCROW RECEIPT VERIFICATION ---
   let aiClient: any = null;
-  function getGeminiClient(): GoogleGenAI | null {
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) {
-      console.warn("GEMINI_API_KEY is missing. Falling back to local rules.");
-      return null;
-    }
+
+function getGeminiClient(): GoogleGenAI | null {
+  const key = process.env.GEMINI_API_KEY;
+  
+  if (!key) {
+    console.warn("⚠️ GEMINI_API_KEY is missing. AI features disabled.");
+    return null;
+  }
+
+  try {
     if (!aiClient) {
       aiClient = new GoogleGenAI({
         apiKey: key,
         httpOptions: {
           headers: {
-            'User-Agent': 'aistudio-build',
+            'User-Agent': 'EliteDrive-App',
           }
         }
       });
     }
     return aiClient;
+  } catch (err) {
+    console.error("Failed to initialize Gemini client:", err);
+    return null;
   }
+}
+
 
   app.post('/api/verify-receipt', authenticateToken, async (req: any, res) => {
     const { receiptImage } = req.body;
@@ -1644,7 +1482,7 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
 
       // Call Gemini with conversation context
       const response = await client.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-3.5-flash',
         contents,
         config: {
           systemInstruction: systemInstructions,
@@ -1763,20 +1601,22 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
       }
     }
 
-    // Create the booking payload
-    const calculatedDeposit = typeof data.securityDepositAmount === 'number' 
-      ? data.securityDepositAmount 
-      : (data.basePrice ? Math.round(data.basePrice * 0.20) : 10000);
+    // === NEW SECURITY DEPOSIT CALCULATION ===
+    const dailyRent = Number(data.dailyRate || data.pricePerDay || data.basePrice || 0);
+    const minimumDeposit = 10000; // TODO: Make this configurable via admin settings
+
+    const calculatedDeposit = Math.max(2 * dailyRent, minimumDeposit);
 
     const newBooking: Booking = {
       ...data,
-      userId: req.user.id, // Securely force the authenticated user ID
+      userId: req.user.id,
       status: data.status || 'pending',
       paymentStatus: data.paymentStatus || 'pending',
       securityDepositAmount: calculatedDeposit,
       securityDepositStatus: 'pending',
       createdAt: new Date().toISOString()
     };
+   
     dbData.bookings.unshift(newBooking);
 
     // Notify user

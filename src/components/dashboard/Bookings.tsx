@@ -71,7 +71,10 @@ const Bookings: React.FC = () => {
   };
 
   const filteredBookings = allBookings.filter(booking => {
-    const matchesStatus = booking.status === bookingFilter;
+    let matchesStatus = booking.status === bookingFilter;
+    if (bookingFilter === 'pending') {
+      matchesStatus = (booking.status === 'pending') || (booking.status === 'cancelled' && !!booking.cancelledPreApproval);
+    }
     const customer = allUsers.find(u => u.id === booking.userId);
     const vehicle = vehicles.find(v => v.id === booking.vehicleId);
     const matchesSearch = 
@@ -302,13 +305,24 @@ const Bookings: React.FC = () => {
                     </div>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${getStatusColor(booking.status)}`}>
-                          {getStatusIcon(booking.status)}
-                          {booking.status}
-                        </span>
+                        {booking.status === 'cancelled' && booking.cancelledPreApproval ? (
+                          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-rose-300 bg-rose-50 text-rose-700 animate-pulse">
+                            ⚠️ Cancelled Pre-Approval
+                          </span>
+                        ) : (
+                          <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${getStatusColor(booking.status)}`}>
+                            {getStatusIcon(booking.status)}
+                            {booking.status}
+                          </span>
+                        )}
                         <span className="text-[10px] font-black text-slate-300">#{booking.id.slice(0, 8)}</span>
                       </div>
                       <h3 className="text-lg font-black text-slate-900">{vehicle?.name}</h3>
+                      {booking.cancelledPreApproval && booking.cancellationNote && (
+                        <p className="text-xs text-rose-600 font-extrabold bg-rose-50 p-2.5 rounded-2xl border border-rose-100 mt-1.5 max-w-xl">
+                          ℹ️ {booking.cancellationNote}
+                        </p>
+                      )}
                       <div className="flex items-center gap-4 mt-2 flex-wrap">
                         <div className="flex items-center gap-1.5 text-slate-400">
                           <UserIcon size={14} />
@@ -887,7 +901,7 @@ const Bookings: React.FC = () => {
                           </button>
                         </div>
                       )}
-                      {booking.status === 'cancelled' && (booking.refundAmount && booking.refundAmount > 0) && (
+                      {booking.status === 'cancelled' && (
                         <div className="mt-8 p-6 bg-rose-50/50 rounded-3xl border border-rose-100/50 space-y-4 text-left">
                           <div className="flex items-center gap-2 pb-3 border-b border-rose-200">
                             <Building2 className="text-rose-600" size={18} />
@@ -989,6 +1003,16 @@ const Bookings: React.FC = () => {
                     <X size={24} />
                   </button>
                 </div>
+
+                {selectedBooking.status === 'cancelled' && selectedBooking.cancellationNote && (
+                  <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-[24px] text-xs text-rose-700 font-extrabold flex items-start gap-2">
+                    <span className="text-sm">⚠️</span>
+                    <div>
+                      <p className="font-black uppercase text-[10px] tracking-wider mb-0.5">Cancellation Alert</p>
+                      <p>{selectedBooking.cancellationNote}</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-8">

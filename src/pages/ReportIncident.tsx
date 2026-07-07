@@ -9,6 +9,7 @@ import {
   FileText, 
   UserPlus, 
   Camera, 
+  X,
   Siren, 
   Phone, 
   Send,

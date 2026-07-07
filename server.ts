@@ -1859,13 +1859,23 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
 
       // Total amount the user has actually paid so far:
       let actualPaidAmount = 0;
-      if (originalBooking.paymentStatus === 'paid' || 
-          originalBooking.bankReceiptApproved === 'approved' ||
-          originalBooking.status === 'pending') {
-        actualPaidAmount += (originalBooking.upfrontAmountPaid || (originalBooking.totalPrice * 0.5) || 0);
+      const upfront = Number(originalBooking.upfrontAmountPaid) || 0;
+      const total = Number(originalBooking.totalPrice) || 0;
+      const remaining = Number(originalBooking.remainingAmount) || 0;
+
+      if (upfront > 0) {
+        actualPaidAmount += upfront;
+      } else if (
+        originalBooking.paymentStatus === 'paid' || 
+        originalBooking.bankReceiptApproved === 'approved' ||
+        originalBooking.status === 'pending' ||
+        originalBooking.status === 'active'
+      ) {
+        actualPaidAmount += (originalBooking.paymentType === 'partial' ? Math.round(total * 0.5) : total);
       }
+
       if (originalBooking.remainingPaymentStatus === 'paid') {
-        actualPaidAmount += (originalBooking.remainingAmount || 0);
+        actualPaidAmount += remaining;
       }
 
       let refundAmount = 0;

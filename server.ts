@@ -1342,7 +1342,7 @@ Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fi
 CRITICAL RULE FOR IDS: The "recommendedVehicleIds" and "vehicleId" values in your response MUST BE EXACT strings from the "id" fields of the available vehicles list provided above (e.g. "vh-1z6w4v2u"). DO NOT invent or modify any ID under any circumstances. If no vehicles match the requirements or budget, return an empty array for "recommendedVehicleIds" and "recommendations". Include a general tip for driving or exploring in Pakistan for this travel type.`;
 
       const response = await client.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -1533,7 +1533,7 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
 
       // Call Gemini with conversation context
       const response = await client.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents,
         config: {
           systemInstruction: systemInstructions,
@@ -3189,7 +3189,7 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
       if (user) {
         matchedUserName = user.name;
         // Auto-charge outstanding balance
-        user.outstandingBalance = (user.outstandingBalance || 0) + Number(amount);
+        // user.outstandingBalance = (user.outstandingBalance || 0) + Number(amount);
         
         // Notify customer
         dbData.notifications.push({
@@ -3438,6 +3438,76 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
   const actualPort = await listenWithPortFallback(server, PORT, '0.0.0.0');
   console.log(`[EliteDrive] Fullstack server (HTTP & WS) listening on http://localhost:${actualPort}`);
 }
+
+
+// WAIVE INDIVIDUAL PENALTY / E-CHALLAN
+app.post('/api/penalties/:id/waive', authenticateToken, checkRole(['admin', 'manager']), async (req: any, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  if (!reason || reason.trim().length < 5) {
+    return res.status(400).json({ error: 'Please provide a valid waiver reason (minimum 5 characters)' });
+  }
+
+  // Find if it's an e-challan
+  const challanIndex = dbData.echallans.findIndex(c => c.id === id);
+  let waivedAmount = 0;
+  let targetUserId: string | null = null;
+
+  if (challanIndex !== -1) {
+    const challan = dbData.echallans[challanIndex];
+    waivedAmount = challan.amount;
+    targetUserId = challan.matchedUserId;
+
+    // Remove or mark as waived
+    dbData.echallans[challanIndex].status = 'finalized';
+    dbData.echallans[challanIndex].waivedAt = new Date().toISOString();
+    dbData.echallans[challanIndex].waiverReason = reason;
+  } 
+  else {
+    // Check if it's a booking penalty
+    const booking = dbData.bookings.find(b => b.id === id || (b.penaltyAmount && b.penaltyAmount > 0));
+    if (booking) {
+      waivedAmount = booking.penaltyAmount || 0;
+      targetUserId = booking.userId;
+      booking.penaltyAmount = 0;
+      booking.penaltyReason = (booking.penaltyReason || '') + ` | Waived: ${reason}`;
+    } else {
+      return res.status(404).json({ error: 'Penalty not found' });
+    }
+  }
+
+  if (targetUserId && waivedAmount > 0) {
+    const userIndex = dbData.users.findIndex(u => u.id === targetUserId);
+    if (userIndex !== -1) {
+      dbData.users[userIndex].outstandingBalance = Math.max(0, 
+        (dbData.users[userIndex].outstandingBalance || 0) - waivedAmount
+      );
+    }
+  }
+
+  // Log the waiver
+  dbData.balancePayments = dbData.balancePayments || [];
+  dbData.balancePayments.unshift({
+    id: `waive_${Date.now()}`,
+    userId: targetUserId,
+    userName: dbData.users.find(u => u.id === targetUserId)?.name || 'Unknown',
+    penaltyTitle: `Individual Waiver - ${id}`,
+    amount: waivedAmount,
+    status: 'waived',
+    resolvedBy: req.user.name || req.user.email,
+    resolvedAt: new Date().toISOString(),
+    waiverReason: reason
+  });
+
+  saveDatabase();
+
+  res.json({ 
+    success: true, 
+    message: `Penalty of PKR ${waivedAmount} waived successfully.`,
+    waivedAmount 
+  });
+});
 
 startServer().catch((err) => {
   console.error('[Server] Failed to start:', err);

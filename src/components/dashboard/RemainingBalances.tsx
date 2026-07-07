@@ -21,6 +21,10 @@ const RemainingBalances: React.FC = () => {
   const [waiverReasons, setWaiverReasons] = useState<Record<string, string>>({});
   const [isWaiving, setIsWaiving] = useState<Record<string, boolean>>({});
 
+  const [selectedPenalty, setSelectedPenalty] = useState<any>(null);
+  const [waiverReason, setWaiverReason] = useState('');
+  const [isWaivingIndividual, setIsWaivingIndividual] = useState(false);
+
   const handleWaiveBalance = async (customerId: string) => {
     const reason = waiverReasons[customerId] || '';
     if (!reason.trim()) {
@@ -49,6 +53,41 @@ const RemainingBalances: React.FC = () => {
       showToast(err.message || 'Error releasing penalties', 'error');
     } finally {
       setIsWaiving(prev => ({ ...prev, [customerId]: false }));
+    }
+  };
+
+    
+  const handleWaiveIndividual = async () => {
+    if (!selectedPenalty || !waiverReason.trim()) {
+      showToast('Please enter a valid reason for waiving this penalty.', 'error');
+      return;
+    }
+
+    setIsWaivingIndividual(true);
+    try {
+      const token = localStorage.getItem('elitedrive_token');
+      const res = await fetch(`/api/penalties/${selectedPenalty.id}/waive`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ 
+          reason: waiverReason,
+          penaltyType: selectedPenalty.type 
+        })
+      });
+
+      if (!res.ok) throw new Error('Failed to waive penalty');
+
+      showToast('Penalty waived successfully and removed from balance!', 'success');
+      setSelectedPenalty(null);
+      setWaiverReason('');
+      await refreshData();
+    } catch (err: any) {
+      showToast(err.message || 'Error waiving penalty', 'error');
+    } finally {
+      setIsWaivingIndividual(false);
     }
   };
 
@@ -329,6 +368,26 @@ const RemainingBalances: React.FC = () => {
             <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-ping" />
             <h3 className="font-extrabold text-amber-900 text-xs uppercase tracking-wider">Awaiting Penalty Payment Verification ({balancePayments.filter(p => p.status === 'pending').length})</h3>
           </div>
+          {pay.receiptUrl && (
+            <div className="mt-3">
+              <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">
+                Payment Receipt
+              </p>
+
+              <a
+                href={pay.receiptUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block"
+              >
+                <img
+                  src={pay.receiptUrl}
+                  alt="Payment Receipt"
+                  className="w-full max-h-48 object-contain rounded-xl border border-slate-200 bg-white hover:opacity-80 transition"
+                />
+              </a>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {balancePayments.filter(p => p.status === 'pending').map((pay) => (
               <div key={pay.id} className="bg-white border border-amber-200/60 rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:border-amber-400 transition-colors">
@@ -414,13 +473,20 @@ const RemainingBalances: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-2.5">
+                                   <div className="space-y-2.5">
                     <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Penalties & Charge Details</span>
                     <div className="grid grid-cols-1 gap-2">
                       {reasons.map((reason, index) => {
                         const IconComponent = reason.icon;
+                        const isSelected = selectedPenalty?.id === reason.id;
+
                         return (
-                          <div key={index} className="flex items-start justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs">
+                          <motion.div
+                            key={index}
+                            onClick={() => setSelectedPenalty(reason)}
+                            className={`penalty-item flex items-start justify-between p-3 bg-slate-50 border rounded-xl text-xs cursor-pointer transition-all hover:bg-blue-50 ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-slate-100'}`}
+                            whileHover={{ x: 4 }}
+                          >
                             <div className="flex items-start gap-2.5">
                               <div className="p-1.5 bg-white border border-slate-100 text-slate-500 rounded-md mt-0.5">
                                 <IconComponent size={14} />
@@ -434,10 +500,13 @@ const RemainingBalances: React.FC = () => {
                                 )}
                               </div>
                             </div>
-                            <span className="font-extrabold text-slate-900 whitespace-nowrap ml-4">
-                              PKR {reason.amount.toLocaleString()}
-                            </span>
-                          </div>
+                            <div className="text-right">
+                              <span className="font-extrabold text-slate-900 whitespace-nowrap">
+                                PKR {reason.amount.toLocaleString()}
+                              </span>
+                              <p className="text-[9px] text-blue-600 font-medium mt-0.5">Click to select &amp; waive</p>
+                            </div>
+                          </motion.div>
                         );
                       })}
                     </div>

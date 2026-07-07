@@ -25,6 +25,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
+import ConfirmationModal from '../ConfirmationModal';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
 import ReactMarkdown from 'react-markdown';
@@ -52,7 +53,8 @@ const SupportCenter: React.FC = () => {
     eChallans, 
     updateIncidentStatus, 
     updateDisputeStatus, 
-    createEChallan 
+    createEChallan,
+    showToast
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<'incidents' | 'disputes' | 'echallans' | 'chat' | 'kb'>('incidents');
@@ -74,6 +76,17 @@ const SupportCenter: React.FC = () => {
 
   const [selectedDisputeId, setSelectedDisputeId] = useState<string | null>(null);
   const [disputeResolutionText, setDisputeResolutionText] = useState('');
+  const [disputeConfirmModal, setDisputeConfirmModal] = useState<{
+    isOpen: boolean;
+    disputeId?: string;
+    status?: string;
+    actionType?: string;
+    actionAmount?: number;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    type: 'danger' | 'warning' | 'info';
+  } | null>(null);
 
   // Chat State
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -244,14 +257,40 @@ ELITEDRIVE COMPLIANCE POLICIES:
     }
   };
 
-  const handleDisputeResolve = async (id: string) => {
-    if (!disputeResolutionText.trim()) return;
+  const handleDisputeResolve = async (id: string, status: string, customActionType?: string, customActionAmount?: number) => {
+    if (!disputeResolutionText.trim()) {
+      showToast?.('Please enter a resolution response memo first.', 'error');
+      return;
+    }
+    
+    setDisputeConfirmModal({
+      isOpen: true,
+      disputeId: id,
+      status,
+      actionType: customActionType,
+      actionAmount: customActionAmount,
+      title: status === 'rejected' ? 'Reject Customer Dispute?' : 'Waive Fine / Resolve Dispute?',
+      message: status === 'rejected' 
+        ? 'Are you ABSOLUTELY certain you want to REJECT this customer grievance and dispute? The status will be permanently set to REJECTED and they will receive an immediate notification.' 
+        : 'Are you sure you want to APPROVE and WAIVE/RESOLVE this customer dispute? Outstanding balance adjustments will be automatically processed.',
+      confirmLabel: status === 'rejected' ? 'Yes, Reject' : 'Yes, Approve & Waive',
+      type: status === 'rejected' ? 'danger' : 'warning'
+    });
+  };
+
+  const handleConfirmDisputeResolve = async () => {
+    if (!disputeConfirmModal || !disputeConfirmModal.disputeId || !disputeConfirmModal.status) return;
+    const { disputeId, status, actionType, actionAmount } = disputeConfirmModal;
     try {
-      await updateDisputeStatus(id, 'resolved', disputeResolutionText);
+      await updateDisputeStatus(disputeId, status, disputeResolutionText, actionType, actionAmount);
       setSelectedDisputeId(null);
       setDisputeResolutionText('');
-    } catch (err) {
+      showToast?.(`Dispute successfully updated to status: ${status.toUpperCase()}`, 'success');
+    } catch (err: any) {
       console.error(err);
+      showToast?.(err.message || 'Failed to update dispute status', 'error');
+    } finally {
+      setDisputeConfirmModal(null);
     }
   };
 
@@ -364,6 +403,18 @@ ELITEDRIVE COMPLIANCE POLICIES:
                             <div className="flex gap-2.5 overflow-x-auto py-1">
                               {inc.photos.map((p: string, idx: number) => (
                                 <img key={idx} src={p} alt="Damage Scan" className="size-20 rounded-xl object-cover border border-slate-200 shadow-xs shrink-0 hover:scale-105 transition-all cursor-pointer" />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* FIR Document Photos */}
+                        {inc.firPhotos && inc.firPhotos.length > 0 && (
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Official Police FIR Document Proofs</p>
+                            <div className="flex gap-2.5 overflow-x-auto py-1">
+                              {inc.firPhotos.map((p: string, idx: number) => (
+                                <img key={idx} src={p} alt="FIR Document" className="size-20 rounded-xl object-cover border border-amber-200 shadow-xs shrink-0 hover:scale-105 transition-all cursor-pointer" />
                               ))}
                             </div>
                           </div>
@@ -526,7 +577,7 @@ ELITEDRIVE COMPLIANCE POLICIES:
                               />
                             </div>
 
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"
                                 onClick={() => setSelectedDisputeId(null)}
@@ -536,10 +587,28 @@ ELITEDRIVE COMPLIANCE POLICIES:
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleDisputeResolve(dsp.id)}
-                                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-lg"
+                                onClick={() => handleDisputeResolve(dsp.id, 'resolved')}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-lg"
                               >
-                                Confirm Resolution
+                                Resolve Claim
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const isChallan = dsp.type === 'traffic_violation' || dsp.title?.toLowerCase().includes('challan') || dsp.description?.toLowerCase().includes('challan');
+                                  const actType = isChallan ? 'waive_challan' : 'waive_booking_penalty';
+                                  handleDisputeResolve(dsp.id, 'resolved', actType);
+                                }}
+                                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black uppercase rounded-lg"
+                              >
+                                Waive Fine / Penalty
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDisputeResolve(dsp.id, 'rejected')}
+                                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase rounded-lg"
+                              >
+                                Reject Dispute
                               </button>
                             </div>
                           </div>
@@ -873,6 +942,19 @@ ELITEDRIVE COMPLIANCE POLICIES:
           </div>
         </div>
       </div>
+
+      {disputeConfirmModal && (
+        <ConfirmationModal
+          isOpen={disputeConfirmModal.isOpen}
+          onClose={() => setDisputeConfirmModal(null)}
+          onConfirm={handleConfirmDisputeResolve}
+          title={disputeConfirmModal.title}
+          message={disputeConfirmModal.message}
+          confirmLabel={disputeConfirmModal.confirmLabel}
+          cancelLabel="Cancel"
+          type={disputeConfirmModal.type}
+        />
+      )}
     </div>
   );
 };

@@ -143,6 +143,7 @@ const ReportIncident: React.FC = () => {
   const [witnessPhone, setWitnessPhone] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
   const [firNumber, setFirNumber] = useState('');
+  const [firPhotos, setFirPhotos] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Disputes states
@@ -263,6 +264,30 @@ const ReportIncident: React.FC = () => {
     setPhotos(prev => prev.filter((_, i) => i !== idx));
   };
 
+  const handleFirPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    if (firPhotos.length + files.length > 3) {
+      showToast?.('Maximum 3 official FIR document photos permitted.', 'error');
+      return;
+    }
+
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setFirPhotos(prev => [...prev, reader.result as string]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeFirPhoto = (idx: number) => {
+    setFirPhotos(prev => prev.filter((_, i) => i !== idx));
+  };
+
   // Submit Handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -299,7 +324,8 @@ const ReportIncident: React.FC = () => {
         witnessName: witnessName || undefined,
         witnessPhone: witnessPhone || undefined,
         photos: photos,
-        firNumber: firNumber || undefined
+        firNumber: firNumber || undefined,
+        firPhotos: firPhotos.length > 0 ? firPhotos : undefined
       };
 
       // Handle filing on behalf of client
@@ -1161,6 +1187,39 @@ const ReportIncident: React.FC = () => {
                         value={firNumber}
                         onChange={(e) => setFirNumber(e.target.value)}
                       />
+                    </div>
+
+                    <div className="space-y-2 pt-2 border-t border-amber-200">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-[10px] uppercase font-black text-amber-900 tracking-wider">Official Police FIR Document Photos ({firPhotos.length}/3)</label>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {firPhotos.map((base64, idx) => (
+                          <div key={idx} className="relative aspect-[4/3] w-full rounded-xl overflow-hidden border border-amber-200 bg-white group shadow-sm">
+                            <img src={base64} alt={`FIR Doc ${idx + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeFirPhoto(idx)}
+                              className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-lg opacity-90 group-hover:opacity-100 transition-all shadow hover:bg-red-700"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                        {firPhotos.length < 3 && (
+                          <label className="border-2 border-dashed border-amber-300 hover:border-amber-500 hover:bg-amber-100/30 rounded-xl flex flex-col items-center justify-center p-4 cursor-pointer gap-2 text-amber-700 aspect-[4/3] active:scale-95 transition-all text-center">
+                            <Camera size={20} />
+                            <span className="text-[9px] font-black uppercase tracking-wider leading-none">Add FIR Image</span>
+                            <input 
+                              type="file" 
+                              multiple 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={handleFirPhotoUpload} 
+                            />
+                          </label>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}

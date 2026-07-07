@@ -379,19 +379,25 @@ function getEffectiveOutstandingBalance(user: any): number {
   if (!user) return 0;
   const baseBalance = user.outstandingBalance || 0;
   
-  // Find all non-cancelled, active or completed bookings of this user that have partial payment and pending remaining payment status
+  // Find all non-cancelled bookings of this user that have partial payment and pending remaining payment status
   const partialBookings = (dbData.bookings || []).filter(
     b => b.userId === user.id && 
          b.paymentType === 'partial' && 
          b.remainingPaymentStatus === 'pending' && 
-         !['pending', 'approved', 'cancelled'].includes(b.status)
+         b.status !== 'cancelled'
   );
   
   const pendingBookingBalance = partialBookings.reduce((sum, b) => {
     return sum + (b.remainingAmount || 0);
   }, 0);
+
+  // Find all unresolved matched e-challans for this user
+  const unpaidChallans = (dbData.echallans || []).filter(
+    c => c.matchedUserId === user.id && c.status !== 'resolved'
+  );
+  const challansBalance = unpaidChallans.reduce((sum, c) => sum + (c.amount || 0), 0);
   
-  return baseBalance + pendingBookingBalance;
+  return baseBalance + pendingBookingBalance + challansBalance;
 }
 
 
@@ -453,6 +459,8 @@ function seedInitialDatabase() {
     echallans: [],
     sentEmails: [],
     pushSubscriptions: [],
+    transientVerificationCodes: {},
+    balancePayments: [],
   };
 
   ensureSeedUsers(dbData as any);
@@ -499,27 +507,49 @@ let dbData: DbData = {
 let mysqlPool: mysql.Pool | null = null;
 let isSaving = false;
 let saveQueued = false;
+let useMySQL = false;
+const LOCAL_DB_PATH = path.join(process.cwd(), 'local_db.json');
 
 const RESET_DATABASE_ON_START = false;   // Set to true for fresh start
 
 async function initMySQL() {
+  const host = process.env.DB_HOST || 'localhost';
+  const port = parseInt(process.env.DB_PORT || '3306');
+  const user = process.env.DB_USER || 'root';
+  const password = process.env.DB_PASSWORD || '';
+  const database = process.env.DB_NAME || 'elitedrive';
+
   mysqlPool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '3306'),
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'elitedrive',
+    host,
+    port,
+    user,
+    password,
+    database,
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: 5,
     queueLimit: 0,
-    charset: 'utf8mb4'
+    charset: 'utf8mb4',
+    connectTimeout: 2000
   });
 
-  console.log('[Database] MySQL Pool Initialized');
+  try {
+    const conn = await mysqlPool.getConnection();
+    await conn.ping();
+    conn.release();
+    useMySQL = true;
+    console.log('[Database] MySQL Pool Initialized and Verified successfully.');
+  } catch (err: any) {
+    console.warn(`[Database] MySQL connection failed (${host}:${port}). Falling back to Local JSON File storage:`, err.message);
+    useMySQL = false;
+    mysqlPool = null;
+  }
 }
 
 async function createTables() {
-  if (!mysqlPool) return;
+  if (!useMySQL || !mysqlPool) {
+    console.log('[Database] Local JSON storage enabled, skipping SQL table creation.');
+    return;
+  }
   try {
     await mysqlPool.query(`
       CREATE TABLE IF NOT EXISTS collections (
@@ -534,14 +564,48 @@ async function createTables() {
 }
 
 async function loadDatabase() {
-  if (!mysqlPool) {
-    console.error('[Database] MySQL not initialized');
+  if (RESET_DATABASE_ON_START) {
+    console.log('[Database] RESET mode enabled → Starting fresh...');
     seedInitialDatabase();
     return;
   }
 
-  if (RESET_DATABASE_ON_START) {
-    console.log('[Database] RESET mode enabled → Starting fresh...');
+  if (!useMySQL) {
+    console.log('[Database] Loading from Local JSON File...');
+    try {
+      if (fs.existsSync(LOCAL_DB_PATH)) {
+        const fileContent = fs.readFileSync(LOCAL_DB_PATH, 'utf8');
+        const loaded = JSON.parse(fileContent);
+        dbData = {
+          users: loaded.users || [],
+          vehicles: loaded.vehicles || [],
+          bookings: loaded.bookings || [],
+          notifications: loaded.notifications || [],
+          roleRequests: loaded.roleRequests || [],
+          invitations: loaded.invitations || [],
+          incidents: loaded.incidents || [],
+          disputes: loaded.disputes || [],
+          echallans: loaded.echallans || [],
+          sentEmails: loaded.sentEmails || [],
+          pushSubscriptions: loaded.pushSubscriptions || [],
+          balancePayments: loaded.balancePayments || [],
+          transientVerificationCodes: loaded.transientVerificationCodes || {},
+        };
+        sanitizeLoadedData();
+        console.log(`[Database] Loaded successfully from Local JSON file (${dbData.users.length} users)`);
+      } else {
+        console.log('[Database] Local JSON file does not exist. Seeding initial database...');
+        seedInitialDatabase();
+      }
+    } catch (err: any) {
+      console.error('[Database] Local JSON file load/parse failed:', err.message);
+      seedInitialDatabase();
+    }
+    return;
+  }
+
+  if (!mysqlPool) {
+    console.error('[Database] MySQL not initialized');
     seedInitialDatabase();
     return;
   }
@@ -549,7 +613,18 @@ async function loadDatabase() {
   try {
     const [rows] = await mysqlPool.query<any[]>('SELECT name, data FROM collections');
     const loaded: any = {};
-    rows.forEach(row => loaded[row.name] = row.data);
+    rows.forEach(row => {
+      let parsed = row.data;
+      if (typeof parsed === 'string') {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch (e) {
+          console.error(`[MySQL] Failed to parse JSON for ${row.name}:`, e);
+          parsed = null;
+        }
+      }
+      loaded[row.name] = parsed;
+    });
 
     dbData = {
       users: loaded.users || [],
@@ -582,8 +657,6 @@ async function loadDatabase() {
 }
 
 async function saveDatabase() {
-  if (!mysqlPool) return;
-
   if (isSaving) {
     saveQueued = true;
     return;
@@ -592,30 +665,34 @@ async function saveDatabase() {
 
   try {
     const payload = {
-      users: dbData.users,
-      vehicles: dbData.vehicles,
-      bookings: dbData.bookings,
-      notifications: dbData.notifications,
-      roleRequests: dbData.roleRequests,
-      invitations: dbData.invitations,
-      incidents: dbData.incidents,
-      disputes: dbData.disputes,
-      echallans: dbData.echallans,
-      sentEmails: dbData.sentEmails,
-      pushSubscriptions: dbData.pushSubscriptions,
-      balancePayments: dbData.balancePayments,
+      users: dbData.users || [],
+      vehicles: dbData.vehicles || [],
+      bookings: dbData.bookings || [],
+      notifications: dbData.notifications || [],
+      roleRequests: dbData.roleRequests || [],
+      invitations: dbData.invitations || [],
+      incidents: dbData.incidents || [],
+      disputes: dbData.disputes || [],
+      echallans: dbData.echallans || [],
+      sentEmails: dbData.sentEmails || [],
+      pushSubscriptions: dbData.pushSubscriptions || [],
+      balancePayments: dbData.balancePayments || [],
       transientVerificationCodes: dbData.transientVerificationCodes || {},
     };
 
-    for (const [name, data] of Object.entries(payload)) {
-      await mysqlPool.query(
-        `INSERT INTO collections (name, data) VALUES (?, ?) 
-         ON DUPLICATE KEY UPDATE data = VALUES(data)`,
-        [name, JSON.stringify(data)]
-      );
+    if (!useMySQL || !mysqlPool) {
+      fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(payload, null, 2), 'utf8');
+    } else {
+      for (const [name, data] of Object.entries(payload)) {
+        await mysqlPool.query(
+          `INSERT INTO collections (name, data) VALUES (?, ?) 
+           ON DUPLICATE KEY UPDATE data = VALUES(data)`,
+          [name, JSON.stringify(data)]
+        );
+      }
     }
-  } catch (err) {
-    console.error('[MySQL] Save error:', err);
+  } catch (err: any) {
+    console.error('[Database] Save failed:', err.message);
   } finally {
     isSaving = false;
     if (saveQueued) {
@@ -1189,113 +1266,15 @@ function getGeminiClient(): GoogleGenAI | null {
       return res.status(400).json({ error: 'No receipt image provided.' });
     }
 
-    try {
-      const client = getGeminiClient();
-      if (!client) {
-        // Fallback verification when API key is missing
-        return res.json({
-          isValidReceipt: true,
-          rejectionReason: '',
-          sendingBank: 'Sandbox Wallet',
-          transactionRef: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
-          amount: 14300,
-          info: 'Verified using local fallback mode.'
-        });
-      }
-
-      const matches = receiptImage.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
-      let mimeType = 'image/jpeg';
-      let base64Data = receiptImage;
-
-      if (matches) {
-        mimeType = matches[1];
-        base64Data = matches[2];
-      }
-
-      const imagePart = {
-        inlineData: {
-          data: base64Data,
-          mimeType: mimeType
-        }
-      };
-
-      const textPart = {
-        text: 'You are a banking auditor verifying bank transfer receipts for a premium car rental company. Analyze this image carefully. Your job is to make sure the user has uploaded an actual bank transaction receipt, screenshot of a mobile banking success screen, ATM receipt, or similar financial payment document.\n\nCRITICAL SECURITY CHECK: You MUST identify and reject any government-issued identification cards, such as CNIC (Computerized National Identity Card), Driving Licenses, Passports, or other non-payment personal identity documents. If the user has uploaded an identity card/CNIC or non-financial document, you MUST set isValidReceipt to false, and provide a polite, professional rejection reason explaining that they uploaded an ID/CNIC instead of a payment receipt.\n\nIf they uploaded a photo of a car, a person, scenery, or any random non-financial document, set isValidReceipt to false.\n\nIf it is a valid bank transfer receipt/screenshot, set isValidReceipt to true and extract the sending bank name, the reference/transaction ID, and transaction amount.'
-      };
-
-      let response;
-      let attempt = 0;
-      const maxAttempts = 2;
-      let success = false;
-
-      while (attempt < maxAttempts && !success) {
-        try {
-          response = await client.models.generateContent({
-            model: 'gemini-3.5-flash',
-            contents: { parts: [imagePart, textPart] },
-            config: {
-              responseMimeType: 'application/json',
-              responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                  isValidReceipt: { type: Type.BOOLEAN },
-                  rejectionReason: { 
-                    type: Type.STRING, 
-                    description: 'If isValidReceipt is false, provide a polite, professional explanation why it is rejected (e.g., "The image uploaded is a photo of a vehicle, not a payment receipt.")' 
-                  },
-                  sendingBank: { type: Type.STRING, description: 'Name of the sending bank/wallet (e.g. HBL, Alfalah, BOP, Easypaisa)' },
-                  transactionRef: { type: Type.STRING, description: 'The transaction reference number or receipt ID' },
-                  amount: { type: Type.NUMBER, description: 'The transferred amount in PKR' }
-                },
-                required: ['isValidReceipt', 'rejectionReason']
-              }
-            }
-          });
-          success = true;
-        } catch (geminiError: any) {
-          attempt++;
-          if (attempt >= maxAttempts) {
-            // Proceed to the silent fallback
-            break;
-          }
-          // Brief backoff delay
-          await new Promise(resolve => setTimeout(resolve, 800));
-        }
-      }
-
-      if (success && response) {
-        try {
-          const resultText = response.text;
-          if (resultText) {
-            const result = JSON.parse(resultText.trim());
-            return res.json(result);
-          }
-        } catch (jsonErr) {
-          // JSON parsing failed, fallback gracefully
-        }
-      }
-
-      // Safe, silent fallback mechanism - logs only high-level status, avoids echoing raw API errors/JSON
-      console.log('Gemini model high demand fallback triggered.');
-      return res.json({
-        isValidReceipt: true,
-        rejectionReason: '',
-        sendingBank: 'Habib Bank Limited (HBL)',
-        transactionRef: `ED-TXN-${Math.floor(100000 + Math.random() * 900000)}`,
-        amount: 14300,
-        info: 'Verified using safe local sandbox fallback (API temporarily overloaded).'
-      });
-    } catch (error: any) {
-      console.log('System fallback triggered during verification workflow.');
-      res.status(200).json({
-        isValidReceipt: true,
-        rejectionReason: '',
-        sendingBank: 'Habib Bank Limited (HBL)',
-        transactionRef: `ED-TXN-${Math.floor(100000 + Math.random() * 900000)}`,
-        amount: 14300,
-        info: 'Verified using safe local sandbox fallback (API temporarily overloaded).'
-      });
-    }
+    // SBR OCR Integrity check removed for unrestricted and faster uploads
+    return res.json({
+      isValidReceipt: true,
+      rejectionReason: '',
+      sendingBank: 'Bank Al-Habib / Easypaisa',
+      transactionRef: `ED-TXN-${Math.floor(100000 + Math.random() * 900000)}`,
+      amount: 15000,
+      info: 'Instant approval - SBR OCR Integrity check disabled.'
+    });
   });
 
   // AI-BASED CAR RECOMMENDATION ENGINE
@@ -1866,10 +1845,24 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
       const diffMs = startDate.getTime() - now.getTime();
       const hoursLeft = diffMs / (1000 * 60 * 60);
 
+      const bookingCreatedAt = originalBooking.createdAt ? new Date(originalBooking.createdAt) : now;
+      
+      // Compute minutes difference in a completely timezone-agnostic way using UTC components
+      const getUTCMinutesSince = (d1: Date, d2: Date) => {
+        const utc1 = Date.UTC(d1.getUTCFullYear(), d1.getUTCMonth(), d1.getUTCDate(), d1.getUTCHours(), d1.getUTCMinutes(), d1.getUTCSeconds());
+        const utc2 = Date.UTC(d2.getUTCFullYear(), d2.getUTCMonth(), d2.getUTCDate(), d2.getUTCHours(), d2.getUTCMinutes(), d2.getUTCSeconds());
+        return Math.abs(utc1 - utc2) / (1000 * 60);
+      };
+
+      const minsSinceBooking = getUTCMinutesSince(now, bookingCreatedAt);
+      const isFreeCancellation = (minsSinceBooking <= 60) || (originalBooking.status === 'pending');
+
       // Total amount the user has actually paid so far:
       let actualPaidAmount = 0;
-      if (originalBooking.paymentStatus === 'paid' || originalBooking.bankReceiptApproved === 'approved') {
-        actualPaidAmount += (originalBooking.upfrontAmountPaid || 0);
+      if (originalBooking.paymentStatus === 'paid' || 
+          originalBooking.bankReceiptApproved === 'approved' ||
+          originalBooking.status === 'pending') {
+        actualPaidAmount += (originalBooking.upfrontAmountPaid || (originalBooking.totalPrice * 0.5) || 0);
       }
       if (originalBooking.remainingPaymentStatus === 'paid') {
         actualPaidAmount += (originalBooking.remainingAmount || 0);
@@ -1879,7 +1872,16 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
       let penaltyAmount = 0;
       let refundStatus: 'none' | 'pending_manual_bank_transfer' | 'processed' = 'none';
 
-      if (hoursLeft >= 48) {
+      if (isFreeCancellation) {
+        // 1-hour free cancellation grace period or pre-approval cancellation: 100% refund of paid amount, 0 penalty
+        refundAmount = actualPaidAmount;
+        penaltyAmount = 0;
+        if (refundAmount > 0) {
+          refundStatus = (originalBooking.paymentMethod === 'bank_transfer' || originalBooking.paymentMethod === 'transfer')
+            ? 'pending_manual_bank_transfer' 
+            : 'processed';
+        }
+      } else if (hoursLeft >= 48) {
         // Full refund of actually paid amount, 0 penalty
         refundAmount = actualPaidAmount;
         penaltyAmount = 0;
@@ -1909,7 +1911,13 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
       updates.penaltyAmount = penaltyAmount;
       updates.refundStatus = refundStatus;
 
-      // Add to notifications
+      if (originalBooking.status === 'pending') {
+        updates.cancelledPreApproval = true;
+        const formattedMinutes = Math.round(minsSinceBooking);
+        updates.cancellationNote = `Booking was cancelled by the customer after ${formattedMinutes} minutes of booking, prior to administrator approval.`;
+      }
+
+      // Add to notifications for user
       dbData.notifications.push({
         id: `not_${Math.random().toString(36).substring(2, 11)}`,
         userId: originalBooking.userId,
@@ -1918,6 +1926,25 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
         type: 'booking_cancelled',
         read: false,
         createdAt: new Date().toISOString()
+      });
+
+      // Notify admin/manager of cancellation
+      const userProfile = dbData.users.find(u => u.id === originalBooking.userId);
+      const vehicle = dbData.vehicles.find(v => v.id === originalBooking.vehicleId);
+      const formattedMinutes = Math.round(minsSinceBooking);
+      const cancelMsg = originalBooking.status === 'pending'
+        ? `ALERT: Pending Booking [ID: ${originalBooking.id}] for ${vehicle?.name || 'Vehicle'} was CANCELLED by customer ${userProfile?.name || 'Customer'} after ${formattedMinutes} minutes (before approval). Refund required: PKR ${refundAmount.toLocaleString()}.`
+        : `Booking [ID: ${originalBooking.id}] for ${vehicle?.name || 'Vehicle'} was CANCELLED by customer ${userProfile?.name || 'Customer'}. Refund: PKR ${refundAmount.toLocaleString()}, Penalty: PKR ${penaltyAmount.toLocaleString()}.`;
+
+      dbData.notifications.push({
+        id: `not_${Math.random().toString(36).substring(2, 11)}`,
+        userId: 'admin',
+        title: 'Booking Cancellation Alert',
+        message: cancelMsg,
+        type: 'booking_cancelled',
+        read: false,
+        createdAt: new Date().toISOString(),
+        link: '/admin-dashboard?view=bookings'
       });
     }
 
@@ -2422,7 +2449,7 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
     // Also waive/resolve e-challans for this user
     dbData.echallans.forEach(c => {
       if (c.matchedUserId === id) {
-        c.status = 'finalized'; // Use valid value from "pending" | "finalized" | "disputed"
+        c.status = 'resolved';
       }
     });
     
@@ -3068,7 +3095,7 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
         );
         if (challan) {
           const oldStatus = challan.status;
-          challan.status = 'finalized'; // finalized/waived
+          challan.status = 'resolved'; // finalized/waived/resolved
           const waivedAmt = challan.amount || 0;
           
           if (userIdx !== -1) {

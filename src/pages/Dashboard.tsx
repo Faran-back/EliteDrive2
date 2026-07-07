@@ -265,11 +265,14 @@ const Dashboard: React.FC = () => {
     const matchedBookings = allBookings.filter(b => b.userId === user.id && (b.penaltyAmount || 0) > 0);
     matchedBookings.forEach(b => {
       const v = vehicles.find(veh => veh.id === b.vehicleId);
+      const isCancelled = b.status === 'cancelled';
       reasons.push({
-        title: `Late Return / Surcharge Penalty (${v?.name || 'Vehicle'} - ID: ${b.id.slice(0, 8).toUpperCase()})`,
+        title: isCancelled
+          ? `Booking Cancellation Penalty (${v?.name || 'Vehicle'} - ID: ${b.id.slice(0, 8).toUpperCase()})`
+          : `Late Return / Surcharge Penalty (${v?.name || 'Vehicle'} - ID: ${b.id.slice(0, 8).toUpperCase()})`,
         amount: b.penaltyAmount || 0,
-        date: b.endDate,
-        icon: Car
+        date: isCancelled ? (b.createdAt || b.startDate) : b.endDate,
+        icon: isCancelled ? Info : Car
       });
     });
 

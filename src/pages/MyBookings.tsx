@@ -118,6 +118,7 @@ const MyBookings: React.FC = () => {
   const [bookingToCancel, setBookingToCancel] = React.useState<string | null>(null);
   const [bookingToModify, setBookingToModify] = React.useState<Booking | null>(null);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const [challanToDispute, setChallanToDispute] = React.useState<string | null>(null);
 
   // Bank Receipt Re-upload State
   const [reuploadSenderBank, setReuploadSenderBank] = React.useState('');
@@ -781,16 +782,9 @@ const MyBookings: React.FC = () => {
                                       {canDispute && (
                                         <button
                                           type="button"
-                                          onClick={async (e) => {
+                                          onClick={(e) => {
                                             e.stopPropagation();
-                                            if (confirm('Lodge official dispute against this traffic violation ticket?')) {
-                                              try {
-                                                await disputeEChallan(ec.id);
-                                                showToast?.('Challan disputed. Verification in progress.', 'success');
-                                              } catch (err: any) {
-                                                showToast?.(err.message || 'Failed to dispute challan.', 'error');
-                                              }
-                                            }
+                                            setChallanToDispute(ec.id);
                                           }}
                                           className="px-3 py-1.5 bg-white border border-orange-300 text-orange-700 hover:bg-orange-55/70 rounded-lg font-black uppercase text-[10px]"
                                         >
@@ -913,6 +907,28 @@ const MyBookings: React.FC = () => {
         confirmLabel="Yes, Cancel"
         cancelLabel="No, Keep it"
         type="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={challanToDispute !== null}
+        onClose={() => setChallanToDispute(null)}
+        onConfirm={async () => {
+          if (challanToDispute) {
+            try {
+              await disputeEChallan(challanToDispute);
+              showToast?.('Challan disputed. Verification in progress.', 'success');
+            } catch (err: any) {
+              showToast?.(err.message || 'Failed to dispute challan.', 'error');
+            } finally {
+              setChallanToDispute(null);
+            }
+          }
+        }}
+        title="Dispute E-Challan Ticket"
+        message="Are you sure you want to lodge an official dispute against this traffic violation ticket? An administrative agent will review the dashcam logs and provincial traffic system."
+        confirmLabel="Yes, Dispute"
+        cancelLabel="Cancel"
+        type="warning"
       />
 
       <ModifyBookingModal

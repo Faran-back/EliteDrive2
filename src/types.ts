@@ -123,6 +123,8 @@ export interface Booking {
   refundStatus?: 'none' | 'pending_manual_bank_transfer' | 'processed';
   penaltyAmount?: number;
   penaltyReason?: string;
+  cancelledPreApproval?: boolean;
+  cancellationNote?: string;
   returnChecklist?: {
     mileage: number;
     fuelLevel: string;
@@ -150,6 +152,7 @@ export interface Incident {
   witnessPhone?: string;
   photos?: string[];
   firNumber?: string;
+  firPhotos?: string[];
   status: 'filed' | 'under_review' | 'action_taken' | 'closed';
   actionType?: 'charge' | 'approve' | 'reject' | 'none';
   notes?: string;
@@ -180,7 +183,7 @@ export interface EChallan {
   matchedBookingId?: string;
   matchedUserId?: string;
   matchedUserName?: string;
-  status: 'pending' | 'finalized' | 'disputed';
+  status: 'pending' | 'finalized' | 'disputed' | 'resolved';
   disputedAt?: string;
   createdAt: string;
 }

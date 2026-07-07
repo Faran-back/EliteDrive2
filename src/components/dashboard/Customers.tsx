@@ -23,6 +23,7 @@ import {
 import { useStore } from '../../context/StoreContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Booking } from '../../types';
+import ConfirmationModal from '../ConfirmationModal';
 
 const getDeterministicCNIC = (name: string = 'User', id: string = 'id') => {
   const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) + id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -43,6 +44,7 @@ const getDeterministicDOB = (name: string = 'User') => {
 const Customers: React.FC = () => {
   const { allUsers, allBookings, vehicles, verifyUserCNIC, toggleUserBlacklist } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [blacklistUserConfirm, setBlacklistUserConfirm] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'active' | 'loyalty'>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<User | null>(null);
 
@@ -424,10 +426,8 @@ const Customers: React.FC = () => {
                          </button>
                        ) : (
                          <button
-                           onClick={async () => {
-                             if (confirm('Are you ABSOLUTELY certain you want to lock and BLACKLIST this client account? Booking functions will be instantly restricted.')) {
-                               await toggleUserBlacklist(currentCustomer.id, true);
-                             }
+                           onClick={() => {
+                             setBlacklistUserConfirm(currentCustomer.id);
                            }}
                            className="px-6 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest transition-all"
                          >
@@ -491,6 +491,22 @@ const Customers: React.FC = () => {
           );
         })()}
       </AnimatePresence>
+
+      <ConfirmationModal
+        isOpen={blacklistUserConfirm !== null}
+        onClose={() => setBlacklistUserConfirm(null)}
+        onConfirm={async () => {
+          if (blacklistUserConfirm) {
+            await toggleUserBlacklist(blacklistUserConfirm, true);
+            setBlacklistUserConfirm(null);
+          }
+        }}
+        title="Blacklist Customer"
+        message="Are you ABSOLUTELY certain you want to lock and BLACKLIST this client account? Booking functions will be instantly restricted."
+        confirmLabel="Yes, Blacklist"
+        cancelLabel="Cancel"
+        type="danger"
+      />
     </div>
   );
 };

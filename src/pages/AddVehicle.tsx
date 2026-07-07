@@ -53,8 +53,10 @@ const AddVehicle: React.FC = () => {
     }
   }, [user, navigate, showToast]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
     if (!formData.name || !formData.location || formData.pricePerDay <= 0) {
       showToast('Please fill all required fields correctly', 'error');
       return;
@@ -72,7 +74,8 @@ const AddVehicle: React.FC = () => {
       };
       await addVehicle(vehicleData);
       showToast('Vehicle added successfully!', 'success');
-      navigate(-1);
+      const targetPath = user?.role === 'admin' ? '/admin-dashboard?view=inventory' : '/manager-dashboard?view=inventory';
+      navigate(targetPath);
     } catch (error) {
       console.error('Error adding vehicle:', error);
       showToast('Failed to add vehicle', 'error');

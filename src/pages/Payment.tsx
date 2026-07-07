@@ -350,66 +350,22 @@ const Payment: React.FC = () => {
     const allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
     const ext = file.name.split('.').pop()?.toLowerCase();
     if (!ext || !allowedExtensions.includes(ext)) {
-      showToast('Security policy error: Only .jpg, .png, and .pdf transfer screenshots are permitted.', 'error');
+      showToast('Only .jpg, .png, and .pdf transfer screenshots are permitted.', 'error');
       return;
     }
     
     setIsReceiptUploading(true);
-    setIsAnalyzingReceipt(true);
-    setReceiptAnalysisStep('scanning');
-
     try {
-      // Step 1: Antivirus & structural integrity scan
-      await new Promise(r => setTimeout(r, 600));
-      setReceiptAnalysisStep('validating');
-
       // Convert file to base64
       const base = await fileToBase64(file);
-
-      // Step 2: Audit receipt structure using Gemini API
-      const token = localStorage.getItem('elitedrive_token');
-      const response = await fetch('/api/verify-receipt', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ receiptImage: base })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || 'Vulnerability check failed: Internal transmission boundary timeout.');
-      }
-
-      const result = await response.json();
-
-      if (!result.isValidReceipt) {
-        setReceiptImage('');
-        setSenderBank('');
-        setTransactionRef('');
-        setReceiptAnalysisStep('idle');
-        showToast(result.rejectionReason || 'Uploaded image is not a valid transaction receipt.', 'error');
-        return;
-      }
-
-      setReceiptAnalysisStep('approved');
       setReceiptImage(base);
-      
-      if (result.sendingBank && !senderBank) {
-        setSenderBank(result.sendingBank);
-      }
-      // Transaction ID (TID) is strictly user-provided to prevent incorrect auto-population or hardcoding.
-      // Therefore, we do not auto-populate it from scanned data.
-
-      showToast(`Secure receipt captured and verified successfully! Bank: ${result.sendingBank || 'Detected'}`, 'success');
+      setSenderBank('Online Bank Transfer');
+      showToast('Receipt uploaded successfully!', 'success');
     } catch (err: any) {
       console.error(err);
-      showToast(err.message || 'Verification service error. Please try uploading a clearer image.', 'error');
-      setReceiptAnalysisStep('idle');
+      showToast('Upload failed. Please try again.', 'error');
     } finally {
       setIsReceiptUploading(false);
-      setIsAnalyzingReceipt(false);
     }
   };
 
@@ -1552,22 +1508,10 @@ const Payment: React.FC = () => {
                                     </div>
                                     <div className="space-y-1 text-center block">
                                       <p className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center justify-center gap-1">
-                                        {receiptAnalysisStep === 'scanning' && "🔬 CLAMAV SIGNATURE SCANNING..."}
-                                        {receiptAnalysisStep === 'validating' && "🛡️ SBP OCR INTEGRITY CHECK..."}
-                                        {receiptAnalysisStep === 'approved' && "✅ SECURE SANDBOX APPROVED"}
+                                        Uploading Receipt screenshot...
                                       </p>
-                                      <div className="w-52 h-1.5 bg-slate-100 rounded-full mx-auto overflow-hidden relative">
-                                        <div 
-                                          className="absolute top-0 bottom-0 left-0 bg-blue-600 transition-all duration-300" 
-                                          style={{
-                                            width: receiptAnalysisStep === 'scanning' ? '35%' : receiptAnalysisStep === 'validating' ? '70%' : '100%'
-                                          }}
-                                        ></div>
-                                      </div>
                                       <p className="text-[9.5px] text-slate-500 font-mono tracking-tight">
-                                        {receiptAnalysisStep === 'scanning' && "Matching file boundaries against 8.4M system signatures..."}
-                                        {receiptAnalysisStep === 'validating' && "Testing metadata headers against SBP clearing rules..."}
-                                        {receiptAnalysisStep === 'approved' && "Static check OK: No web shell or malicious payload found."}
+                                        Please wait while your transfer proof is being loaded.
                                       </p>
                                     </div>
                                   </div>

@@ -258,6 +258,7 @@ ELITEDRIVE COMPLIANCE POLICIES:
   };
 
   const handleDisputeResolve = async (id: string, status: string, customActionType?: string, customActionAmount?: number) => {
+<<<<<<< HEAD
     if (!disputeResolutionText.trim()) {
       showToast?.('Please enter a resolution response memo first.', 'error');
       return;
@@ -283,14 +284,22 @@ ELITEDRIVE COMPLIANCE POLICIES:
     const { disputeId, status, actionType, actionAmount } = disputeConfirmModal;
     try {
       await updateDisputeStatus(disputeId, status, disputeResolutionText, actionType, actionAmount);
+=======
+    if (!disputeResolutionText.trim()) return;
+    try {
+      await updateDisputeStatus(id, status, disputeResolutionText, customActionType, customActionAmount);
+>>>>>>> da8d3ea87f1631a5e73c36a388e74944fbd453d4
       setSelectedDisputeId(null);
       setDisputeResolutionText('');
       showToast?.(`Dispute successfully updated to status: ${status.toUpperCase()}`, 'success');
     } catch (err: any) {
       console.error(err);
       showToast?.(err.message || 'Failed to update dispute status', 'error');
+<<<<<<< HEAD
     } finally {
       setDisputeConfirmModal(null);
+=======
+>>>>>>> da8d3ea87f1631a5e73c36a388e74944fbd453d4
     }
   };
 

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { motion, AnimatePresence } from 'motion/react';
+import ConfirmationModal from '../ConfirmationModal';
 
 const EChallanManagement: React.FC = () => {
   const { eChallans, vehicles, allBookings, allUsers, createEChallan, disputeEChallan, removeEChallan, showToast } = useStore();
@@ -29,6 +30,7 @@ const EChallanManagement: React.FC = () => {
   const [violationDate, setViolationDate] = useState(new Date().toISOString().split('T')[0]);
   const [fineAmount, setFineAmount] = useState('');
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
+  const [challanToWaive, setChallanToWaive] = useState<any | null>(null);
   
   // Search / filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,8 +101,9 @@ const EChallanManagement: React.FC = () => {
         chal.id.toLowerCase().includes(searchQuery.toLowerCase());
         
       const matchesStatus = statusFilter === 'all' || chal.status === statusFilter;
+      const isNotResolved = chal.status !== 'resolved';
       
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesStatus && isNotResolved;
     });
   }, [eChallans, vehicles, searchQuery, statusFilter]);
 
@@ -420,14 +423,8 @@ const EChallanManagement: React.FC = () => {
                             )}
 
                             <button
-                              onClick={async () => {
-                                if (window.confirm(`Are you sure you want to waive and remove this E-Challan ticket (${chal.challanNumber})? This will clear PKR ${chal.amount.toLocaleString()} from the driver's outstanding balance.`)) {
-                                  try {
-                                    await removeEChallan(chal.id);
-                                  } catch (err: any) {
-                                    showToast?.(err.message || 'Failed to waive challan.', 'error');
-                                  }
-                                }
+                              onClick={() => {
+                                setChallanToWaive(chal);
                               }}
                               className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[9px] font-black uppercase tracking-wider rounded-xl transition-all border border-rose-200 shrink-0 cursor-pointer flex items-center gap-1"
                             >
@@ -447,6 +444,26 @@ const EChallanManagement: React.FC = () => {
 
       </div>
 
+      <ConfirmationModal
+        isOpen={challanToWaive !== null}
+        onClose={() => setChallanToWaive(null)}
+        onConfirm={async () => {
+          if (challanToWaive) {
+            try {
+              await removeEChallan(challanToWaive.id);
+            } catch (err: any) {
+              showToast?.(err.message || 'Failed to waive challan.', 'error');
+            } finally {
+              setChallanToWaive(null);
+            }
+          }
+        }}
+        title="Waive E-Challan Fine"
+        message={`Are you sure you want to waive and remove this E-Challan ticket (${challanToWaive?.challanNumber})? This will clear PKR ${challanToWaive?.amount.toLocaleString() || '0'} from the driver's outstanding balance.`}
+        confirmLabel="Yes, Waive"
+        cancelLabel="Cancel"
+        type="danger"
+      />
     </div>
   );
 };

@@ -1846,7 +1846,6 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
       const hoursLeft = diffMs / (1000 * 60 * 60);
 
       const bookingCreatedAt = originalBooking.createdAt ? new Date(originalBooking.createdAt) : now;
-<<<<<<< HEAD
       
       // Compute minutes difference in a completely timezone-agnostic way using UTC components
       const getUTCMinutesSince = (d1: Date, d2: Date) => {
@@ -1857,10 +1856,6 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
 
       const minsSinceBooking = getUTCMinutesSince(now, bookingCreatedAt);
       const isFreeCancellation = (minsSinceBooking <= 60) || (originalBooking.status === 'pending');
-=======
-      const minsSinceBooking = (now.getTime() - bookingCreatedAt.getTime()) / (1000 * 60);
-      const isFreeCancellation = minsSinceBooking <= 60; // 1 hour grace period
->>>>>>> da8d3ea87f1631a5e73c36a388e74944fbd453d4
 
       // Total amount the user has actually paid so far:
       let actualPaidAmount = 0;
@@ -1878,11 +1873,7 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
       let refundStatus: 'none' | 'pending_manual_bank_transfer' | 'processed' = 'none';
 
       if (isFreeCancellation) {
-<<<<<<< HEAD
         // 1-hour free cancellation grace period or pre-approval cancellation: 100% refund of paid amount, 0 penalty
-=======
-        // 1-hour free cancellation grace period: 100% refund of paid amount, 0 penalty
->>>>>>> da8d3ea87f1631a5e73c36a388e74944fbd453d4
         refundAmount = actualPaidAmount;
         penaltyAmount = 0;
         if (refundAmount > 0) {

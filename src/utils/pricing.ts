@@ -96,3 +96,12 @@ export const calculateBaseFare = (
   const days = duration;
   return config.pricePerDay * days;
 };
+
+/**
+ * Calculates the security deposit based on the daily rent and minimum deposit limit.
+ * Formula: max(2 * Daily Rent, Minimum Deposit)
+ */
+export const calculateSecurityDeposit = (dailyRent: number, minimumDeposit = 10000): number => {
+  return Math.max(2 * dailyRent, minimumDeposit);
+};
+

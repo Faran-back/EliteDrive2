@@ -23,6 +23,10 @@ const SystemConfig: React.FC = () => {
   const { user, allUsers, showToast, migrateVehicleIds } = useStore();
   const [activeTab, setActiveTab] = useState<'roles' | 'fleet' | 'integrations' | 'backup'>('roles');
   const [isMigrating, setIsMigrating] = useState(false);
+  const [minDeposit, setMinDeposit] = useState<number>(() => {
+    const stored = localStorage.getItem('min_security_deposit');
+    return stored ? Number(stored) : 10000;
+  });
 
   // Webhook Simulator state
   const [webhookUserId, setWebhookUserId] = useState('');
@@ -41,6 +45,7 @@ const SystemConfig: React.FC = () => {
   ];
 
   const handleSave = () => {
+    localStorage.setItem('min_security_deposit', minDeposit.toString());
     showToast('Settings saved successfully', 'success');
   };
 
@@ -156,6 +161,15 @@ const SystemConfig: React.FC = () => {
                     <option>USD ($)</option>
                     <option>EUR (€)</option>
                   </select>
+                </div>
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Minimum Security Deposit (PKR)</label>
+                  <input 
+                    type="number" 
+                    value={minDeposit} 
+                    onChange={(e) => setMinDeposit(Number(e.target.value))}
+                    className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-600/20 transition-all" 
+                  />
                 </div>
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Booking Confirmation</label>

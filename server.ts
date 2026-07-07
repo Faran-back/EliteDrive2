@@ -569,6 +569,12 @@ async function loadDatabase() {
 
     sanitizeLoadedData();
     console.log(`[Database] Loaded from MySQL`);
+    if (rows.length === 0) {
+      console.log('[Database] Seeding initial database tables because database was empty...');
+      process.nextTick(() => {
+        saveDatabase();
+      });
+    }
   } catch (err) {
     console.error('[MySQL] Load failed:', err);
     seedInitialDatabase();
@@ -617,6 +623,72 @@ async function saveDatabase() {
       setTimeout(saveDatabase, 100);
     }
   }
+}
+
+// --- BACKGROUND JOB QUEUE SYSTEM ---
+interface BackgroundJob {
+  id: string;
+  type: string;
+  bookingId: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  progress: number; // 0 to 100
+  statusText: string;
+  error?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+const activeJobs: Record<string, BackgroundJob> = {};
+const jobQueue: { jobId: string; task: () => Promise<any> }[] = [];
+let isProcessingQueue = false;
+
+async function runJobQueue() {
+  if (isProcessingQueue || jobQueue.length === 0) return;
+  isProcessingQueue = true;
+
+  const { jobId, task } = jobQueue.shift()!;
+  const job = activeJobs[jobId];
+  if (job) {
+    job.status = 'processing';
+    job.progress = 10;
+    job.statusText = 'Starting transaction execution...';
+  }
+
+  try {
+    await task();
+    if (job) {
+      job.status = 'completed';
+      job.progress = 100;
+      job.statusText = 'Transaction completed and successfully synchronized!';
+      job.completedAt = new Date().toISOString();
+    }
+  } catch (error: any) {
+    console.error(`[JobQueue] Error running job ${jobId}:`, error);
+    if (job) {
+      job.status = 'failed';
+      job.statusText = `Failed: ${error.message || String(error)}`;
+      job.error = error.message || String(error);
+    }
+  } finally {
+    isProcessingQueue = false;
+    setTimeout(runJobQueue, 50);
+  }
+}
+
+function enqueueJob(type: string, bookingId: string, task: () => Promise<any>): string {
+  const jobId = `job_${Math.random().toString(36).substring(2, 11)}`;
+  activeJobs[jobId] = {
+    id: jobId,
+    type,
+    bookingId,
+    status: 'queued',
+    progress: 0,
+    statusText: 'Placed in background queue.',
+    createdAt: new Date().toISOString()
+  };
+  jobQueue.push({ jobId, task });
+  process.nextTick(runJobQueue);
+  return jobId;
 }
 
 
@@ -1602,8 +1674,8 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
     }
 
     // === NEW SECURITY DEPOSIT CALCULATION ===
-    const dailyRent = Number(data.dailyRate || data.pricePerDay || data.basePrice || 0);
-    const minimumDeposit = 10000; // TODO: Make this configurable via admin settings
+    const dailyRent = vehicle ? Number(vehicle.pricePerDay || 0) : Number(data.dailyRate || data.pricePerDay || data.basePrice || 0);
+    const minimumDeposit = Number(data.minimumDeposit || 10000);
 
     const calculatedDeposit = Math.max(2 * dailyRent, minimumDeposit);
 

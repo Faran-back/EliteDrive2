@@ -21,7 +21,7 @@ import {
   Car
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { calculateBaseFare, getVehicleFareConfig } from '../utils/pricing';
+import { calculateBaseFare, getVehicleFareConfig, calculateSecurityDeposit } from '../utils/pricing';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { paymentSchema, PaymentFormData } from '../schemas/payment';
@@ -273,7 +273,10 @@ const Payment: React.FC = () => {
       }
     }
 
-    const securityDeposit = Math.round(base * 0.20);
+    const dailyRent = vehicle.pricePerDay || 0;
+    const storedMinDeposit = localStorage.getItem('min_security_deposit');
+    const minimumDepositSetting = storedMinDeposit ? Number(storedMinDeposit) : 10000;
+    const securityDeposit = calculateSecurityDeposit(dailyRent, minimumDepositSetting);
     const total = base + insurance + chauffeurCost + securityDeposit - discountAmount;
     
     return { base, insurance, chauffeurCost, discount: discountAmount, securityDeposit, total };
@@ -512,6 +515,7 @@ const Payment: React.FC = () => {
         insuranceType: insuranceType,
         securityDepositAmount: prices.securityDeposit,
         securityDepositStatus: 'pending',
+        minimumDeposit: localStorage.getItem('min_security_deposit') ? Number(localStorage.getItem('min_security_deposit')) : 10000,
         
         createdAt: new Date().toISOString(), // date-based sorting/filtering support!
         paymentType: paymentType,

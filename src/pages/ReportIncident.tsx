@@ -509,7 +509,7 @@ const ReportIncident: React.FC = () => {
                                 <span className="block">Timeframe: <strong className="text-slate-900">{new Date(matchedBooking.startDate).toLocaleDateString()} to {new Date(matchedBooking.endDate).toLocaleDateString()}</strong></span>
                                 <span className="block">Route Scope: <strong className="text-slate-900">{matchedBooking.isOutOfCity ? `Out-of-City (${matchedBooking.destination})` : 'In-City Only'}</strong></span>
                                 <span className="block">Chauffeur Service: <strong className="text-slate-900">{matchedBooking.chauffeurSelected ? 'Yes (Driver Assigned)' : 'No (Self-Driven)'}</strong></span>
-                                <span className="block">Security Deposit: <strong className="text-blue-600">PKR {(matchedBooking.securityDepositAmount ?? Math.round((matchedBooking.basePrice ?? 0) * 0.2)).toLocaleString()} ({matchedBooking.securityDepositStatus || 'Collected'})</strong></span>
+                                <span className="block">Security Deposit: <strong className="text-blue-600">PKR {(matchedBooking.securityDepositAmount ?? Math.max(2 * (vehicles.find(v => v.id === matchedBooking.vehicleId)?.pricePerDay || 0), 10000)).toLocaleString()} ({matchedBooking.securityDepositStatus || 'Collected'})</strong></span>
                               </div>
                             </div>
                           )}
@@ -1018,7 +1018,7 @@ const ReportIncident: React.FC = () => {
                       <div>
                         <span className="block text-[10px] text-slate-400 uppercase font-black">Refundable Security Deposit</span>
                         <span className="text-xs font-black text-blue-600">
-                          PKR {(selectedBooking.securityDepositAmount ?? Math.round((selectedBooking.basePrice ?? 0) * 0.2)).toLocaleString()} — <span className="uppercase text-[9px] font-bold text-slate-500">Status: {selectedBooking.securityDepositStatus || 'Collected'}</span>
+                          PKR {(selectedBooking.securityDepositAmount ?? Math.max(2 * (selectedVehicle?.pricePerDay || 0), 10000)).toLocaleString()} — <span className="uppercase text-[9px] font-bold text-slate-500">Status: {selectedBooking.securityDepositStatus || 'Collected'}</span>
                         </span>
                       </div>
                       <div>

@@ -52,7 +52,8 @@ const SupportCenter: React.FC = () => {
     eChallans, 
     updateIncidentStatus, 
     updateDisputeStatus, 
-    createEChallan 
+    createEChallan,
+    showToast
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<'incidents' | 'disputes' | 'echallans' | 'chat' | 'kb'>('incidents');
@@ -244,14 +245,16 @@ ELITEDRIVE COMPLIANCE POLICIES:
     }
   };
 
-  const handleDisputeResolve = async (id: string) => {
+  const handleDisputeResolve = async (id: string, status: string, customActionType?: string, customActionAmount?: number) => {
     if (!disputeResolutionText.trim()) return;
     try {
-      await updateDisputeStatus(id, 'resolved', disputeResolutionText);
+      await updateDisputeStatus(id, status, disputeResolutionText, customActionType, customActionAmount);
       setSelectedDisputeId(null);
       setDisputeResolutionText('');
-    } catch (err) {
+      showToast?.(`Dispute successfully updated to status: ${status.toUpperCase()}`, 'success');
+    } catch (err: any) {
       console.error(err);
+      showToast?.(err.message || 'Failed to update dispute status', 'error');
     }
   };
 
@@ -526,7 +529,7 @@ ELITEDRIVE COMPLIANCE POLICIES:
                               />
                             </div>
 
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"
                                 onClick={() => setSelectedDisputeId(null)}
@@ -536,10 +539,28 @@ ELITEDRIVE COMPLIANCE POLICIES:
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleDisputeResolve(dsp.id)}
-                                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-lg"
+                                onClick={() => handleDisputeResolve(dsp.id, 'resolved')}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-lg"
                               >
-                                Confirm Resolution
+                                Resolve Claim
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const isChallan = dsp.type === 'traffic_violation' || dsp.title?.toLowerCase().includes('challan') || dsp.description?.toLowerCase().includes('challan');
+                                  const actType = isChallan ? 'waive_challan' : 'waive_booking_penalty';
+                                  handleDisputeResolve(dsp.id, 'resolved', actType);
+                                }}
+                                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black uppercase rounded-lg"
+                              >
+                                Waive Fine / Penalty
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDisputeResolve(dsp.id, 'rejected')}
+                                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase rounded-lg"
+                              >
+                                Reject Dispute
                               </button>
                             </div>
                           </div>

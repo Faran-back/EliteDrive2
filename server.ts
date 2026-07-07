@@ -453,6 +453,8 @@ function seedInitialDatabase() {
     echallans: [],
     sentEmails: [],
     pushSubscriptions: [],
+    transientVerificationCodes: {},
+    balancePayments: [],
   };
 
   ensureSeedUsers(dbData as any);
@@ -549,7 +551,18 @@ async function loadDatabase() {
   try {
     const [rows] = await mysqlPool.query<any[]>('SELECT name, data FROM collections');
     const loaded: any = {};
-    rows.forEach(row => loaded[row.name] = row.data);
+    rows.forEach(row => {
+      let parsed = row.data;
+      if (typeof parsed === 'string') {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch (e) {
+          console.error(`[MySQL] Failed to parse JSON for ${row.name}:`, e);
+          parsed = null;
+        }
+      }
+      loaded[row.name] = parsed;
+    });
 
     dbData = {
       users: loaded.users || [],
@@ -592,18 +605,18 @@ async function saveDatabase() {
 
   try {
     const payload = {
-      users: dbData.users,
-      vehicles: dbData.vehicles,
-      bookings: dbData.bookings,
-      notifications: dbData.notifications,
-      roleRequests: dbData.roleRequests,
-      invitations: dbData.invitations,
-      incidents: dbData.incidents,
-      disputes: dbData.disputes,
-      echallans: dbData.echallans,
-      sentEmails: dbData.sentEmails,
-      pushSubscriptions: dbData.pushSubscriptions,
-      balancePayments: dbData.balancePayments,
+      users: dbData.users || [],
+      vehicles: dbData.vehicles || [],
+      bookings: dbData.bookings || [],
+      notifications: dbData.notifications || [],
+      roleRequests: dbData.roleRequests || [],
+      invitations: dbData.invitations || [],
+      incidents: dbData.incidents || [],
+      disputes: dbData.disputes || [],
+      echallans: dbData.echallans || [],
+      sentEmails: dbData.sentEmails || [],
+      pushSubscriptions: dbData.pushSubscriptions || [],
+      balancePayments: dbData.balancePayments || [],
       transientVerificationCodes: dbData.transientVerificationCodes || {},
     };
 
@@ -1866,6 +1879,10 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
       const diffMs = startDate.getTime() - now.getTime();
       const hoursLeft = diffMs / (1000 * 60 * 60);
 
+      const bookingCreatedAt = originalBooking.createdAt ? new Date(originalBooking.createdAt) : now;
+      const minsSinceBooking = (now.getTime() - bookingCreatedAt.getTime()) / (1000 * 60);
+      const isFreeCancellation = minsSinceBooking <= 60; // 1 hour grace period
+
       // Total amount the user has actually paid so far:
       let actualPaidAmount = 0;
       if (originalBooking.paymentStatus === 'paid' || originalBooking.bankReceiptApproved === 'approved') {
@@ -1879,7 +1896,16 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
       let penaltyAmount = 0;
       let refundStatus: 'none' | 'pending_manual_bank_transfer' | 'processed' = 'none';
 
-      if (hoursLeft >= 48) {
+      if (isFreeCancellation) {
+        // 1-hour free cancellation grace period: 100% refund of paid amount, 0 penalty
+        refundAmount = actualPaidAmount;
+        penaltyAmount = 0;
+        if (refundAmount > 0) {
+          refundStatus = (originalBooking.paymentMethod === 'bank_transfer' || originalBooking.paymentMethod === 'transfer')
+            ? 'pending_manual_bank_transfer' 
+            : 'processed';
+        }
+      } else if (hoursLeft >= 48) {
         // Full refund of actually paid amount, 0 penalty
         refundAmount = actualPaidAmount;
         penaltyAmount = 0;
@@ -2422,7 +2448,7 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
     // Also waive/resolve e-challans for this user
     dbData.echallans.forEach(c => {
       if (c.matchedUserId === id) {
-        c.status = 'finalized'; // Use valid value from "pending" | "finalized" | "disputed"
+        c.status = 'resolved';
       }
     });
     
@@ -3068,7 +3094,7 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
         );
         if (challan) {
           const oldStatus = challan.status;
-          challan.status = 'finalized'; // finalized/waived
+          challan.status = 'resolved'; // finalized/waived/resolved
           const waivedAmt = challan.amount || 0;
           
           if (userIdx !== -1) {

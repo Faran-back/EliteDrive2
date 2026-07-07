@@ -180,7 +180,7 @@ export interface EChallan {
   matchedBookingId?: string;
   matchedUserId?: string;
   matchedUserName?: string;
-  status: 'pending' | 'finalized' | 'disputed';
+  status: 'pending' | 'finalized' | 'disputed' | 'resolved';
   disputedAt?: string;
   createdAt: string;
 }

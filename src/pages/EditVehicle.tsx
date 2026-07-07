@@ -111,7 +111,7 @@ const EditVehicle: React.FC = () => {
       };
       await updateVehicle(vehicle.id, updateData);
       showToast('Vehicle updated successfully!', 'success');
-      navigate(-1);
+      navigate(user?.role === 'admin' ? '/admin-dashboard?view=inventory' : '/manager-dashboard?view=inventory');
     } catch (error) {
       console.error('Error updating vehicle:', error);
       showToast('Failed to update vehicle', 'error');

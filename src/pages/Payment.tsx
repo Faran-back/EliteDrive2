@@ -479,7 +479,7 @@ const Payment: React.FC = () => {
         remainingAmount: remainAmount,
         remainingPaymentStatus: paymentType === 'partial' ? 'pending' : 'none',
         paymentMethod: paymentMethod,
-        receiptImage: paymentMethod === 'transfer' ? receiptImage : '',
+        receiptImage: receiptImage,
         bankReceiptApproved: paymentMethod === 'transfer' ? 'pending' as const : undefined,
         sendingBank: paymentMethod === 'transfer' ? senderBank : undefined,
         transactionRef: paymentMethod === 'transfer' ? transactionRef : undefined,
@@ -1633,6 +1633,62 @@ const Payment: React.FC = () => {
                                 <ShieldCheck className="text-emerald-600 mt-0.5 shrink-0" size={13} />
                                 <span>3D-Secure 2.0 transaction protection active. Your connection is fully encrypted via TLS 1.3. No credit card credentials are stored permanently on our servers.</span>
                               </p>
+
+                              {/* Card Receipt Upload (New User Request) */}
+                              <div className="space-y-2 pt-4 border-t border-slate-100">
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block ml-0.5">Upload Payment Receipt / Proof (Optional for Card)</label>
+                                
+                                <div 
+                                  className="border-2 border-dashed border-slate-250 rounded-2xl p-6 bg-white hover:border-blue-500 transition-all cursor-pointer flex flex-col items-center justify-center text-center relative min-h-[140px]"
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onDrop={async (e) => {
+                                    e.preventDefault();
+                                    const file = e.dataTransfer.files?.[0];
+                                    if (!file) return;
+                                    await processSecureReceiptFile(file);
+                                  }}
+                                >
+                                  {isReceiptUploading ? (
+                                    <div className="flex flex-col items-center justify-center py-4 space-y-3 px-4 w-full animate-fadeIn">
+                                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 animate-bounce">
+                                        <Activity size={16} className="animate-spin" />
+                                      </div>
+                                      <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Uploading Proof...</p>
+                                    </div>
+                                  ) : receiptImage ? (
+                                    <div className="w-full flex flex-col items-center p-2 animate-fadeIn">
+                                      <img src={receiptImage} alt="Receipt Preview" className="max-h-24 object-contain rounded-xl border border-slate-200 mb-2 shadow-sm" />
+                                      <div className="flex items-center gap-1 text-[9px] font-black text-green-700 uppercase tracking-widest bg-green-50 px-2 rounded border border-green-150">
+                                        ✓ Attached
+                                      </div>
+                                      <button 
+                                        type="button" 
+                                        onClick={() => setReceiptImage('')} 
+                                        className="text-[10px] font-black uppercase tracking-wider text-red-500 hover:underline mt-2"
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <label className="w-full h-full cursor-pointer flex flex-col items-center justify-center py-4">
+                                      <Activity className="text-slate-300 mb-2" size={20} />
+                                      <p className="text-[10px] font-black text-slate-800 uppercase tracking-wider">Drag & drop card payment proof</p>
+                                      <p className="text-[9px] text-slate-400 font-medium">or click to browse (Optional)</p>
+                                      <input 
+                                        type="file" 
+                                        accept="image/*"
+                                        className="hidden" 
+                                        onChange={async (e) => {
+                                          const file = e.target.files?.[0];
+                                          if (!file) return;
+                                          await processSecureReceiptFile(file);
+                                        }}
+                                      />
+                                    </label>
+                                  )}
+                                </div>
+                              </div>
+
                               {errors.paymentDetail && (!cardNumber || !cardHolder || cardExpiry.length !== 5 || cardCvv.length < 3) && (
                                 <p className="text-[10px] text-red-500 font-black tracking-wide bg-red-50 p-2.5 rounded-lg border border-red-150">
                                   ⚠ Please fully complete your Card Details (Number, Holder, Expiration, CVV) to authorize and clear payment.

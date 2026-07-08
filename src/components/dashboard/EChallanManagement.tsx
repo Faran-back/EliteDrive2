@@ -44,7 +44,11 @@ const EChallanManagement: React.FC = () => {
     const matchedBooking = allBookings.find(b => {
       if (b.vehicleId !== selectedVehicleId) return false;
       if (b.status !== 'active' && b.status !== 'completed') return false;
-      return (b.startDate <= violationDate && b.endDate >= violationDate);
+      
+      const bStart = b.startDate.split('T')[0];
+      const bEnd = b.endDate.split('T')[0];
+      
+      return (bStart <= violationDate && bEnd >= violationDate);
     });
     
     if (matchedBooking) {

@@ -489,20 +489,9 @@ const Bookings: React.FC = () => {
                                     ...(vehicle?.images || [])
                                   ].filter(Boolean) as string[];
 
-                                  const fallbacks = [
-                                    'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=600',
-                                    'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&q=80&w=600',
-                                    'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=600'
-                                  ];
-
-                                  while (pics.length < 4) {
-                                    const nextFallback = fallbacks[pics.length - 1] || fallbacks[0];
-                                    pics.push(nextFallback);
-                                  }
-
                                   return (
                                     <div className="grid grid-cols-2 gap-2">
-                                      {pics.slice(0, 4).map((imgUrl, i) => (
+                                      {pics.length > 0 ? pics.slice(0, 4).map((imgUrl, i) => (
                                         <div 
                                           key={i} 
                                           onClick={() => setSelectedReceiptUrl(imgUrl)}
@@ -518,7 +507,12 @@ const Bookings: React.FC = () => {
                                             <span className="text-[8px] text-white font-black uppercase tracking-wider bg-slate-950/70 px-2 py-1 rounded-md backdrop-blur-xs">Zoom</span>
                                           </div>
                                         </div>
-                                      ))}
+                                      )) : (
+                                        <div className="col-span-2 py-4 text-center border border-dashed border-slate-200 rounded-xl">
+                                          <Camera className="mx-auto text-slate-300 mb-1" size={20} />
+                                          <p className="text-[9px] font-black text-slate-400 uppercase">No Baseline Photos</p>
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })()}

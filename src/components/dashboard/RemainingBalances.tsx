@@ -14,10 +14,12 @@ import {
   Eye,
   XCircle,
   AlertOctagon,
-  X
+  X,
+  ShieldCheck
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { motion, AnimatePresence } from 'motion/react';
+import PromptModal from '../PromptModal';
 
 const RemainingBalances: React.FC = () => {
   const { allUsers, allBookings, eChallans, vehicles, showToast, refreshData } = useStore();
@@ -25,6 +27,25 @@ const RemainingBalances: React.FC = () => {
   const [waiverReasons, setWaiverReasons] = useState<Record<string, string>>({});
   const [isWaiving, setIsWaiving] = useState<Record<string, boolean>>({});
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
+
+  // Prompt Modal States
+  const [promptConfig, setPromptConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    placeholder: string;
+    confirmLabel: string;
+    type: 'info' | 'warning' | 'danger';
+    onConfirm: (val: string) => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    placeholder: '',
+    confirmLabel: '',
+    type: 'info',
+    onConfirm: () => {}
+  });
 
   const handleWaiveBalance = async (customerId: string) => {
     const reason = waiverReasons[customerId] || '';
@@ -101,69 +122,90 @@ const RemainingBalances: React.FC = () => {
   };
 
   const handleRejectPayment = async (paymentId: string) => {
-    const reason = window.prompt('Enter rejection reason:');
-    if (reason === null) return;
-    
-    try {
-      const token = localStorage.getItem('elitedrive_token');
-      const res = await fetch(`/api/balance-payments/${paymentId}/reject`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ reason })
-      });
-      if (!res.ok) throw new Error('Failed to reject payment');
-      showToast('Penalty payment rejected.', 'info');
-      await fetchBalancePayments();
-    } catch (err: any) {
-      showToast(err.message || 'Error rejecting payment', 'error');
-    }
+    setPromptConfig({
+      isOpen: true,
+      title: 'Reject Penalty Payment',
+      message: 'Please provide a clear reason why this payment proof is being rejected. This will be visible to the customer.',
+      placeholder: 'e.g. Screenshot is blurry, Transaction ID mismatch...',
+      confirmLabel: 'Reject Payment',
+      type: 'danger',
+      onConfirm: async (reason) => {
+        try {
+          const token = localStorage.getItem('elitedrive_token');
+          const res = await fetch(`/api/balance-payments/${paymentId}/reject`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({ reason })
+          });
+          if (!res.ok) throw new Error('Failed to reject payment');
+          showToast('Penalty payment rejected.', 'info');
+          await fetchBalancePayments();
+        } catch (err: any) {
+          showToast(err.message || 'Error rejecting payment', 'error');
+        }
+      }
+    });
   };
 
   const handleReviewPayment = async (paymentId: string) => {
-    const notes = window.prompt('Enter internal review notes:');
-    if (notes === null) return;
-
-    try {
-      const token = localStorage.getItem('elitedrive_token');
-      const res = await fetch(`/api/balance-payments/${paymentId}/review`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ notes })
-      });
-      if (!res.ok) throw new Error('Failed to set to review');
-      showToast('Payment set to Under Review status.', 'info');
-      await fetchBalancePayments();
-    } catch (err: any) {
-      showToast(err.message || 'Error updating review status', 'error');
-    }
+    setPromptConfig({
+      isOpen: true,
+      title: 'Set Under Review',
+      message: 'Enter internal notes for this review. This helps other admins understand why this payment needs verification.',
+      placeholder: 'e.g. Need to check bank statement for actual settlement...',
+      confirmLabel: 'Set to Review',
+      type: 'warning',
+      onConfirm: async (notes) => {
+        try {
+          const token = localStorage.getItem('elitedrive_token');
+          const res = await fetch(`/api/balance-payments/${paymentId}/review`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({ notes })
+          });
+          if (!res.ok) throw new Error('Failed to set to review');
+          showToast('Payment set to Under Review status.', 'info');
+          await fetchBalancePayments();
+        } catch (err: any) {
+          showToast(err.message || 'Error updating review status', 'error');
+        }
+      }
+    });
   };
 
   const handleWaiveIndividualPenalty = async (userId: string, sourceId: string, sourceType: string, amount: number, title: string) => {
-    const reason = window.prompt(`Enter reason for waiving "${title}":`);
-    if (!reason) return;
-
-    try {
-      const token = localStorage.getItem('elitedrive_token');
-      const res = await fetch(`/api/users/${userId}/waive-penalty`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ sourceId, sourceType, reason, amount })
-      });
-      if (!res.ok) throw new Error('Failed to waive individual penalty');
-      showToast(`Penalty "${title}" waived successfully!`, 'success');
-      await refreshData();
-    } catch (err: any) {
-      showToast(err.message || 'Error waiving penalty', 'error');
-    }
+    setPromptConfig({
+      isOpen: true,
+      title: 'Waive Individual Penalty',
+      message: `You are about to waive the penalty "${title}" of PKR ${amount.toLocaleString()}. Please provide a justification for this waiver.`,
+      placeholder: 'e.g. Verified manual settlement, Goodwill gesture...',
+      confirmLabel: 'Waive Penalty',
+      type: 'info',
+      onConfirm: async (reason) => {
+        try {
+          const token = localStorage.getItem('elitedrive_token');
+          const res = await fetch(`/api/users/${userId}/waive-penalty`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({ sourceId, sourceType, reason, amount })
+          });
+          if (!res.ok) throw new Error('Failed to waive individual penalty');
+          showToast(`Penalty "${title}" waived successfully!`, 'success');
+          await refreshData();
+        } catch (err: any) {
+          showToast(err.message || 'Error waiving penalty', 'error');
+        }
+      }
+    });
   };
 
   const [clearingItem, setClearingItem] = useState<Record<string, boolean>>({});
@@ -875,6 +917,18 @@ const RemainingBalances: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Prompt Modal for Rejections/Reviews/Waivers */}
+      <PromptModal
+        isOpen={promptConfig.isOpen}
+        onClose={() => setPromptConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={promptConfig.onConfirm}
+        title={promptConfig.title}
+        message={promptConfig.message}
+        placeholder={promptConfig.placeholder}
+        confirmLabel={promptConfig.confirmLabel}
+        type={promptConfig.type}
+      />
     </div>
   );
 };

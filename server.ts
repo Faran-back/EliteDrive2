@@ -1315,6 +1315,12 @@ function getGeminiClient(): GoogleGenAI | null {
   app.post('/api/recommendations', async (req: any, res) => {
     const { budget, travelType, preferences, pickupLocation, dropoffLocation, pickupDate, returnDate } = req.body;
     
+    // Calculate booking counts for all-time popularity
+    const bookingCounts: Record<string, number> = {};
+    (dbData.bookings || []).forEach(b => {
+      bookingCounts[b.vehicleId] = (bookingCounts[b.vehicleId] || 0) + 1;
+    });
+
     // Calculate overlapping bookings if dates are provided
     let bookedVehicleIds: string[] = [];
     if (pickupDate && returnDate) {
@@ -1337,7 +1343,10 @@ function getGeminiClient(): GoogleGenAI | null {
     }
 
     // Filter available cars (not under repair/maintenance, and not already booked in requested period)
-    const candidateVehicles = dbData.vehicles.filter(v => 
+    const candidateVehicles = dbData.vehicles.map(v => ({
+      ...v,
+      bookingCount: bookingCounts[v.id] || 0
+    })).filter(v => 
       v.status !== 'maintenance' && !bookedVehicleIds.includes(v.id)
     );
     
@@ -1365,15 +1374,16 @@ Based on the following request:
 - Return Date: ${returnDate || 'N/A'}
 - Extra Preferences/User Requirements: ${preferences || 'None'}
 
-Here is the list of active, available vehicles in EliteDrive fleet for this specific travel window:
-${JSON.stringify(candidateVehicles.map(v => ({ id: v.id, name: v.name, type: v.type, pricePerDay: v.pricePerDay, transmission: v.transmission, fuel: v.fuel, seats: v.seats, features: v.features, location: v.location, description: v.description || '' })), null, 2)}
+Here is the list of active, available vehicles in EliteDrive fleet for this specific travel window. I have included "bookingCount" which indicates how many times each vehicle has been successfully booked in the past.
+${JSON.stringify(candidateVehicles.map(v => ({ id: v.id, name: v.name, type: v.type, pricePerDay: v.pricePerDay, transmission: v.transmission, fuel: v.fuel, seats: v.seats, features: v.features, location: v.location, description: v.description || '', bookingCount: v.bookingCount })), null, 2)}
 
 Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fit:
-1. The budget limit (PKR).
-2. The pickup and dropoff locations & estimated travel distance/terrain (e.g. Inter-city on Motorways M2/M3 requires stability, mountainous terrain requires power/clearance, city commuting requires fuel efficiency).
-3. The user's specified preferences/requirements (e.g., if they asked for a sedan, sunroof, specific brand like Toyota, manual/automatic transmission, etc.). Compare these requirements carefully with the vehicle names, types, features, transmission, and fuel types.
+1. POPULARITY: If the user asks for the "most booked" or "popular" car, prioritize vehicles with the highest "bookingCount".
+2. BUDGET: Strictly respect the budget limit (PKR). Do not recommend vehicles significantly over budget unless no others exist.
+3. CONTEXT: The pickup and dropoff locations & estimated travel distance/terrain.
+4. USER REQUIREMENTS: If the user specified a car type (e.g. "Sedan"), comfort requirements ("comfortable"), or specific features, ensure the results are highly accurate. Only show the most accurate matches if the user is specific.
 
-CRITICAL RULE FOR IDS: The "recommendedVehicleIds" and "vehicleId" values in your response MUST BE EXACT strings from the "id" fields of the available vehicles list provided above (e.g. "vh-1z6w4v2u"). DO NOT invent or modify any ID under any circumstances. If no vehicles match the requirements or budget, return an empty array for "recommendedVehicleIds" and "recommendations". Include a general tip for driving or exploring in Pakistan for this travel type.`;
+CRITICAL RULE FOR IDS: The "recommendedVehicleIds" and "vehicleId" values in your response MUST BE EXACT strings from the "id" fields of the available vehicles list provided above. Inclusion of "bookingCount" in reasoning is highly encouraged if it helps justify the "most booked" status. Include a general tip for driving or exploring in Pakistan for this travel type.`;
 
       const response = await client.models.generateContent({
         model: 'gemini-3.5-flash',
@@ -1428,8 +1438,10 @@ CRITICAL RULE FOR IDS: The "recommendedVehicleIds" and "vehicleId" values in you
       // Filter by trip suitability heuristic and user requirements keywords
       let sortedMatches = [...matches];
       
-      if (preferences) {
-        const keywords = preferences.toLowerCase().split(/[\s,.'"]+/).filter((w: string) => w.length > 2);
+      const isPopularRequest = (preferences || '').toLowerCase().includes('most booked') || (preferences || '').toLowerCase().includes('popular');
+
+      if (preferences || isPopularRequest) {
+        const keywords = (preferences || '').toLowerCase().split(/[\s,.'"]+/).filter((w: string) => w.length > 2);
         sortedMatches.sort((a, b) => {
           let scoreA = 0;
           let scoreB = 0;
@@ -1437,21 +1449,33 @@ CRITICAL RULE FOR IDS: The "recommendedVehicleIds" and "vehicleId" values in you
           const textB = `${b.name} ${b.type} ${b.transmission} ${b.fuel} ${b.features.join(' ')} ${b.description || ''}`.toLowerCase();
           
           for (const kw of keywords) {
-            if (textA.includes(kw)) scoreA += 5;
-            if (textB.includes(kw)) scoreB += 5;
+            if (textA.includes(kw)) scoreA += 10;
+            if (textB.includes(kw)) scoreB += 10;
+          }
+
+          // Popularity bonus
+          scoreA += (a.bookingCount || 0) * 1.5;
+          scoreB += (b.bookingCount || 0) * 1.5;
+          
+          if (isPopularRequest) {
+            scoreA += (a.bookingCount || 0) * 10;
+            scoreB += (b.bookingCount || 0) * 10;
           }
           
           return scoreB - scoreA;
         });
       } else {
         if (travelType === 'mountainous') {
-          sortedMatches.sort((a, b) => (b.type === 'SUV' ? 2 : 0) - (a.type === 'SUV' ? 2 : 0));
+          sortedMatches.sort((a, b) => ((b.type === 'SUV' ? 100 : 0) + (b.bookingCount || 0)) - ((a.type === 'SUV' ? 100 : 0) + (a.bookingCount || 0)));
         } else if (travelType === 'family_trip') {
-          sortedMatches.sort((a, b) => b.seats - a.seats);
+          sortedMatches.sort((a, b) => (b.seats * 10 + (b.bookingCount || 0)) - (a.seats * 10 + (a.bookingCount || 0)));
         } else if (travelType === 'business') {
-          sortedMatches.sort((a, b) => (b.type === 'Luxury' ? 2 : 0) - (a.type === 'Luxury' ? 2 : 0));
+          sortedMatches.sort((a, b) => ((b.type === 'Luxury' ? 100 : 0) + (b.bookingCount || 0)) - ((a.type === 'Luxury' ? 100 : 0) + (a.bookingCount || 0)));
         } else if (travelType === 'in_city') {
-          sortedMatches.sort((a, b) => (b.type === 'Economy' || b.type === 'Sedan' ? 2 : 0) - (a.type === 'Economy' || a.type === 'Sedan' ? 2 : 0));
+          sortedMatches.sort((a, b) => ((b.type === 'Economy' || b.type === 'Sedan' ? 100 : 0) + (b.bookingCount || 0)) - ((a.type === 'Economy' || a.type === 'Sedan' ? 100 : 0) + (a.bookingCount || 0)));
+        } else {
+          // Default to popularity
+          sortedMatches.sort((a, b) => (b.bookingCount || 0) - (a.bookingCount || 0));
         }
       }
 
@@ -1460,6 +1484,9 @@ CRITICAL RULE FOR IDS: The "recommendedVehicleIds" and "vehicleId" values in you
       
       const recommendations = top3.map(v => {
         let reason = `Excellent reliable selection for your EliteDrive journey. Matches your budget (PKR ${v.pricePerDay.toLocaleString()}/day) and route from ${pickupLocation || 'pickup'} to ${dropoffLocation || 'destination'}.`;
+        if (v.bookingCount > 5) {
+          reason = `Our most booked and highly rated ${v.type}! ${reason}`;
+        }
         if (travelType === 'mountainous') {
           reason = `Great power, high ground clearance, and robust capabilities. Ideal for Pakistan's adventurous northern routes (e.g., Karakoram Highway/Naran) from ${pickupLocation || 'your starting point'}.`;
         } else if (travelType === 'family_trip') {

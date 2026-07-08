@@ -379,19 +379,32 @@ function getEffectiveOutstandingBalance(user: any): number {
   if (!user) return 0;
   const baseBalance = user.outstandingBalance || 0;
   
-  // Find all non-cancelled, active or completed bookings of this user that have partial payment and pending remaining payment status
-  const partialBookings = (dbData.bookings || []).filter(
+  // Find all non-cancelled bookings that have pending remaining payments or penalties
+  const unpaidBookings = (dbData.bookings || []).filter(
     b => b.userId === user.id && 
-         b.paymentType === 'partial' && 
-         b.remainingPaymentStatus === 'pending' && 
-         !['pending', 'approved', 'cancelled'].includes(b.status)
+         !['cancelled'].includes(b.status)
   );
   
-  const pendingBookingBalance = partialBookings.reduce((sum, b) => {
-    return sum + (b.remainingAmount || 0);
+  const pendingBookingBalance = unpaidBookings.reduce((sum, b) => {
+    let amt = 0;
+    if (b.paymentType === 'partial' && b.remainingPaymentStatus === 'pending' && !['pending', 'approved'].includes(b.status)) {
+      amt += (b.remainingAmount || 0);
+    }
+    // We don't add penaltyAmount here if we are already adding it to outstandingBalance in the user object
+    // But to be safe against synchronization issues, we can ensure we don't double count.
+    return sum + amt;
   }, 0);
   
   return baseBalance + pendingBookingBalance;
+}
+
+function updateUserBalance(userId: string, addedAmount: number) {
+  if (addedAmount === 0) return;
+  const userIdx = dbData.users.findIndex(u => u.id === userId);
+  if (userIdx !== -1) {
+    dbData.users[userIdx].outstandingBalance = Math.max(0, (dbData.users[userIdx].outstandingBalance || 0) + addedAmount);
+    addDebugLog(`[Balance] Updated user ${userId} balance by ${addedAmount}. New balance: ${dbData.users[userIdx].outstandingBalance}`);
+  }
 }
 
 
@@ -1978,15 +1991,9 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
     // 2. Adjust outstanding balance if penalties or late charges are saved
     if (updates.penaltyAmount !== undefined && updates.penaltyAmount !== originalBooking.penaltyAmount) {
       const addedPenalty = Number(updates.penaltyAmount) - (Number(originalBooking.penaltyAmount) || 0);
-      if (addedPenalty > 0) {
-        const userIdx = dbData.users.findIndex(u => u.id === originalBooking.userId);
-        if (userIdx !== -1) {
-          // If the booking is cancelled, the cancellation penalty shouldn't be added to their outstanding account balance.
-          const isCancellation = (updates.status === 'cancelled' || originalBooking.status === 'cancelled');
-          if (!isCancellation) {
-            dbData.users[userIdx].outstandingBalance = (dbData.users[userIdx].outstandingBalance || 0) + addedPenalty;
-          }
-        }
+      const isCancellation = (updates.status === 'cancelled' || originalBooking.status === 'cancelled');
+      if (!isCancellation) {
+        updateUserBalance(originalBooking.userId, addedPenalty);
       }
     }
 
@@ -2269,6 +2276,15 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
 
     // 1. Instantly apply updates to in-memory dbData for immediate local responsiveness
     if (bookingUpdates) {
+      // Adjust outstanding balance if penalties are added
+      if (bookingUpdates.penaltyAmount !== undefined && bookingUpdates.penaltyAmount !== originalBooking.penaltyAmount) {
+        const addedPenalty = Number(bookingUpdates.penaltyAmount) - (Number(originalBooking.penaltyAmount) || 0);
+        const isCancellation = (bookingUpdates.status === 'cancelled' || originalBooking.status === 'cancelled');
+        if (!isCancellation) {
+          updateUserBalance(originalBooking.userId, addedPenalty);
+        }
+      }
+
       dbData.bookings[bIndex] = { ...originalBooking, ...bookingUpdates };
     }
 
@@ -2576,27 +2592,55 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
     if (amountToPay <= 0) return res.status(400).json({ error: 'Invalid amount' });
 
     // Deduct from outstanding balance
-    user.outstandingBalance = Math.max(0, (user.outstandingBalance || 0) - amountToPay);
+    const oldBalance = user.outstandingBalance || 0;
+    user.outstandingBalance = Math.max(0, oldBalance - amountToPay);
+    const actualDeducted = oldBalance - user.outstandingBalance;
 
-    // If paying full balance or close to it, resolve everything
-    if (user.outstandingBalance < 1) {
-      user.outstandingBalance = 0;
-      
-      // Resolve all source items
-      dbData.echallans.forEach(c => {
-        if (c.matchedUserId === user.id) c.status = 'resolved';
-      });
-      
-      dbData.bookings.forEach(b => {
-        if (b.userId === user.id) {
-          b.penaltyAmount = 0;
-          if (b.paymentType === 'partial' && b.remainingPaymentStatus === 'pending') {
-            b.remainingPaymentStatus = 'paid';
-            b.remainingAmount = 0;
+    // Resolve individual source items proportionally
+    let remainingToResolve = actualDeducted;
+
+    // 1. Resolve E-Challans
+    dbData.echallans.forEach(c => {
+      if (c.matchedUserId === user.id && c.status !== 'resolved' && remainingToResolve > 0) {
+        if (c.amount <= remainingToResolve) {
+          remainingToResolve -= c.amount;
+          c.status = 'resolved';
+        } else {
+          // Partial payment on a challan - we don't have a partial status, so we just deduct from balance
+          // and wait for full payment. 
+          // However, for better UX, we could mark it resolved if it's very close
+        }
+      }
+    });
+
+    // 2. Resolve Booking Penalties and Remaining Payments
+    dbData.bookings.forEach(b => {
+      if (b.userId === user.id && remainingToResolve > 0) {
+        // Handle penaltyAmount
+        if ((b.penaltyAmount || 0) > 0) {
+          if (b.penaltyAmount! <= remainingToResolve) {
+            remainingToResolve -= b.penaltyAmount!;
+            b.penaltyAmount = 0;
+          } else {
+            b.penaltyAmount! -= remainingToResolve;
+            remainingToResolve = 0;
           }
         }
-      });
-    }
+
+        // Handle remaining payment for partials
+        if (remainingToResolve > 0 && b.paymentType === 'partial' && b.remainingPaymentStatus === 'pending') {
+          const remAmt = b.remainingAmount || (b.totalPrice * 0.5);
+          if (remAmt <= remainingToResolve) {
+            remainingToResolve -= remAmt;
+            b.remainingPaymentStatus = 'paid';
+            b.remainingAmount = 0;
+          } else {
+            b.remainingAmount = remAmt - remainingToResolve;
+            remainingToResolve = 0;
+          }
+        }
+      }
+    });
 
     // Store in balancePayments collection as approved
     dbData.balancePayments = dbData.balancePayments || [];

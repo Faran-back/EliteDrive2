@@ -11,6 +11,7 @@ import {
   XCircle,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   ArrowRight,
   Building2,
   Lock,
@@ -586,6 +587,27 @@ const MyBookings: React.FC = () => {
                       </div>
 
                       <div className="space-y-8">
+                        {booking.penaltyAmount > 0 && booking.status !== 'cancelled' && (
+                          <div className="p-6 bg-red-50 border-2 border-red-100 rounded-[32px] space-y-3 shadow-sm">
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-2 text-red-800">
+                                <AlertTriangle size={18} />
+                                <h5 className="text-[10px] font-black uppercase tracking-widest">Outstanding Penalty Owed</h5>
+                              </div>
+                              <span className="text-xl font-black text-red-600">PKR {booking.penaltyAmount.toLocaleString()}</span>
+                            </div>
+                            <p className="text-xs text-red-700 font-bold leading-relaxed bg-white/50 p-3 rounded-xl border border-red-100/50">
+                              {booking.penaltyReason || 'Miscellaneous surcharge logged during vehicle check-in / return.'}
+                            </p>
+                            <Link 
+                              to="/dashboard"
+                              className="block w-full py-3.5 bg-red-600 text-white rounded-2xl font-black text-xs text-center uppercase tracking-wider hover:bg-red-700 transition-all shadow-lg shadow-red-200 active:scale-98"
+                            >
+                              Settle Outstanding Balance
+                            </Link>
+                          </div>
+                        )}
+
                         <div className="space-y-4">
                           <h4 className="text-xs font-black uppercase tracking-widest text-[#94A3B8]">Booking Information</h4>
                           <div className="grid grid-cols-1 gap-4">

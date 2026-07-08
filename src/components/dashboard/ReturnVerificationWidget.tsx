@@ -130,6 +130,8 @@ const ReturnVerificationWidget: React.FC = () => {
   const [penaltyType, setPenaltyType] = useState<'minor_scratch' | 'major_accident' | 'cleaning_issue' | 'late' | 'fuel_shortage' | 'other'>('minor_scratch');
   const [penaltyAmount, setPenaltyAmount] = useState<number>(0);
   const [penaltyNotes, setPenaltyNotes] = useState('');
+  const [penaltyPaidInPerson, setPenaltyPaidInPerson] = useState(false);
+  const [isWaivingReturnPenalty, setIsWaivingReturnPenalty] = useState(false);
   
   // Automatic pricing rules based on differences
   const [autoFuelFine, setAutoFuelFine] = useState<number>(0);
@@ -272,6 +274,8 @@ const ReturnVerificationWidget: React.FC = () => {
       setPenaltyAmount(0);
       setPenaltyType('minor_scratch');
       setPenaltyNotes('');
+      setPenaltyPaidInPerson(false);
+      setIsWaivingReturnPenalty(false);
       setAutoFuelFine(0);
       setAutoLateFine(0);
     }
@@ -377,10 +381,13 @@ const ReturnVerificationWidget: React.FC = () => {
 
     try {
       // 1. Process Booking with penalty rates & updates
+      const finalPenaltyAmount = (isWaivingReturnPenalty || penaltyPaidInPerson) ? 0 : (hasPenalty ? penaltyAmount : 0);
+      const finalPenaltyNotes = isWaivingReturnPenalty ? `WAIVED BY ADMIN: ${penaltyNotes}` : (penaltyPaidInPerson ? `PAID IN PERSON: ${penaltyNotes}` : (hasPenalty ? penaltyNotes : ''));
+
       const bookingUpdates: any = { 
         status: 'completed',
-        penaltyAmount: hasPenalty ? penaltyAmount : 0,
-        penaltyReason: hasPenalty ? penaltyNotes : '',
+        penaltyAmount: finalPenaltyAmount,
+        penaltyReason: finalPenaltyNotes,
         returnChecklist: {
           fuelLevel: returnFuel,
           mileage: returnMileage,
@@ -389,6 +396,11 @@ const ReturnVerificationWidget: React.FC = () => {
           timestamp: new Date().toISOString()
         }
       };
+
+      if (penaltyPaidInPerson && hasPenalty && penaltyAmount > 0) {
+        // We log a record that penalty was paid in person if we had a dedicated endpoint for that, 
+        // but for now, setting penaltyAmount to 0 on the booking achieves the same "paid" effect.
+      }
 
       if (selectedBooking.paymentType === 'partial') {
         bookingUpdates.remainingPaymentStatus = remainingPaymentCollected ? 'paid' : 'pending';
@@ -1204,12 +1216,57 @@ const ReturnVerificationWidget: React.FC = () => {
                           </span>
                         </div>
                         {activeTab === 'checkin' && (
-                          <div className="flex justify-between font-bold text-slate-500">
-                            <span>Total Applied Penalties:</span>
-                            <span className={hasPenalty ? "text-red-600 font-black" : "text-emerald-600 font-black"}>
-                              PKR {penaltyAmount.toLocaleString()}
-                            </span>
-                          </div>
+                          <>
+                            <div className="flex justify-between font-bold text-slate-500">
+                              <span>Total Applied Penalties:</span>
+                              <span className={hasPenalty ? "text-red-600 font-black" : "text-emerald-600 font-black"}>
+                                PKR {penaltyAmount.toLocaleString()}
+                              </span>
+                            </div>
+                            
+                            {hasPenalty && !isWaivingReturnPenalty && (
+                              <div className="mt-3 pt-3 border-t border-blue-100/50 space-y-2">
+                                <label className="flex items-center gap-2 cursor-pointer group">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={penaltyPaidInPerson}
+                                    onChange={(e) => setPenaltyPaidInPerson(e.target.checked)}
+                                    className="size-4 rounded border-blue-200 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest group-hover:text-blue-900 transition-colors">
+                                    Mark as Paid in Person
+                                  </span>
+                                </label>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsWaivingReturnPenalty(true);
+                                    setPenaltyPaidInPerson(false);
+                                    showToast('Penalty marked as waived for this return.', 'info');
+                                  }}
+                                  className="w-full py-1.5 bg-white border border-red-200 text-red-600 font-black text-[9px] uppercase tracking-wider rounded-lg hover:bg-red-50 transition-colors"
+                                >
+                                  Waive Entire Penalty
+                                </button>
+                              </div>
+                            )}
+
+                            {isWaivingReturnPenalty && (
+                              <div className="mt-3 p-2 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-between">
+                                <span className="text-[9px] font-black text-emerald-800 uppercase tracking-widest flex items-center gap-1.5">
+                                  <ShieldCheck size={12} />
+                                  Penalty Waived
+                                </span>
+                                <button 
+                                  onClick={() => setIsWaivingReturnPenalty(false)}
+                                  className="text-[9px] font-bold text-emerald-600 hover:underline"
+                                >
+                                  Undo
+                                </button>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

@@ -248,14 +248,7 @@ const ReturnVerificationWidget: React.FC = () => {
       }
       setLocalGalleryImages(loaded);
     } else {
-      // Use fallback baseline images so we have a consistent baseline!
-      const fallbacks = [
-        'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=600'
-      ];
-      setLocalGalleryImages(fallbacks);
+      setLocalGalleryImages(['', '', '', '']);
     }
 
     if (activeTab === 'checkout') {
@@ -822,8 +815,12 @@ const ReturnVerificationWidget: React.FC = () => {
                             {/* Primary photo */}
                             <div className="space-y-1">
                               <span className="text-[9px] font-bold text-slate-400 block truncate">Primary Photo</span>
-                              <div className="relative group aspect-[4/3] rounded-xl overflow-hidden bg-slate-50 border border-slate-200">
-                                <img src={localPrimaryImage || 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800'} alt="Primary" className="w-full h-full object-cover" />
+                              <div className="relative group aspect-[4/3] rounded-xl overflow-hidden bg-slate-50 border border-slate-200 flex items-center justify-center">
+                                {localPrimaryImage ? (
+                                  <img src={localPrimaryImage} alt="Primary" className="w-full h-full object-cover" />
+                                ) : (
+                                  <span className="text-[10px] font-black text-slate-300 uppercase">No Image</span>
+                                )}
                                 {(user?.role === 'admin' || user?.role === 'manager') && (
                                   <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center cursor-pointer text-white text-[8px] font-black uppercase tracking-wider text-center p-1">
                                     <Upload size={12} className="mb-0.5" />
@@ -923,13 +920,20 @@ const ReturnVerificationWidget: React.FC = () => {
                                 {/* Primary photo */}
                                 <div className="space-y-1">
                                   <span className="text-[8px] font-bold text-slate-400 block truncate text-center">Primary</span>
-                                  <div className="aspect-[4/3] rounded-xl overflow-hidden bg-white border border-slate-200 shadow-xs">
-                                    <img 
-                                      src={vehicles.find(v => v.id === selectedBooking.vehicleId)?.image || 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800'} 
-                                      alt="Baseline Primary" 
-                                      className="w-full h-full object-cover" 
-                                      referrerPolicy="no-referrer"
-                                    />
+                                  <div className="aspect-[4/3] rounded-xl overflow-hidden bg-white border border-slate-200 shadow-xs flex items-center justify-center">
+                                    {(() => {
+                                      const vImg = vehicles.find(v => v.id === selectedBooking.vehicleId)?.image;
+                                      return vImg ? (
+                                        <img 
+                                          src={vImg} 
+                                          alt="Baseline Primary" 
+                                          className="w-full h-full object-cover" 
+                                          referrerPolicy="no-referrer"
+                                        />
+                                      ) : (
+                                        <span className="text-[8px] font-bold text-slate-300 uppercase">No Image</span>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
                                 {/* Gallery photos */}
@@ -949,23 +953,20 @@ const ReturnVerificationWidget: React.FC = () => {
                                   }
                                   const displayPhotos = finalPhotos.slice(0, 4);
                                   
-                                  const fallbacks = [
-                                    'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=600',
-                                    'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&q=80&w=600',
-                                    'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=600',
-                                    'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=600'
-                                  ];
-
                                   return displayPhotos.map((photo, pIdx) => (
                                     <div key={pIdx} className="space-y-1">
                                       <span className="text-[8px] font-bold text-slate-400 block truncate text-center">Angle {pIdx + 1}</span>
-                                      <div className="aspect-[4/3] rounded-xl overflow-hidden bg-white border border-slate-200 shadow-xs">
-                                        <img 
-                                          src={photo || fallbacks[pIdx]} 
-                                          alt={`Angle ${pIdx + 1}`} 
-                                          className="w-full h-full object-cover" 
-                                          referrerPolicy="no-referrer"
-                                        />
+                                      <div className="aspect-[4/3] rounded-xl overflow-hidden bg-white border border-slate-200 shadow-xs flex items-center justify-center">
+                                        {photo ? (
+                                          <img 
+                                            src={photo} 
+                                            alt={`Angle ${pIdx + 1}`} 
+                                            className="w-full h-full object-cover" 
+                                            referrerPolicy="no-referrer"
+                                          />
+                                        ) : (
+                                          <span className="text-[8px] font-bold text-slate-300 uppercase">No Photo</span>
+                                        )}
                                       </div>
                                     </div>
                                   ));

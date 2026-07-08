@@ -275,7 +275,7 @@ const Bookings: React.FC = () => {
           filteredBookings.map((booking) => {
             const customer = allUsers.find(u => u.id === booking.userId);
             const vehicle = vehicles.find(v => v.id === booking.vehicleId);
-            const receiptToDisplay = booking.receiptImage || 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=600';
+            const receiptToDisplay = booking.receiptImage || '';
             
             const isExpanded = expandedBookingId === booking.id;
             
@@ -690,22 +690,29 @@ const Bookings: React.FC = () => {
                               <FileText size={12} /> Uploaded Receipt
                             </h4>
                             <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100/50 space-y-3">
-                              <div 
-                                onClick={() => setSelectedReceiptUrl(receiptToDisplay)}
-                                className="relative w-full h-32 bg-white rounded-xl overflow-hidden border border-slate-200 group/receipt cursor-pointer shadow-sm hover:border-blue-300 hover:shadow-md transition-all duration-300"
-                              >
-                                <img 
-                                  src={receiptToDisplay} 
-                                  alt="Customer Payment Receipt" 
-                                  referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover group-hover/receipt:scale-105 transition-all duration-300"
-                                />
-                                <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover/receipt:opacity-100 transition-all duration-300 flex items-center justify-center">
-                                  <span className="text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 bg-black/60 px-3 py-1.5 rounded-full backdrop-blur-xs">
-                                    <Eye size={12} /> Click to Zoom
-                                  </span>
+                              {receiptToDisplay ? (
+                                <div 
+                                  onClick={() => setSelectedReceiptUrl(receiptToDisplay)}
+                                  className="relative w-full h-32 bg-white rounded-xl overflow-hidden border border-slate-200 group/receipt cursor-pointer shadow-sm hover:border-blue-300 hover:shadow-md transition-all duration-300"
+                                >
+                                  <img 
+                                    src={receiptToDisplay} 
+                                    alt="Customer Payment Receipt" 
+                                    referrerPolicy="no-referrer"
+                                    className="w-full h-full object-cover group-hover/receipt:scale-105 transition-all duration-300"
+                                  />
+                                  <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover/receipt:opacity-100 transition-all duration-300 flex items-center justify-center">
+                                    <span className="text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 bg-black/60 px-3 py-1.5 rounded-full backdrop-blur-xs">
+                                      <Eye size={12} /> Click to Zoom
+                                    </span>
+                                  </div>
                                 </div>
-                              </div>
+                              ) : (
+                                <div className="w-full h-32 bg-slate-100 rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center text-center p-4">
+                                  <FileText className="text-slate-300 mb-1" size={24} />
+                                  <p className="text-[10px] font-black text-slate-400 uppercase">No Receipt Uploaded</p>
+                                </div>
+                              )}
                               <div className="flex items-center justify-between">
                                 <span className="text-[9px] text-slate-400 font-bold uppercase">Receipt File</span>
                                 <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">
@@ -1361,7 +1368,7 @@ const Bookings: React.FC = () => {
               </div>
 
                <div className="p-5 flex items-center justify-between border-t border-slate-100 bg-white">
-                {selectedReceiptUrl.includes('unsplash.com') ? (
+                {selectedReceiptUrl.includes('unsplash.com') || selectedReceiptUrl.startsWith('https://images.unsplash.com') ? (
                   <div>
                     <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                       <Camera size={14} className="text-blue-500" /> High-Resolution Inspection Gallery

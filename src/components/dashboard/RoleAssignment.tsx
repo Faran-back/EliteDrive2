@@ -228,12 +228,12 @@ const RoleAssignment: React.FC = () => {
       </AnimatePresence>
 
       {/* Desktop Table View */}
-      <div className="hidden lg:block bg-white rounded-[40px] border border-slate-200 shadow-xl overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="hidden lg:block bg-white rounded-[40px] border border-slate-200 shadow-xl overflow-visible">
+        <div className="overflow-x-auto overflow-visible">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-8 py-6 w-12">
+                <th className="px-8 py-6 w-12 rounded-tl-[40px]">
                   <button onClick={toggleSelectAll} className="text-slate-400 hover:text-blue-600 transition-colors">
                     {selectedUsers.length === filteredAndSortedUsers.length ? <CheckSquare size={20} /> : <Square size={20} />}
                   </button>
@@ -249,14 +249,14 @@ const RoleAssignment: React.FC = () => {
                   </button>
                 </th>
                 <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">Audit Trail</th>
-                <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right rounded-tr-[40px]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-50 overflow-visible">
               {filteredAndSortedUsers.length > 0 ? (
                 filteredAndSortedUsers.map((user, idx) => (
                   <tr key={user.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'} hover:bg-blue-50/30 transition-colors group`}>
-                    <td className="px-8 py-5">
+                    <td className={`px-8 py-5 ${idx === filteredAndSortedUsers.length - 1 ? 'rounded-bl-[40px]' : ''}`}>
                       <button onClick={() => toggleSelectUser(user.id)} className="text-slate-300 group-hover:text-blue-600 transition-colors">
                         {selectedUsers.includes(user.id) ? <CheckSquare size={20} /> : <Square size={20} />}
                       </button>
@@ -301,7 +301,7 @@ const RoleAssignment: React.FC = () => {
                         <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">No History</span>
                       )}
                     </td>
-                    <td className="px-6 py-5 text-right">
+                    <td className={`px-6 py-5 text-right ${idx === filteredAndSortedUsers.length - 1 ? 'rounded-br-[40px]' : ''}`}>
                       <div className="relative inline-block text-left">
                         <button 
                           onClick={() => setActiveDropdown(activeDropdown === user.id ? null : user.id)}
@@ -313,12 +313,14 @@ const RoleAssignment: React.FC = () => {
                         <AnimatePresence>
                           {activeDropdown === user.id && (
                             <>
-                              <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
+                              <div className="fixed inset-0 z-[100]" onClick={() => setActiveDropdown(null)} />
                               <motion.div 
                                 initial={{ opacity: 0, scale: 0.95, y: 10 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-2xl z-20 overflow-hidden"
+                                className={`absolute right-0 w-48 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[110] overflow-hidden ${
+                                  idx >= filteredAndSortedUsers.length - 2 ? 'bottom-full mb-2' : 'mt-2'
+                                }`}
                               >
                                 <div className="p-2">
                                   <p className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">Assign New Role</p>
@@ -348,7 +350,7 @@ const RoleAssignment: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-6 py-32 text-center">
+                  <td colSpan={5} className="px-6 py-32 text-center rounded-b-[40px]">
                     <div className="flex flex-col items-center gap-4 text-slate-300">
                       <Users size={64} strokeWidth={1} />
                       <div>

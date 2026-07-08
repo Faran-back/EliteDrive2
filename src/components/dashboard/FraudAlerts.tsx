@@ -55,6 +55,16 @@ const FraudAlerts: React.FC = () => {
       return d.toISOString();
     };
 
+    const isFirstBookingOfUser = (bookingId: string, userId: string) => {
+      const userBookings = allBookings.filter(bk => bk.userId === userId);
+      const sorted = [...userBookings].sort((x, y) => {
+        const tX = x.createdAt ? new Date(x.createdAt).getTime() : new Date(x.startDate).getTime();
+        const tY = y.createdAt ? new Date(y.createdAt).getTime() : new Date(y.startDate).getTime();
+        return tX - tY;
+      });
+      return sorted.length > 0 && sorted[0].id === bookingId;
+    };
+
     // 1. Scan for Multiple Bookings Threat Pattern (High Severity)
     // Find users with multiple bookings in the active or pending status
     allUsers.forEach((usr, idx) => {
@@ -83,6 +93,9 @@ const FraudAlerts: React.FC = () => {
       const vehicle = vehicles.find(v => v.id === b.vehicleId);
       
       if (usr && vehicle && (vehicle.pricePerDay > 12000 || b.totalPrice > 40000)) {
+        if (isFirstBookingOfUser(b.id, usr.id)) {
+          return;
+        }
         const isKycIncomplete = !usr.cnicVerified || !usr.cnicFront || !usr.license;
         if (isKycIncomplete) {
           alertsList.push({
@@ -106,9 +119,12 @@ const FraudAlerts: React.FC = () => {
     // 3. Scan for Out-of-City Route Boundaries lacking guarantor credentials (Medium Severity)
     allBookings.forEach((b, idx) => {
       if (b.isOutOfCity) {
+        const usr = allUsers.find(u => u.id === b.userId);
+        if (usr && isFirstBookingOfUser(b.id, usr.id)) {
+          return;
+        }
         const hasGuarantor = b.outOfCityDetails?.guarantorName && b.outOfCityDetails?.guarantorPhone;
         if (!hasGuarantor) {
-          const usr = allUsers.find(u => u.id === b.userId);
           const vehicle = vehicles.find(v => v.id === b.vehicleId);
           
           if (usr) {

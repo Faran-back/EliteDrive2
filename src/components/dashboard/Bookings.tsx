@@ -278,6 +278,14 @@ const Bookings: React.FC = () => {
             const receiptToDisplay = booking.receiptImage || '';
             
             const isExpanded = expandedBookingId === booking.id;
+
+            const customerBookings = allBookings.filter(b => b.userId === booking.userId);
+            const sortedCustomerBookings = [...customerBookings].sort((a, b) => {
+              const tA = a.createdAt ? new Date(a.createdAt).getTime() : new Date(a.startDate).getTime();
+              const tB = b.createdAt ? new Date(b.createdAt).getTime() : new Date(b.startDate).getTime();
+              return tA - tB;
+            });
+            const isFirstBooking = sortedCustomerBookings.length > 0 && sortedCustomerBookings[0].id === booking.id;
             
             return (
               <motion.div 
@@ -304,7 +312,7 @@ const Bookings: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         {booking.status === 'cancelled' && booking.cancelledPreApproval ? (
                           <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-rose-300 bg-rose-50 text-rose-700 animate-pulse">
                             ⚠️ Cancelled Pre-Approval
@@ -313,6 +321,11 @@ const Bookings: React.FC = () => {
                           <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${getStatusColor(booking.status)}`}>
                             {getStatusIcon(booking.status)}
                             {booking.status}
+                          </span>
+                        )}
+                        {isFirstBooking && (
+                          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-200 bg-emerald-50 text-emerald-700">
+                            ✨ Customer's First Booking
                           </span>
                         )}
                         <span className="text-[10px] font-black text-slate-300">#{booking.id.slice(0, 8)}</span>
@@ -412,6 +425,15 @@ const Bookings: React.FC = () => {
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden mt-6 pt-6 border-t border-slate-100"
                     >
+                      {isFirstBooking && (
+                        <div className="mb-6 p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center gap-3">
+                          <span className="text-xl">✨</span>
+                          <div>
+                            <p className="text-xs font-black text-emerald-800 uppercase tracking-wider">Customer's First Booking</p>
+                            <p className="text-xs text-emerald-700 font-bold">This is the customer's very first rental booking. Welcome them warmly to EliteDrive Pakistan!</p>
+                          </div>
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {/* 1. Customer & Vehicle Information */}
                         <div className="space-y-6">

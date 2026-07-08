@@ -328,6 +328,19 @@ async function sendEmail({ to, subject, html, text }: { to: string; subject: str
 
 
  function checkForBookingFraudThreats(booking: Booking, user: any, vehicle: Vehicle) {
+  // Check if it is the customer's first booking
+  const userBookings = dbData.bookings.filter(b => b && b.userId === user.id);
+  const sorted = [...userBookings].sort((a, b) => {
+    const tA = a.createdAt ? new Date(a.createdAt).getTime() : new Date(a.startDate).getTime();
+    const tB = b.createdAt ? new Date(b.createdAt).getTime() : new Date(b.startDate).getTime();
+    return tA - tB;
+  });
+  const isFirstBooking = sorted.length > 0 && sorted[0].id === booking.id;
+  if (isFirstBooking) {
+    console.log(`[Fraud Detection] Skipping fraud alert scan because Booking #${booking.id} is the customer's first booking.`);
+    return;
+  }
+
   const threats: string[] = [];
 
   // 1. Rapid Multi-Vehicle Booking Pattern

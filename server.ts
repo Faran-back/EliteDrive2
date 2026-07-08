@@ -1375,9 +1375,9 @@ Here is the fleet data. I have included "bookingCount" (past popularity) and "is
 ${JSON.stringify(candidateVehicles.map(v => ({ id: v.id, name: v.name, type: v.type, pricePerDay: v.pricePerDay, transmission: v.transmission, fuel: v.fuel, seats: v.seats, bookingCount: v.bookingCount, isAvailable: v.isAvailable })), null, 2)}
 
 Recommend the top 2-3 most appropriate vehicles. 
-1. POPULARITY: If the user asks for "most booked" or "popular", prioritize cars with high "bookingCount" (e.g. Suzuki Alto with 6 bookings).
-2. ACCURACY: If the user asks for a specific type (e.g. "Comfortable Sedan") and budget (e.g. "20k"), filter strictly for those.
-3. AVAILABILITY: You CAN recommend a vehicle even if "isAvailable: false", but you MUST start the reasoning by stating it's currently booked and then explain why it's still the best recommendation based on their specific needs.
+1. POPULARITY (MOST IMPORTANT): If the user asks for "most booked", "popular", "frequently rented", or "top car", you MUST prioritize cars with high "bookingCount". For example, if Suzuki Alto has 6 bookings and Honda Civic has 5, they should be your top choices regardless of current availability.
+2. ACCURACY: If the user asks for a specific type (e.g. "Comfortable Sedan") and budget (e.g. "20k"), filter strictly for those. Honda Civic or Toyota Corolla are classic choices for comfortable sedans in Pakistan.
+3. AVAILABILITY: You MUST recommend the best cars even if "isAvailable: false". If you recommend a currently booked car, clearly state that it is currently reserved but is the highest-rated/most popular match for their specific needs.
 
 CRITICAL RULE: "recommendedVehicleIds" and "vehicleId" MUST be exact IDs from the list. Reasoning must be professional and reference the popularity/stats if relevant.`;
 
@@ -3493,12 +3493,31 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
     const now = new Date();
     let changed = false;
     dbData.bookings.forEach((booking) => {
-      if ((booking.status === 'active' || booking.status === 'pending') && new Date(booking.endDate) <= now) {
+      // Only auto-complete bookings that are currently ACTIVE and have an end date in the past
+      // We do NOT auto-complete 'pending' bookings as they haven't even started/been approved yet.
+      // We also add a small 5-minute buffer to avoid race conditions with same-time bookings.
+      const endDate = new Date(booking.endDate);
+      const fiveMinutesPastEnd = new Date(endDate.getTime() + 5 * 60 * 1000);
+
+      if (booking.status === 'active' && fiveMinutesPastEnd <= now) {
         booking.status = 'completed';
         const vehicleIdx = dbData.vehicles.findIndex(v => v.id === booking.vehicleId);
         if (vehicleIdx !== -1) {
           dbData.vehicles[vehicleIdx].status = 'available';
         }
+        
+        // Push notification for completion
+        dbData.notifications.push({
+          id: `not_${Math.random().toString(36).substring(2, 11)}`,
+          userId: booking.userId,
+          title: 'Rental Automatically Completed',
+          message: `Your rental has reached its scheduled end time and has been marked as completed.`,
+          type: 'info',
+          read: false,
+          createdAt: new Date().toISOString(),
+          link: '/my-bookings'
+        });
+
         changed = true;
       }
     });

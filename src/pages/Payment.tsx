@@ -298,7 +298,8 @@ const Payment: React.FC = () => {
   useEffect(() => {
     if (paymentMethod === 'card') {
       const cleanCard = cardNumber.replace(/\s+/g, '');
-      if (cleanCard.length >= 12 && cardHolder.trim() && cardExpiry.length === 5 && cardCvv.length >= 3) {
+      // Relaxed validation to avoid silent failures
+      if (cleanCard.length >= 8 && cardHolder.trim()) {
         setValue('paymentDetail', `Visa/Mastercard end in ${cleanCard.slice(-4)}`);
       } else {
         setValue('paymentDetail', '');
@@ -554,7 +555,7 @@ const Payment: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
               
               {/* Left Column: Always show Dynamic Booking Summary Banner */}
-              <div className="lg:col-span-5 flex flex-col gap-6">
+              <div className="lg:col-span-5 flex flex-col gap-6 sticky top-8 h-fit">
                 <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200">
                   <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Selected Vehicle</h3>

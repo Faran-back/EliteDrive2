@@ -2563,6 +2563,74 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
     res.json({ success: true, message: 'Penalty payment submitted successfully for administrative review!' });
   });
 
+  // DIRECT CARD PAYMENT FOR PENALTIES
+  app.post('/api/users/pay-penalty-card', authenticateToken, (req: any, res) => {
+    const { amount, cardNumber, cardHolder, cardExpiry, cardCvv } = req.body;
+    
+    const userIndex = dbData.users.findIndex(u => u.id === req.user.id);
+    if (userIndex === -1) return res.status(404).json({ error: 'User not found' });
+    
+    const user = dbData.users[userIndex];
+    const amountToPay = Number(amount);
+
+    if (amountToPay <= 0) return res.status(400).json({ error: 'Invalid amount' });
+
+    // Deduct from outstanding balance
+    user.outstandingBalance = Math.max(0, (user.outstandingBalance || 0) - amountToPay);
+
+    // If paying full balance or close to it, resolve everything
+    if (user.outstandingBalance < 1) {
+      user.outstandingBalance = 0;
+      
+      // Resolve all source items
+      dbData.echallans.forEach(c => {
+        if (c.matchedUserId === user.id) c.status = 'resolved';
+      });
+      
+      dbData.bookings.forEach(b => {
+        if (b.userId === user.id) {
+          b.penaltyAmount = 0;
+          if (b.paymentType === 'partial' && b.remainingPaymentStatus === 'pending') {
+            b.remainingPaymentStatus = 'paid';
+            b.remainingAmount = 0;
+          }
+        }
+      });
+    }
+
+    // Store in balancePayments collection as approved
+    dbData.balancePayments = dbData.balancePayments || [];
+    dbData.balancePayments.push({
+      id: `bal_pay_${Math.random().toString(36).substring(2, 11)}`,
+      userId: user.id,
+      userName: user.name,
+      userEmail: user.email,
+      penaltyTitle: 'Card Settlement: Full Outstanding Balance',
+      amount: amountToPay,
+      senderBank: 'Visa/Mastercard',
+      transactionRef: `CARD_SETTLE_${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+      receiptImage: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?auto=format&fit=crop&q=80&w=400',
+      status: 'approved',
+      resolvedBy: 'System (Auto-Debit Card)',
+      resolvedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString()
+    });
+
+    // Notify user
+    dbData.notifications.push({
+      id: `not_${Math.random().toString(36).substring(2, 11)}`,
+      userId: user.id,
+      title: 'Balance Cleared Successfully',
+      message: `Your payment of PKR ${amountToPay.toLocaleString()} via card was successful. Your outstanding balance is now PKR ${user.outstandingBalance.toLocaleString()}.`,
+      type: 'success',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
+    saveDatabase();
+    res.json({ success: true, outstandingBalance: user.outstandingBalance });
+  });
+
   // GET MY BALANCE PAYMENTS LIST (For customers)
   app.get('/api/my-balance-payments', authenticateToken, (req: any, res) => {
     const list = (dbData.balancePayments || []).filter(p => p.userId === req.user.id);

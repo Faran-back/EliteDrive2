@@ -21,6 +21,7 @@ import {
   Car,
   Clock,
   ShieldCheck,
+  CreditCard,
   Copy,
   Lock,
   Upload,
@@ -47,6 +48,12 @@ const Dashboard: React.FC = () => {
   const [payReceiptBase64, setPayReceiptBase64] = useState('');
   const [isSubmittingPay, setIsSubmittingPay] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const [paymentOption, setPaymentOption] = useState<'bank' | 'card'>('bank');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardHolder, setCardHolder] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
 
   const [myBalancePayments, setMyBalancePayments] = useState<any[]>([]);
 
@@ -139,6 +146,63 @@ const Dashboard: React.FC = () => {
       await fetchMyBalancePayments();
     } catch (err: any) {
       showToast(err.message || 'Error submitting payment', 'error');
+    } finally {
+      setIsSubmittingPay(false);
+    }
+  };
+
+  const handleCardPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountNum = Number(payAmount);
+    const outstandingBalance = user?.outstandingBalance || 0;
+
+    if (!payAmount || amountNum <= 0) {
+      showToast('Please enter a valid amount to pay.', 'error');
+      return;
+    }
+    
+    if (cardNumber.replace(/\s/g, '').length < 16) {
+      showToast('Please enter a valid 16-digit card number.', 'error');
+      return;
+    }
+
+    if (!cardHolder.trim()) {
+      showToast('Please enter the card holder name.', 'error');
+      return;
+    }
+
+    setIsSubmittingPay(true);
+    try {
+      const token = localStorage.getItem('elitedrive_token');
+      const res = await fetch('/api/users/pay-penalty-card', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          amount: amountNum,
+          cardNumber,
+          cardHolder,
+          cardExpiry,
+          cardCvv
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('Card payment failed');
+      }
+
+      showToast('Balance cleared successfully via card! Your account is now in good standing.', 'success');
+      setPayAmount('');
+      setCardNumber('');
+      setCardHolder('');
+      setCardExpiry('');
+      setCardCvv('');
+      await refreshData();
+      await fetchMyBalancePayments();
+    } catch (err: any) {
+      showToast(err.message || 'Error processing card payment', 'error');
     } finally {
       setIsSubmittingPay(false);
     }
@@ -420,6 +484,20 @@ const Dashboard: React.FC = () => {
               <p className="text-xs text-slate-350 leading-relaxed font-medium">
                 Please settle this balance as soon as possible. Unpaid balances will prevent placing new bookings.
               </p>
+              
+              <button 
+                onClick={() => {
+                  setPaymentOption('card');
+                  setPayAmount(String(outstandingBalance));
+                  const element = document.getElementById('settlement-section');
+                  element?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl font-black uppercase tracking-wider text-[10px] transition-all flex items-center justify-center gap-2"
+              >
+                <CreditCard size={14} />
+                Pay Full Balance via Card
+              </button>
+
               <div className="flex items-center gap-2.5 text-[10px] text-amber-500 font-bold uppercase tracking-wider">
                 <Clock size={14} />
                 <span>Pending Settlement</span>
@@ -468,203 +546,319 @@ const Dashboard: React.FC = () => {
 
         {/* Settle Outstanding Surcharges Section */}
         {outstandingBalance > 0 && (
-          <div className="bg-slate-900 text-white rounded-[32px] p-8 lg:p-10 border border-slate-950 shadow-2xl space-y-8 animate-in slide-in-from-bottom duration-500">
-            <div>
-              <span className="text-[10px] font-black uppercase text-amber-500 tracking-widest block mb-2">★ Direct Settlement Desk</span>
-              <h3 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
-                <ShieldCheck className="text-amber-500 animate-pulse" size={24} />
-                Settle Outstanding Penalties
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Select your outstanding penalty, review BOP escrow deposit coordinates, and upload your payment receipt to instantly file for settlement review.
-              </p>
-            </div>
-
-            <form onSubmit={handlePayPenaltySubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              {/* Left Side: Select Penalty, Amount, Bank and Reference ID */}
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">1. Select Penalty Item to Settle</label>
-                  <select
-                    value={payPenaltyType}
-                    onChange={(e) => {
-                      setPayPenaltyType(e.target.value);
-                      const matched = myReasons.find(r => r.title === e.target.value);
-                      if (matched) {
-                        setPayAmount(String(matched.amount));
-                      }
-                    }}
-                    className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-extrabold text-xs transition-all"
-                  >
-                    <option value="">-- Choose a Penalty Item --</option>
-                    {myReasons.map((r, i) => (
-                      <option key={i} value={r.title}>{r.title} (PKR {r.amount.toLocaleString()})</option>
-                    ))}
-                    <option value="Miscellaneous penalty">Something else / Miscellaneous penalty</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">2. Enter Settle Amount (PKR) *</label>
-                  <input
-                    type="number"
-                    placeholder="Enter PKR amount you are depositing"
-                    value={payAmount}
-                    onChange={(e) => setPayAmount(e.target.value)}
-                    className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-mono text-xs font-black transition-all"
-                  />
-                  <p className="text-[9px] text-slate-500 font-semibold">Total outstanding: PKR {outstandingBalance.toLocaleString()}</p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">3. Select Your Issuing Bank (Sender)</label>
-                  <select
-                    value={paySenderBank}
-                    onChange={(e) => setPaySenderBank(e.target.value)}
-                    className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-extrabold text-xs transition-all"
-                  >
-                    <option value="">-- Choose Your Bank --</option>
-                    <option value="Meezan Bank">Meezan Bank</option>
-                    <option value="HBL">Habib Bank Limited (HBL)</option>
-                    <option value="UBL">United Bank Limited (UBL)</option>
-                    <option value="MCB">MCB Bank Limited</option>
-                    <option value="Bank of Punjab">Bank of Punjab (BOP)</option>
-                    <option value="Bank Alfalah">Bank Alfalah</option>
-                    <option value="Standard Chartered">Standard Chartered</option>
-                    <option value="NayaPay">NayaPay</option>
-                    <option value="SadaPay">SadaPay</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">4. Transaction ID (TID) / Reference Number *</label>
-                  <input
-                    type="text"
-                    placeholder="Enter exact TID from receipt"
-                    value={payTid}
-                    onChange={(e) => setPayTid(e.target.value)}
-                    className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-mono text-xs font-black uppercase transition-all"
-                  />
-                </div>
+          <div id="settlement-section" className="bg-slate-900 text-white rounded-[32px] p-8 lg:p-10 border border-slate-950 shadow-2xl space-y-8 animate-in slide-in-from-bottom duration-500">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="space-y-2">
+                <span className="text-[10px] font-black uppercase text-amber-500 tracking-widest block">★ Direct Settlement Desk</span>
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+                  <ShieldCheck className="text-amber-500 animate-pulse" size={24} />
+                  Settle Outstanding Penalties
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Select your outstanding penalty and settle instantly via card or bank transfer coordinates.
+                </p>
               </div>
 
-              {/* Right Side: Bank coordinates & receipt upload */}
-              <div className="space-y-6">
-                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4">
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-800">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-1.5">
-                      <ShieldCheck size={14} />
-                      Elite Drive BOP Accounts Coordinates
-                    </h4>
-                  </div>
-
-                  <div className="space-y-2.5">
-                    {/* Bank Name */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
-                      <div>
-                        <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Beneficiary Bank</p>
-                        <p className="font-extrabold text-slate-200 text-[11px]">Bank of Punjab (BOP)</p>
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={() => handleCopyText('Bank of Punjab', 'Bank Name')}
-                        className="text-[9px] font-black text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wider bg-slate-800 px-2 py-1 rounded"
-                      >
-                        {copiedField === 'Bank Name' ? 'Copied ✓' : 'Copy'}
-                      </button>
-                    </div>
-
-                    {/* Account Title */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
-                      <div>
-                        <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Account Title</p>
-                        <p className="font-extrabold text-slate-200 text-[11px]">Elite Drive (Private) Limited</p>
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={() => handleCopyText('Elite Drive (Private) Limited', 'Account Title')}
-                        className="text-[9px] font-black text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wider bg-slate-800 px-2 py-1 rounded"
-                      >
-                        {copiedField === 'Account Title' ? 'Copied ✓' : 'Copy'}
-                      </button>
-                    </div>
-
-                    {/* Account Number */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
-                      <div>
-                        <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Account Number</p>
-                        <p className="font-mono text-[11px] font-black text-slate-200">0201-987654-01-3</p>
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={() => handleCopyText('0201-987654-01-3', 'Account Number')}
-                        className="text-[9px] font-black text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wider bg-slate-800 px-2 py-1 rounded"
-                      >
-                        {copiedField === 'Account Number' ? 'Copied ✓' : 'Copy'}
-                      </button>
-                    </div>
-
-                    {/* IBAN */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
-                      <div>
-                        <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">IBAN Number</p>
-                        <p className="font-mono text-[10px] font-black text-slate-200">PK42 BOP 0201 0201 9876 5401</p>
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={() => handleCopyText('PK42 BOP 0201 0201 9876 5401', 'IBAN')}
-                        className="text-[9px] font-black text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wider bg-slate-800 px-2 py-1 rounded"
-                      >
-                        {copiedField === 'IBAN' ? 'Copied ✓' : 'Copy'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Screenshot upload */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">5. Upload Transfer Receipt Screenshot (Optional)</label>
-                  <div className="flex items-center gap-3">
-                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-700 bg-slate-800 hover:border-amber-500 rounded-xl p-3 cursor-pointer transition-colors w-32 h-16 shrink-0 text-center">
-                      <Upload size={18} className="text-slate-400 mb-0.5" />
-                      <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Upload File</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setPayReceiptName(file.name);
-                            const reader = new FileReader();
-                            reader.onload = () => setPayReceiptBase64(reader.result as string);
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
-                    <div className="text-[10px] text-slate-400 truncate max-w-xs font-semibold">
-                      {payReceiptName ? (
-                        <p className="text-emerald-400 flex items-center gap-1">
-                          <Check size={12} />
-                          {payReceiptName}
-                        </p>
-                      ) : (
-                        'No screenshot selected'
-                      )}
-                    </div>
-                  </div>
-                </div>
-
+              {/* Payment Method Toggle */}
+              <div className="flex p-1 bg-slate-800 rounded-xl border border-slate-700 w-fit">
                 <button
-                  type="submit"
-                  disabled={isSubmittingPay}
-                  className="w-full h-12 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-black uppercase tracking-wider rounded-xl transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 text-xs"
+                  type="button"
+                  onClick={() => setPaymentOption('bank')}
+                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${paymentOption === 'bank' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
                 >
-                  {isSubmittingPay ? 'Verifying Coordinates & Submitting...' : 'Submit Penalty Payment Details'}
+                  Bank Transfer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentOption('card')}
+                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${paymentOption === 'card' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+                >
+                  Credit / Debit Card
                 </button>
               </div>
-            </form>
+            </div>
+
+            {paymentOption === 'bank' ? (
+              <form onSubmit={handlePayPenaltySubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                {/* Left Side: Select Penalty, Amount, Bank and Reference ID */}
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">1. Select Penalty Item to Settle</label>
+                    <select
+                      value={payPenaltyType}
+                      onChange={(e) => {
+                        setPayPenaltyType(e.target.value);
+                        const matched = myReasons.find(r => r.title === e.target.value);
+                        if (matched) {
+                          setPayAmount(String(matched.amount));
+                        }
+                      }}
+                      className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-extrabold text-xs transition-all"
+                    >
+                      <option value="">-- Choose a Penalty Item --</option>
+                      {myReasons.map((r, i) => (
+                        <option key={i} value={r.title}>{r.title} (PKR {r.amount.toLocaleString()})</option>
+                      ))}
+                      <option value="Miscellaneous penalty">Something else / Miscellaneous penalty</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">2. Enter Settle Amount (PKR) *</label>
+                    <input
+                      type="number"
+                      placeholder="Enter PKR amount you are depositing"
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                      className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-mono text-xs font-black transition-all"
+                    />
+                    <p className="text-[9px] text-slate-500 font-semibold">Total outstanding: PKR {outstandingBalance.toLocaleString()}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">3. Select Your Issuing Bank (Sender)</label>
+                    <select
+                      value={paySenderBank}
+                      onChange={(e) => setPaySenderBank(e.target.value)}
+                      className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-extrabold text-xs transition-all"
+                    >
+                      <option value="">-- Choose Your Bank --</option>
+                      <option value="Meezan Bank">Meezan Bank</option>
+                      <option value="HBL">Habib Bank Limited (HBL)</option>
+                      <option value="UBL">United Bank Limited (UBL)</option>
+                      <option value="MCB">MCB Bank Limited</option>
+                      <option value="Bank of Punjab">Bank of Punjab (BOP)</option>
+                      <option value="Bank Alfalah">Bank Alfalah</option>
+                      <option value="Standard Chartered">Standard Chartered</option>
+                      <option value="NayaPay">NayaPay</option>
+                      <option value="SadaPay">SadaPay</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">4. Transaction ID (TID) / Reference Number *</label>
+                    <input
+                      type="text"
+                      placeholder="Enter exact TID from receipt"
+                      value={payTid}
+                      onChange={(e) => setPayTid(e.target.value)}
+                      className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-mono text-xs font-black uppercase transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Right Side: Bank coordinates & receipt upload */}
+                <div className="space-y-6">
+                  <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4">
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-1.5">
+                        <ShieldCheck size={14} />
+                        Elite Drive BOP Accounts Coordinates
+                      </h4>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {/* Bank Name */}
+                      <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
+                        <div>
+                          <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Beneficiary Bank</p>
+                          <p className="font-extrabold text-slate-200 text-[11px]">Bank of Punjab (BOP)</p>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => handleCopyText('Bank of Punjab', 'Bank Name')}
+                          className="text-[9px] font-black text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wider bg-slate-800 px-2 py-1 rounded"
+                        >
+                          {copiedField === 'Bank Name' ? 'Copied ✓' : 'Copy'}
+                        </button>
+                      </div>
+
+                      {/* Account Title */}
+                      <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
+                        <div>
+                          <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Account Title</p>
+                          <p className="font-extrabold text-slate-200 text-[11px]">Elite Drive (Private) Limited</p>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => handleCopyText('Elite Drive (Private) Limited', 'Account Title')}
+                          className="text-[9px] font-black text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wider bg-slate-800 px-2 py-1 rounded"
+                        >
+                          {copiedField === 'Account Title' ? 'Copied ✓' : 'Copy'}
+                        </button>
+                      </div>
+
+                      {/* Account Number */}
+                      <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
+                        <div>
+                          <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Account Number</p>
+                          <p className="font-mono text-[11px] font-black text-slate-200">0201-987654-01-3</p>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => handleCopyText('0201-987654-01-3', 'Account Number')}
+                          className="text-[9px] font-black text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wider bg-slate-800 px-2 py-1 rounded"
+                        >
+                          {copiedField === 'Account Number' ? 'Copied ✓' : 'Copy'}
+                        </button>
+                      </div>
+
+                      {/* IBAN */}
+                      <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
+                        <div>
+                          <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">IBAN Number</p>
+                          <p className="font-mono text-[10px] font-black text-slate-200">PK42 BOP 0201 0201 9876 5401</p>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => handleCopyText('PK42 BOP 0201 0201 9876 5401', 'IBAN')}
+                          className="text-[9px] font-black text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wider bg-slate-800 px-2 py-1 rounded"
+                        >
+                          {copiedField === 'IBAN' ? 'Copied ✓' : 'Copy'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Screenshot upload */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">5. Upload Transfer Receipt Screenshot (Optional)</label>
+                    <div className="flex items-center gap-3">
+                      <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-700 bg-slate-800 hover:border-amber-500 rounded-xl p-3 cursor-pointer transition-colors w-32 h-16 shrink-0 text-center">
+                        <Upload size={18} className="text-slate-400 mb-0.5" />
+                        <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Upload File</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setPayReceiptName(file.name);
+                              const reader = new FileReader();
+                              reader.onload = () => setPayReceiptBase64(reader.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      <div className="text-[10px] text-slate-400 truncate max-w-xs font-semibold">
+                        {payReceiptName ? (
+                          <p className="text-emerald-400 flex items-center gap-1">
+                            <Check size={12} />
+                            {payReceiptName}
+                          </p>
+                        ) : (
+                          'No screenshot selected'
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmittingPay}
+                    className="w-full h-12 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-black uppercase tracking-wider rounded-xl transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 text-xs"
+                  >
+                    {isSubmittingPay ? 'Verifying Coordinates & Submitting...' : 'Submit Penalty Payment Details'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleCardPaymentSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Amount to Pay (PKR)</label>
+                    <input
+                      type="number"
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                      className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 outline-none font-mono text-sm font-black"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Card Number</label>
+                    <div className="relative">
+                      <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                      <input
+                        type="text"
+                        placeholder="0000 0000 0000 0000"
+                        value={cardNumber}
+                        onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim().slice(0, 19))}
+                        className="w-full h-12 pl-12 pr-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 outline-none font-mono text-sm font-black"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Expiry (MM/YY)</label>
+                      <input
+                        type="text"
+                        placeholder="MM/YY"
+                        value={cardExpiry}
+                        onChange={(e) => setCardExpiry(e.target.value)}
+                        className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 outline-none font-mono text-sm font-black"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">CVV</label>
+                      <input
+                        type="password"
+                        placeholder="•••"
+                        value={cardCvv}
+                        onChange={(e) => setCardCvv(e.target.value.slice(0, 4))}
+                        className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 outline-none font-mono text-sm font-black"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Card Holder Name</label>
+                    <input
+                      type="text"
+                      placeholder="FULL NAME AS ON CARD"
+                      value={cardHolder}
+                      onChange={(e) => setCardHolder(e.target.value.toUpperCase())}
+                      className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 outline-none font-sans text-xs font-black uppercase"
+                    />
+                  </div>
+                  
+                  <button
+                    type="submit"
+                    disabled={isSubmittingPay}
+                    className="w-full h-14 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-black uppercase tracking-wider rounded-xl transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 text-sm mt-4"
+                  >
+                    {isSubmittingPay ? (
+                      <>
+                        <RefreshCw className="animate-spin" size={18} />
+                        Processing Secure Card Payment...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck size={18} />
+                        Securely Pay PKR {Number(payAmount).toLocaleString()} Now
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-8 flex flex-col items-center justify-center text-center space-y-6">
+                  <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center border border-amber-500/20">
+                    <Lock className="text-amber-500" size={32} />
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-lg font-black text-white uppercase tracking-tight">Direct Card Settlement</h4>
+                    <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
+                      Settling via card is instant. Once successful, your outstanding balance will be cleared immediately and you can resume booking vehicles.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4 pt-4 grayscale opacity-50">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-4" />
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-6" />
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" alt="PayPal" className="h-4" />
+                  </div>
+                </div>
+              </form>
+            )}
           </div>
         )}
 

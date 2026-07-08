@@ -575,19 +575,44 @@ const Fleet: React.FC = () => {
                 >
                   <div className="relative h-64 overflow-hidden">
                     <div className="absolute top-6 left-6 z-10 flex gap-2">
-                      {activeBooking && activeBooking.status === 'pending' ? (
-                        <span className="px-5 py-2 bg-amber-600 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-amber-500 shadow-md">
-                          Reviewing
-                        </span>
-                      ) : isCurrentlyBooked ? (
-                        <span className="px-5 py-2 bg-amber-500 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-amber-400 shadow-md">
-                          Booked
-                        </span>
-                      ) : (
-                        <span className="px-5 py-2 bg-white/80 backdrop-blur-md text-primary text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-white">
-                          Available
-                        </span>
-                      )}
+                      {(() => {
+                        // Check if vehicle is booked during the user's selected dates
+                        const userStart = pickupDate;
+                        const userEnd = returnDate;
+                        
+                        let isBookedInWindow = false;
+                        if (userStart && userEnd) {
+                          isBookedInWindow = allBookings.some(b => {
+                            if (b.vehicleId !== vehicle.id) return false;
+                            if (b.status !== 'active' && b.status !== 'pending') return false;
+                            const bStart = new Date(b.startDate);
+                            const bEnd = new Date(b.endDate);
+                            return (userStart < bEnd && userEnd > bStart);
+                          });
+                        }
+
+                        if (vehicle.status === 'maintenance') {
+                          return (
+                            <span className="px-5 py-2 bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-red-500 shadow-md">
+                              Maintenance
+                            </span>
+                          );
+                        }
+
+                        if (isBookedInWindow || vehicle.status === 'booked' || vehicle.status === 'rented') {
+                          return (
+                            <span className="px-5 py-2 bg-amber-500 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-amber-400 shadow-md">
+                              Booked
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <span className="px-5 py-2 bg-white/80 backdrop-blur-md text-primary text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-white">
+                            Available
+                          </span>
+                        );
+                      })()}
                       {vehicle.reasoning && (
                         <span className="px-5 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-blue-500 shadow-md flex items-center gap-1.5">
                           <Sparkles size={10} />

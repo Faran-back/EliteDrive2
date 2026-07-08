@@ -1342,19 +1342,18 @@ function getGeminiClient(): GoogleGenAI | null {
       }
     }
 
-    // Filter available cars (not under repair/maintenance, and not already booked in requested period)
+    // Filter available cars (not under repair/maintenance). Tag availability for AI consideration.
     const candidateVehicles = dbData.vehicles.map(v => ({
       ...v,
-      bookingCount: bookingCounts[v.id] || 0
-    })).filter(v => 
-      v.status !== 'maintenance' && !bookedVehicleIds.includes(v.id)
-    );
+      bookingCount: bookingCounts[v.id] || 0,
+      isAvailable: !bookedVehicleIds.includes(v.id)
+    })).filter(v => v.status !== 'maintenance');
     
     if (candidateVehicles.length === 0) {
       return res.json({
         recommendedVehicleIds: [],
         recommendations: [],
-        generalAdvice: "No vehicles are currently available in our fleet during your requested travel window."
+        generalAdvice: "No vehicles are currently registered in our fleet."
       });
     }
 
@@ -1364,26 +1363,23 @@ function getGeminiClient(): GoogleGenAI | null {
         throw new Error("Gemini API Client missing");
       }
 
-      const prompt = `You are an elite AI Car Recommendation Engine for "EliteDrive", Pakistan's premier self-drive and chauffeur car rental platform.
+      const prompt = `You are an elite AI Car Recommendation Engine for "EliteDrive", Pakistan's premier self-drive and car rental platform.
 Based on the following request:
-- Travel Type: ${travelType || 'general'} (e.g. in_city, out_city, mountainous, family_trip, business)
+- Travel Type: ${travelType || 'general'}
 - Daily Budget Limit: ${budget ? `PKR ${budget}` : 'No limit'}
 - Pickup Location: ${pickupLocation || 'Lahore, Pakistan'}
-- Drop-off Location: ${dropoffLocation || 'Same as pickup'}
-- Pickup Date: ${pickupDate || 'N/A'}
-- Return Date: ${returnDate || 'N/A'}
-- Extra Preferences/User Requirements: ${preferences || 'None'}
+- Dates: ${pickupDate || 'Any'} to ${returnDate || 'Any'}
+- Extra Preferences: ${preferences || 'None'}
 
-Here is the list of active, available vehicles in EliteDrive fleet for this specific travel window. I have included "bookingCount" which indicates how many times each vehicle has been successfully booked in the past.
-${JSON.stringify(candidateVehicles.map(v => ({ id: v.id, name: v.name, type: v.type, pricePerDay: v.pricePerDay, transmission: v.transmission, fuel: v.fuel, seats: v.seats, features: v.features, location: v.location, description: v.description || '', bookingCount: v.bookingCount })), null, 2)}
+Here is the fleet data. I have included "bookingCount" (past popularity) and "isAvailable" (whether it's free for the requested dates).
+${JSON.stringify(candidateVehicles.map(v => ({ id: v.id, name: v.name, type: v.type, pricePerDay: v.pricePerDay, transmission: v.transmission, fuel: v.fuel, seats: v.seats, bookingCount: v.bookingCount, isAvailable: v.isAvailable })), null, 2)}
 
-Recommend the top 2-3 most appropriate vehicles. Highlight why they perfectly fit:
-1. POPULARITY: If the user asks for the "most booked" or "popular" car, prioritize vehicles with the highest "bookingCount".
-2. BUDGET: Strictly respect the budget limit (PKR). Do not recommend vehicles significantly over budget unless no others exist.
-3. CONTEXT: The pickup and dropoff locations & estimated travel distance/terrain.
-4. USER REQUIREMENTS: If the user specified a car type (e.g. "Sedan"), comfort requirements ("comfortable"), or specific features, ensure the results are highly accurate. Only show the most accurate matches if the user is specific.
+Recommend the top 2-3 most appropriate vehicles. 
+1. POPULARITY: If the user asks for "most booked" or "popular", prioritize cars with high "bookingCount" (e.g. Suzuki Alto with 6 bookings).
+2. ACCURACY: If the user asks for a specific type (e.g. "Comfortable Sedan") and budget (e.g. "20k"), filter strictly for those.
+3. AVAILABILITY: You CAN recommend a vehicle even if "isAvailable: false", but you MUST start the reasoning by stating it's currently booked and then explain why it's still the best recommendation based on their specific needs.
 
-CRITICAL RULE FOR IDS: The "recommendedVehicleIds" and "vehicleId" values in your response MUST BE EXACT strings from the "id" fields of the available vehicles list provided above. Inclusion of "bookingCount" in reasoning is highly encouraged if it helps justify the "most booked" status. Include a general tip for driving or exploring in Pakistan for this travel type.`;
+CRITICAL RULE: "recommendedVehicleIds" and "vehicleId" MUST be exact IDs from the list. Reasoning must be professional and reference the popularity/stats if relevant.`;
 
       const response = await client.models.generateContent({
         model: 'gemini-3.5-flash',
@@ -1483,19 +1479,24 @@ CRITICAL RULE FOR IDS: The "recommendedVehicleIds" and "vehicleId" values in you
       const recommendedVehicleIds = top3.map(v => v.id);
       
       const recommendations = top3.map(v => {
-        let reason = `Excellent reliable selection for your EliteDrive journey. Matches your budget (PKR ${v.pricePerDay.toLocaleString()}/day) and route from ${pickupLocation || 'pickup'} to ${dropoffLocation || 'destination'}.`;
-        if (v.bookingCount > 5) {
-          reason = `Our most booked and highly rated ${v.type}! ${reason}`;
+        let reason = `Excellent reliable selection for your EliteDrive journey. Matches your budget (PKR ${v.pricePerDay.toLocaleString()}/day) perfectly.`;
+        
+        if (!v.isAvailable) {
+          reason = `[CURRENTLY BOOKED] Note: This car is reserved for your dates, but is our top recommendation based on your preferences. ${reason}`;
+        } else if (v.bookingCount > 5) {
+          reason = `Our most booked and highly rated selection! ${reason}`;
         }
+
         if (travelType === 'mountainous') {
-          reason = `Great power, high ground clearance, and robust capabilities. Ideal for Pakistan's adventurous northern routes (e.g., Karakoram Highway/Naran) from ${pickupLocation || 'your starting point'}.`;
+          reason += ` Great power and high ground clearance. Ideal for Pakistan's adventurous northern routes.`;
         } else if (travelType === 'family_trip') {
-          reason = `Superb cabin space with comfortable ${v.seats}-seater layout. Offers perfect legroom and massive luggage capacity for the family trip.`;
+          reason += ` Superb cabin space with comfortable ${v.seats}-seater layout.`;
         } else if (travelType === 'business') {
-          reason = `Stunning executive presence. This premium model provides unparalleled comfort, high-end features, and elegant drive dynamics for business in ${pickupLocation || 'major cities'}.`;
+          reason += ` Stunning executive presence for business meetings in ${pickupLocation || 'major cities'}.`;
         } else if (travelType === 'in_city') {
-          reason = `Ultra-efficient fuel consumption, smooth automatic gearbox, and highly maneuverable. Excellent choice for navigating urban traffic in ${pickupLocation || 'Lahore'} effortlessly.`;
+          reason += ` Ultra-efficient fuel consumption and highly maneuverable in ${pickupLocation || 'Lahore'} traffic.`;
         }
+
         return {
           vehicleId: v.id,
           reasoning: reason

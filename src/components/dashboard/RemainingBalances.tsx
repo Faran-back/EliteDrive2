@@ -409,7 +409,9 @@ const RemainingBalances: React.FC = () => {
       reasons.push({
         title: 'Account Balance Adjustment / Unresolved Security Surcharge',
         amount: outstandingBalance - sumPenalties,
-        icon: Wallet
+        icon: Wallet,
+        sourceId: 'misc',
+        sourceType: 'misc'
       });
     }
 

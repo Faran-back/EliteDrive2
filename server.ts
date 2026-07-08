@@ -379,7 +379,7 @@ function getEffectiveOutstandingBalance(user: any): number {
   if (!user) return 0;
   const baseBalance = user.outstandingBalance || 0;
   
-  // Find all non-cancelled bookings that have pending remaining payments or penalties
+  // Find all bookings that have pending remaining payments
   const unpaidBookings = (dbData.bookings || []).filter(
     b => b.userId === user.id && 
          !['cancelled'].includes(b.status)
@@ -387,11 +387,11 @@ function getEffectiveOutstandingBalance(user: any): number {
   
   const pendingBookingBalance = unpaidBookings.reduce((sum, b) => {
     let amt = 0;
+    // Only add pending partial payments. 
+    // penaltyAmount should ALREADY be in baseBalance (user.outstandingBalance)
     if (b.paymentType === 'partial' && b.remainingPaymentStatus === 'pending' && !['pending', 'approved'].includes(b.status)) {
       amt += (b.remainingAmount || 0);
     }
-    // We don't add penaltyAmount here if we are already adding it to outstandingBalance in the user object
-    // But to be safe against synchronization issues, we can ensure we don't double count.
     return sum + amt;
   }, 0);
   
@@ -411,6 +411,33 @@ function updateUserBalance(userId: string, addedAmount: number) {
 function sanitizeLoadedData() {
   dbData.users = dbData.users || [];
   dbData.vehicles = dbData.vehicles || [];
+  dbData.bookings = dbData.bookings || [];
+  dbData.echallans = dbData.echallans || [];
+
+  // Ensure all users have a valid outstandingBalance that includes their penalties and challans
+  dbData.users.forEach(u => {
+    let calculatedPenaltyBalance = 0;
+    
+    // 1. Add all booking penalties
+    dbData.bookings.forEach(b => {
+      if (b.userId === u.id && (b.penaltyAmount || 0) > 0) {
+        calculatedPenaltyBalance += b.penaltyAmount!;
+      }
+    });
+
+    // 2. Add all unresolved e-challans
+    dbData.echallans.forEach(c => {
+      if (c.matchedUserId === u.id && c.status !== 'resolved') {
+        calculatedPenaltyBalance += Number(c.amount);
+      }
+    });
+
+    // Sync if missing
+    if (calculatedPenaltyBalance > (u.outstandingBalance || 0)) {
+      u.outstandingBalance = calculatedPenaltyBalance;
+      addDebugLog(`[Sanitize] Synced user ${u.id} balance to ${calculatedPenaltyBalance}`);
+    }
+  });
 
   // Filter out default pre-seeded vehicles from INITIAL_VEHICLES
   const defaultVehicleIds = new Set(INITIAL_VEHICLES.map(v => v.id));
@@ -436,17 +463,6 @@ function sanitizeLoadedData() {
   dbData.users.forEach(u => {
     if (u.outstandingBalance === undefined) u.outstandingBalance = 0;
     if (u.isBlacklisted === undefined) u.isBlacklisted = false;
-    
-    // Correct any incorrect outstandingBalance that was added from cancelled bookings
-    const cancelledBookingsWithPenalty = dbData.bookings.filter(
-      b => b.userId === u.id && b.status === 'cancelled' && (b.penaltyAmount || 0) > 0
-    );
-    const totalIncorrectCancellationPenalty = cancelledBookingsWithPenalty.reduce((sum, b) => {
-      return sum + (b.penaltyAmount || 0);
-    }, 0);
-    if (totalIncorrectCancellationPenalty > 0) {
-      u.outstandingBalance = Math.max(0, u.outstandingBalance - totalIncorrectCancellationPenalty);
-    }
   });
 
   // Ensure seed users are always present in the database
@@ -1991,10 +2007,7 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
     // 2. Adjust outstanding balance if penalties or late charges are saved
     if (updates.penaltyAmount !== undefined && updates.penaltyAmount !== originalBooking.penaltyAmount) {
       const addedPenalty = Number(updates.penaltyAmount) - (Number(originalBooking.penaltyAmount) || 0);
-      const isCancellation = (updates.status === 'cancelled' || originalBooking.status === 'cancelled');
-      if (!isCancellation) {
-        updateUserBalance(originalBooking.userId, addedPenalty);
-      }
+      updateUserBalance(originalBooking.userId, addedPenalty);
     }
 
     if (updates.status === 'active') {
@@ -2279,10 +2292,7 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
       // Adjust outstanding balance if penalties are added
       if (bookingUpdates.penaltyAmount !== undefined && bookingUpdates.penaltyAmount !== originalBooking.penaltyAmount) {
         const addedPenalty = Number(bookingUpdates.penaltyAmount) - (Number(originalBooking.penaltyAmount) || 0);
-        const isCancellation = (bookingUpdates.status === 'cancelled' || originalBooking.status === 'cancelled');
-        if (!isCancellation) {
-          updateUserBalance(originalBooking.userId, addedPenalty);
-        }
+        updateUserBalance(originalBooking.userId, addedPenalty);
       }
 
       dbData.bookings[bIndex] = { ...originalBooking, ...bookingUpdates };
@@ -2815,6 +2825,8 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
         booking.remainingPaymentStatus = 'paid';
         booking.remainingAmount = 0;
       }
+    } else if (sourceType === 'misc') {
+      actualAmount = Number(amount);
     }
 
     // Deduct from outstanding balance

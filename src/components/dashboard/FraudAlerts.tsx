@@ -36,7 +36,7 @@ interface FraudAlert {
 }
 
 const FraudAlerts: React.FC = () => {
-  const { allBookings, allUsers, vehicles, toggleUserBlacklist, showToast } = useStore();
+  const { allBookings, allUsers, vehicles, eChallans, toggleUserBlacklist, showToast } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'pending' | 'resolved' | 'blocked'>('pending');
   const [expandedAlertId, setExpandedAlertId] = useState<string | null>(null);
@@ -133,9 +133,19 @@ const FraudAlerts: React.FC = () => {
 
     // 4. Scan for Outstanding Debt Liability & Active Reservation (High Severity)
     allUsers.forEach((usr, idx) => {
-      if (usr.outstandingBalance && usr.outstandingBalance > 15000) {
-        const activeOrPendingBookings = allBookings.filter(b => b.userId === usr.id && (b.status === 'pending' || b.status === 'active'));
-        if (activeOrPendingBookings.length > 0) {
+      const baseOutstanding = usr.outstandingBalance || 0;
+      const activeOrPendingBookings = allBookings.filter(b => b.userId === usr.id && (b.status === 'pending' || b.status === 'active'));
+      
+      if (activeOrPendingBookings.length > 0 && baseOutstanding > 15000) {
+        // Find newest active/pending reservation remaining amount and subtract it, so we exclude the current active/pending reservation remaining payment
+        const sortedActiveOrPending = [...activeOrPendingBookings].sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
+        const newestBookingRemaining = sortedActiveOrPending.length > 0 && sortedActiveOrPending[0].paymentType === 'partial' && sortedActiveOrPending[0].remainingPaymentStatus === 'pending'
+          ? (sortedActiveOrPending[0].remainingAmount || 0)
+          : 0;
+
+        const actualDebt = Math.max(0, baseOutstanding - newestBookingRemaining);
+
+        if (actualDebt > 15000) {
           alertsList.push({
             id: `frd-debt-${usr.id.slice(-4)}`,
             userId: usr.id,
@@ -143,10 +153,10 @@ const FraudAlerts: React.FC = () => {
             userEmail: usr.email,
             type: 'Financial Outstanding Debt Liability',
             severity: 'high',
-            message: ` Renter has unpaid penalties/outstanding balance of PKR ${usr.outstandingBalance.toLocaleString()} but placed a new reservation. Payment risk flag.`,
+            message: ` Renter has unpaid penalties/outstanding balance of PKR ${actualDebt.toLocaleString()} but placed a new reservation. Payment risk flag.`,
             status: usr.isBlacklisted ? 'blocked' : (clearedAlertIds.includes(`frd-debt-${usr.id.slice(-4)}`) ? 'resolved' : 'pending'),
             createdAt: getAlertTime(idx * 4 + 4),
-            bookingAmount: activeOrPendingBookings[0].totalPrice,
+            bookingAmount: sortedActiveOrPending[0].totalPrice,
             threatType: 'debt'
           });
         }
@@ -218,7 +228,7 @@ const FraudAlerts: React.FC = () => {
     }
 
     return alertsList;
-  }, [allBookings, allUsers, vehicles, clearedAlertIds]);
+  }, [allBookings, allUsers, vehicles, eChallans, clearedAlertIds]);
 
   // Filter alerts based on search query and status tab
   const filteredAlerts = useMemo(() => {

@@ -102,12 +102,21 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       }
     });
 
-    // 4. Outstanding Debt Liability & Active Reservation
+    // 4. Outstanding Debt Liability & Active Reservation (Exclude remaining payment of the current/newest partial reservation)
     allUsers.forEach(usr => {
-      if (usr.outstandingBalance && usr.outstandingBalance > 15000 && !usr.isBlacklisted) {
+      const baseOutstanding = usr.outstandingBalance || 0;
+      if (baseOutstanding > 15000 && !usr.isBlacklisted) {
         const activeOrPendingBookings = allBookings.filter(b => b.userId === usr.id && (b.status === 'pending' || b.status === 'active'));
         if (activeOrPendingBookings.length > 0) {
-          count++;
+          const sortedActiveOrPending = [...activeOrPendingBookings].sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
+          const newestBookingRemaining = sortedActiveOrPending.length > 0 && sortedActiveOrPending[0].paymentType === 'partial' && sortedActiveOrPending[0].remainingPaymentStatus === 'pending'
+            ? (sortedActiveOrPending[0].remainingAmount || 0)
+            : 0;
+
+          const actualDebt = Math.max(0, baseOutstanding - newestBookingRemaining);
+          if (actualDebt > 15000) {
+            count++;
+          }
         }
       }
     });

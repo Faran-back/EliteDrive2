@@ -120,9 +120,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Fetch vehicles and user profile in parallel to eliminate waterfall
       const [vData, uData] = await Promise.all([
         apiFetch('/api/vehicles').catch(() => []),
-        token ? apiFetch('/api/auth/me').catch(() => {
-          localStorage.removeItem('elitedrive_token');
-          setUser(null);
+        token ? apiFetch('/api/auth/me').catch((err) => {
+          // Only clear token if it's an explicit authentication error (401, 403, 404)
+          const errorMsg = err?.message || '';
+          const isAuthError = errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('404') || errorMsg.includes('Unauthorized') || errorMsg.includes('Forbidden');
+          if (isAuthError) {
+            localStorage.removeItem('elitedrive_token');
+            setUser(null);
+          }
           return null;
         }) : Promise.resolve(null)
       ]);
@@ -183,11 +188,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               });
 
               if (deliveryMode === 'browser') {
-                const browserNotification = new window.Notification(n.title, {
-                  body: n.message,
-                  icon: '/favicon.ico'
-                });
-                window.setTimeout(() => browserNotification.close(), 5000);
+                try {
+                  const browserNotification = new window.Notification(n.title, {
+                    body: n.message,
+                    icon: '/favicon.ico'
+                  });
+                  window.setTimeout(() => browserNotification.close(), 5000);
+                } catch (notifErr) {
+                  console.warn('Failed to display browser notification:', notifErr);
+                }
               }
             });
           }
@@ -267,11 +276,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             });
 
             if (deliveryMode === 'browser') {
-              const browserNotification = new window.Notification(newNotif.title, {
-                body: newNotif.message,
-                icon: '/favicon.ico'
-              });
-              window.setTimeout(() => browserNotification.close(), 5000);
+              try {
+                const browserNotification = new window.Notification(newNotif.title, {
+                  body: newNotif.message,
+                  icon: '/favicon.ico'
+                });
+                window.setTimeout(() => browserNotification.close(), 5000);
+              } catch (notifErr) {
+                console.warn('Failed to display browser notification over websocket:', notifErr);
+              }
             }
 
             // Play elegant sound chime using the Web Audio API

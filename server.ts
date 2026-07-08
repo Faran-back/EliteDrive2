@@ -376,21 +376,21 @@ function hashPassword(password: string): string {
 }
 
 function getEffectiveOutstandingBalance(user: any): number {
-  if (!user) return 0;
-  const baseBalance = user.outstandingBalance || 0;
+  if (!user || !user.id) return 0;
+  const baseBalance = Number(user.outstandingBalance || 0);
   
   // Find all bookings that have pending remaining payments
   const unpaidBookings = (dbData.bookings || []).filter(
-    b => b.userId === user.id && 
-         !['cancelled'].includes(b.status)
+    b => b && b.userId === user.id && b.status && !['cancelled'].includes(b.status)
   );
   
   const pendingBookingBalance = unpaidBookings.reduce((sum, b) => {
+    if (!b) return sum;
     let amt = 0;
     // Only add pending partial payments. 
     // penaltyAmount should ALREADY be in baseBalance (user.outstandingBalance)
-    if (b.paymentType === 'partial' && b.remainingPaymentStatus === 'pending' && !['pending', 'approved'].includes(b.status)) {
-      amt += (b.remainingAmount || 0);
+    if (b.paymentType === 'partial' && b.remainingPaymentStatus === 'pending' && b.status && !['pending', 'approved'].includes(b.status)) {
+      amt += Number(b.remainingAmount || 0);
     }
     return sum + amt;
   }, 0);

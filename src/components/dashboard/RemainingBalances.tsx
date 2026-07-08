@@ -10,20 +10,21 @@ import {
   Car,
   Clock,
   ArrowRight,
-  CheckCircle
+  CheckCircle,
+  Eye,
+  XCircle,
+  AlertOctagon,
+  X
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 const RemainingBalances: React.FC = () => {
   const { allUsers, allBookings, eChallans, vehicles, showToast, refreshData } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [waiverReasons, setWaiverReasons] = useState<Record<string, string>>({});
   const [isWaiving, setIsWaiving] = useState<Record<string, boolean>>({});
-
-  const [selectedPenalty, setSelectedPenalty] = useState<any>(null);
-  const [waiverReason, setWaiverReason] = useState('');
-  const [isWaivingIndividual, setIsWaivingIndividual] = useState(false);
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
   const handleWaiveBalance = async (customerId: string) => {
     const reason = waiverReasons[customerId] || '';
@@ -53,41 +54,6 @@ const RemainingBalances: React.FC = () => {
       showToast(err.message || 'Error releasing penalties', 'error');
     } finally {
       setIsWaiving(prev => ({ ...prev, [customerId]: false }));
-    }
-  };
-
-    
-  const handleWaiveIndividual = async () => {
-    if (!selectedPenalty || !waiverReason.trim()) {
-      showToast('Please enter a valid reason for waiving this penalty.', 'error');
-      return;
-    }
-
-    setIsWaivingIndividual(true);
-    try {
-      const token = localStorage.getItem('elitedrive_token');
-      const res = await fetch(`/api/penalties/${selectedPenalty.id}/waive`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ 
-          reason: waiverReason,
-          penaltyType: selectedPenalty.type 
-        })
-      });
-
-      if (!res.ok) throw new Error('Failed to waive penalty');
-
-      showToast('Penalty waived successfully and removed from balance!', 'success');
-      setSelectedPenalty(null);
-      setWaiverReason('');
-      await refreshData();
-    } catch (err: any) {
-      showToast(err.message || 'Error waiving penalty', 'error');
-    } finally {
-      setIsWaivingIndividual(false);
     }
   };
 
@@ -131,6 +97,72 @@ const RemainingBalances: React.FC = () => {
       await fetchBalancePayments();
     } catch (err: any) {
       showToast(err.message || 'Error approving payment', 'error');
+    }
+  };
+
+  const handleRejectPayment = async (paymentId: string) => {
+    const reason = window.prompt('Enter rejection reason:');
+    if (reason === null) return;
+    
+    try {
+      const token = localStorage.getItem('elitedrive_token');
+      const res = await fetch(`/api/balance-payments/${paymentId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ reason })
+      });
+      if (!res.ok) throw new Error('Failed to reject payment');
+      showToast('Penalty payment rejected.', 'info');
+      await fetchBalancePayments();
+    } catch (err: any) {
+      showToast(err.message || 'Error rejecting payment', 'error');
+    }
+  };
+
+  const handleReviewPayment = async (paymentId: string) => {
+    const notes = window.prompt('Enter internal review notes:');
+    if (notes === null) return;
+
+    try {
+      const token = localStorage.getItem('elitedrive_token');
+      const res = await fetch(`/api/balance-payments/${paymentId}/review`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ notes })
+      });
+      if (!res.ok) throw new Error('Failed to set to review');
+      showToast('Payment set to Under Review status.', 'info');
+      await fetchBalancePayments();
+    } catch (err: any) {
+      showToast(err.message || 'Error updating review status', 'error');
+    }
+  };
+
+  const handleWaiveIndividualPenalty = async (userId: string, sourceId: string, sourceType: string, amount: number, title: string) => {
+    const reason = window.prompt(`Enter reason for waiving "${title}":`);
+    if (!reason) return;
+
+    try {
+      const token = localStorage.getItem('elitedrive_token');
+      const res = await fetch(`/api/users/${userId}/waive-penalty`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ sourceId, sourceType, reason, amount })
+      });
+      if (!res.ok) throw new Error('Failed to waive individual penalty');
+      showToast(`Penalty "${title}" waived successfully!`, 'success');
+      await refreshData();
+    } catch (err: any) {
+      showToast(err.message || 'Error waiving penalty', 'error');
     }
   };
 
@@ -279,16 +311,18 @@ const RemainingBalances: React.FC = () => {
   });
 
   const getCustomerReasons = (customerId: string, outstandingBalance: number) => {
-    const reasons: { title: string; amount: number; date?: string; icon: any }[] = [];
+    const reasons: { title: string; amount: number; date?: string; icon: any; sourceId?: string; sourceType?: string }[] = [];
     
     // 1. Get matched e-challans
-    const matchedChallans = eChallans.filter(c => c.matchedUserId === customerId);
+    const matchedChallans = eChallans.filter(c => c.matchedUserId === customerId && c.status !== 'resolved');
     matchedChallans.forEach(c => {
       reasons.push({
         title: `Traffic E-Challan #${c.challanNumber}`,
         amount: c.amount,
         date: c.date || c.createdAt,
-        icon: Scale
+        icon: Scale,
+        sourceId: c.id,
+        sourceType: 'echallan'
       });
     });
 
@@ -300,7 +334,9 @@ const RemainingBalances: React.FC = () => {
         title: `Late Return / Damage Penalty (${v?.name || 'Vehicle'} - ID: ${b.id.slice(0, 8).toUpperCase()})`,
         amount: b.penaltyAmount || 0,
         date: b.endDate,
-        icon: Car
+        icon: Car,
+        sourceId: b.id,
+        sourceType: 'booking_penalty'
       });
     });
 
@@ -317,7 +353,9 @@ const RemainingBalances: React.FC = () => {
         title: `Pending 50% Remaining Payment (${v?.name || 'Vehicle'} - ID: ${b.id.slice(0, 8).toUpperCase()})`,
         amount: b.remainingAmount || (b.totalPrice * 0.5),
         date: b.startDate,
-        icon: Wallet
+        icon: Wallet,
+        sourceId: b.id,
+        sourceType: 'remaining_payment'
       });
     });
 
@@ -362,34 +400,14 @@ const RemainingBalances: React.FC = () => {
       </div>
 
       {/* Pending Penalty Payments Section */}
-      {balancePayments.some(p => p.status === 'pending') && (
+      {(balancePayments.some(p => p.status === 'pending' || p.status === 'under_review')) && (
         <div className="bg-amber-50/50 border-2 border-dashed border-amber-200 rounded-3xl p-6 space-y-4 animate-in fade-in duration-500">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-ping" />
-            <h3 className="font-extrabold text-amber-900 text-xs uppercase tracking-wider">Awaiting Penalty Payment Verification ({balancePayments.filter(p => p.status === 'pending').length})</h3>
+            <h3 className="font-extrabold text-amber-900 text-xs uppercase tracking-wider">Awaiting Penalty Payment Verification ({balancePayments.filter(p => p.status === 'pending' || p.status === 'under_review').length})</h3>
           </div>
-          {pay.receiptUrl && (
-            <div className="mt-3">
-              <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">
-                Payment Receipt
-              </p>
-
-              <a
-                href={pay.receiptUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block"
-              >
-                <img
-                  src={pay.receiptUrl}
-                  alt="Payment Receipt"
-                  className="w-full max-h-48 object-contain rounded-xl border border-slate-200 bg-white hover:opacity-80 transition"
-                />
-              </a>
-            </div>
-          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {balancePayments.filter(p => p.status === 'pending').map((pay) => (
+            {balancePayments.filter(p => p.status === 'pending' || p.status === 'under_review').map((pay) => (
               <div key={pay.id} className="bg-white border border-amber-200/60 rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:border-amber-400 transition-colors">
                 <div className="space-y-3">
                   <div className="flex justify-between items-start">
@@ -397,37 +415,68 @@ const RemainingBalances: React.FC = () => {
                       <h4 className="font-extrabold text-slate-900 text-xs">{pay.userName}</h4>
                       <p className="text-[10px] text-slate-400 font-medium">{pay.userEmail}</p>
                     </div>
-                    <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 uppercase tracking-wider">
-                      Pending Approval
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded border uppercase tracking-wider ${
+                      pay.status === 'under_review' ? 'text-blue-600 bg-blue-50 border-blue-100' : 'text-amber-600 bg-amber-50 border-amber-100'
+                    }`}>
+                      {pay.status === 'under_review' ? 'Under Review' : 'Pending Approval'}
                     </span>
                   </div>
 
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-                    <div className="flex justify-between text-[11px] font-bold">
-                      <span className="text-slate-500">Target Penalty:</span>
-                      <span className="text-slate-800">{pay.penaltyTitle}</span>
+                  <div className="flex gap-4">
+                    <div className="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+                      <div className="flex justify-between text-[11px] font-bold">
+                        <span className="text-slate-500">Target Penalty:</span>
+                        <span className="text-slate-800">{pay.penaltyTitle}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px] font-bold">
+                        <span className="text-slate-500">Amount Deposited:</span>
+                        <span className="text-amber-600 font-extrabold">PKR {pay.amount.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-[10px] font-medium font-mono">
+                        <span className="text-slate-400">Sender Bank:</span>
+                        <span className="text-slate-600">{pay.senderBank}</span>
+                      </div>
+                      <div className="flex justify-between text-[10px] font-medium font-mono">
+                        <span className="text-slate-400">TID Reference:</span>
+                        <span className="text-slate-600 uppercase font-bold">{pay.transactionRef}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-[11px] font-bold">
-                      <span className="text-slate-500">Amount Deposited:</span>
-                      <span className="text-amber-600 font-extrabold">PKR {pay.amount.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-[10px] font-medium font-mono">
-                      <span className="text-slate-400">Sender Bank:</span>
-                      <span className="text-slate-600">{pay.senderBank}</span>
-                    </div>
-                    <div className="flex justify-between text-[10px] font-medium font-mono">
-                      <span className="text-slate-400">TID Reference:</span>
-                      <span className="text-slate-600 uppercase font-bold">{pay.transactionRef}</span>
-                    </div>
+
+                    {pay.receiptImage && (
+                      <div 
+                        className="w-24 h-24 rounded-xl border border-slate-200 overflow-hidden relative group cursor-pointer"
+                        onClick={() => setViewingReceipt(pay.receiptImage)}
+                      >
+                        <img src={pay.receiptImage} alt="Receipt" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Eye size={16} className="text-white" />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     onClick={() => handleApprovePayment(pay.id)}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2 rounded-xl text-[10px] uppercase tracking-wider transition-colors"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2 rounded-xl text-[10px] uppercase tracking-wider transition-colors inline-flex items-center justify-center gap-1.5"
                   >
-                    Approve Payment
+                    <CheckCircle size={14} />
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => handleReviewPayment(pay.id)}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-2 rounded-xl text-[10px] uppercase tracking-wider transition-colors inline-flex items-center justify-center gap-1.5"
+                  >
+                    <AlertOctagon size={14} />
+                    Review
+                  </button>
+                  <button
+                    onClick={() => handleRejectPayment(pay.id)}
+                    className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-black py-2 rounded-xl text-[10px] uppercase tracking-wider transition-colors inline-flex items-center justify-center gap-1.5"
+                  >
+                    <XCircle size={14} />
+                    Reject
                   </button>
                 </div>
               </div>
@@ -473,20 +522,13 @@ const RemainingBalances: React.FC = () => {
                     </div>
                   </div>
 
-                                   <div className="space-y-2.5">
+                  <div className="space-y-2.5">
                     <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Penalties & Charge Details</span>
                     <div className="grid grid-cols-1 gap-2">
                       {reasons.map((reason, index) => {
                         const IconComponent = reason.icon;
-                        const isSelected = selectedPenalty?.id === reason.id;
-
                         return (
-                          <motion.div
-                            key={index}
-                            onClick={() => setSelectedPenalty(reason)}
-                            className={`penalty-item flex items-start justify-between p-3 bg-slate-50 border rounded-xl text-xs cursor-pointer transition-all hover:bg-blue-50 ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-slate-100'}`}
-                            whileHover={{ x: 4 }}
-                          >
+                          <div key={index} className="flex items-start justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs">
                             <div className="flex items-start gap-2.5">
                               <div className="p-1.5 bg-white border border-slate-100 text-slate-500 rounded-md mt-0.5">
                                 <IconComponent size={14} />
@@ -500,13 +542,21 @@ const RemainingBalances: React.FC = () => {
                                 )}
                               </div>
                             </div>
-                            <div className="text-right">
-                              <span className="font-extrabold text-slate-900 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-slate-900 whitespace-nowrap ml-4">
                                 PKR {reason.amount.toLocaleString()}
                               </span>
-                              <p className="text-[9px] text-blue-600 font-medium mt-0.5">Click to select &amp; waive</p>
+                              {(reason.sourceId && reason.sourceType) && (
+                                <button
+                                  onClick={() => handleWaiveIndividualPenalty(customer.id, reason.sourceId!, reason.sourceType!, reason.amount, reason.title)}
+                                  className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
+                                  title="Waive individual penalty"
+                                >
+                                  <XCircle size={14} />
+                                </button>
+                              )}
                             </div>
-                          </motion.div>
+                          </div>
                         );
                       })}
                     </div>
@@ -795,6 +845,36 @@ const RemainingBalances: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* Receipt Preview Modal */}
+      <AnimatePresence>
+        {viewingReceipt && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="relative max-w-2xl w-full bg-white rounded-3xl overflow-hidden shadow-2xl"
+            >
+              <button 
+                onClick={() => setViewingReceipt(null)}
+                className="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-10"
+              >
+                <X size={20} />
+              </button>
+              <img src={viewingReceipt} alt="Receipt Full" className="w-full h-auto max-h-[80vh] object-contain" />
+              <div className="p-6 bg-white border-t border-slate-100">
+                <h3 className="font-black text-slate-900 text-sm uppercase">Payment Receipt Proof</h3>
+                <p className="text-[11px] text-slate-400 font-medium">Verify transaction ID and account details before approving.</p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

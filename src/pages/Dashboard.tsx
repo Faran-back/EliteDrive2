@@ -102,6 +102,8 @@ const Dashboard: React.FC = () => {
       return;
     }
 
+    const selectedReason = myReasons.find(r => r.title === payPenaltyType);
+
     setIsSubmittingPay(true);
     try {
       const token = localStorage.getItem('elitedrive_token');
@@ -116,7 +118,9 @@ const Dashboard: React.FC = () => {
           amount: amountNum,
           senderBank: paySenderBank,
           transactionRef: payTid,
-          receiptImage: payReceiptBase64
+          receiptImage: payReceiptBase64,
+          sourceId: selectedReason?.sourceId,
+          sourceType: selectedReason?.sourceType
         })
       });
 
@@ -248,16 +252,18 @@ const Dashboard: React.FC = () => {
 
   const myReasons = useMemo(() => {
     if (!user) return [];
-    const reasons: { title: string; amount: number; date?: string; icon: any }[] = [];
+    const reasons: { title: string; amount: number; date?: string; icon: any; sourceId?: string; sourceType?: string }[] = [];
     
     // 1. Get matched e-challans
-    const matchedChallans = eChallans ? eChallans.filter(c => c.matchedUserId === user.id) : [];
+    const matchedChallans = eChallans ? eChallans.filter(c => c.matchedUserId === user.id && c.status !== 'resolved') : [];
     matchedChallans.forEach(c => {
       reasons.push({
         title: `Traffic E-Challan Ticket #${c.challanNumber}`,
         amount: c.amount,
         date: c.date || c.createdAt,
-        icon: Scale
+        icon: Scale,
+        sourceId: c.id,
+        sourceType: 'echallan'
       });
     });
 
@@ -265,14 +271,13 @@ const Dashboard: React.FC = () => {
     const matchedBookings = allBookings.filter(b => b.userId === user.id && (b.penaltyAmount || 0) > 0);
     matchedBookings.forEach(b => {
       const v = vehicles.find(veh => veh.id === b.vehicleId);
-      const isCancelled = b.status === 'cancelled';
       reasons.push({
-        title: isCancelled
-          ? `Booking Cancellation Penalty (${v?.name || 'Vehicle'} - ID: ${b.id.slice(0, 8).toUpperCase()})`
-          : `Late Return / Surcharge Penalty (${v?.name || 'Vehicle'} - ID: ${b.id.slice(0, 8).toUpperCase()})`,
+        title: `Late Return / Surcharge Penalty (${v?.name || 'Vehicle'} - ID: ${b.id.slice(0, 8).toUpperCase()})`,
         amount: b.penaltyAmount || 0,
-        date: isCancelled ? (b.createdAt || b.startDate) : b.endDate,
-        icon: isCancelled ? Info : Car
+        date: b.endDate,
+        icon: Car,
+        sourceId: b.id,
+        sourceType: 'booking_penalty'
       });
     });
 
@@ -289,7 +294,9 @@ const Dashboard: React.FC = () => {
         title: `Pending 50% Remaining Payment (${v?.name || 'Vehicle'} - ID: ${b.id.slice(0, 8).toUpperCase()})`,
         amount: b.remainingAmount || (b.totalPrice * 0.5),
         date: b.startDate,
-        icon: Wallet
+        icon: Wallet,
+        sourceId: b.id,
+        sourceType: 'remaining_payment'
       });
     });
 
@@ -300,7 +307,8 @@ const Dashboard: React.FC = () => {
       reasons.push({
         title: 'Account Balance Surcharge / Miscellaneous Adjustment',
         amount: outstandingBalance - sumPenalties,
-        icon: Wallet
+        icon: Wallet,
+        sourceType: 'misc'
       });
     }
 
@@ -476,23 +484,22 @@ const Dashboard: React.FC = () => {
               {/* Left Side: Select Penalty, Amount, Bank and Reference ID */}
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">1. Select Penalty Type</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">1. Select Penalty Item to Settle</label>
                   <select
                     value={payPenaltyType}
                     onChange={(e) => {
                       setPayPenaltyType(e.target.value);
-                      const matched = myReasons.find(r => r.title.toLowerCase().includes(e.target.value.toLowerCase().split(' ')[0]));
+                      const matched = myReasons.find(r => r.title === e.target.value);
                       if (matched) {
                         setPayAmount(String(matched.amount));
                       }
                     }}
                     className="w-full h-12 px-4 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-extrabold text-xs transition-all"
                   >
-                    <option value="Late return penalty">Late return penalty</option>
-                    <option value="E-challan payment">E-challan payment</option>
-                    <option value="Traffic violation fine">Traffic violation fine</option>
-                    <option value="Accident surcharge">Accident surcharge</option>
-                    <option value="Theft fine">Theft fine</option>
+                    <option value="">-- Choose a Penalty Item --</option>
+                    {myReasons.map((r, i) => (
+                      <option key={i} value={r.title}>{r.title} (PKR {r.amount.toLocaleString()})</option>
+                    ))}
                     <option value="Miscellaneous penalty">Something else / Miscellaneous penalty</option>
                   </select>
                 </div>

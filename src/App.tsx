@@ -34,7 +34,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: strin
   }
 
   if (!user) {
-    return <Navigate to="/auth" />;
+    const currentQuery = typeof window !== 'undefined' ? window.location.search : '';
+    return <Navigate to={`/auth${currentQuery}`} />;
   }
 
   if (user.isBlacklisted || (user as any).isBlackListed) {

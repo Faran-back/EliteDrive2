@@ -42,6 +42,18 @@ const Auth: React.FC = () => {
     }
   }, [location.pathname, location.search]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const ev = params.get('email_verified');
+    if (ev === '1') {
+      showToast('Email verified successfully! You can now sign in.', 'success');
+      navigate(location.pathname, { replace: true });
+    } else if (ev === '0') {
+      showToast('Email verification link is invalid or has expired.', 'error');
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.search, navigate, showToast, location.pathname]);
+
   const {
     register: registerLogin,
     handleSubmit: handleSubmitLogin,

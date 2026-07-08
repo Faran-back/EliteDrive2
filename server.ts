@@ -244,6 +244,35 @@ function getEmailTemplate(title: string, contentHtml: string) {
   `;
 }
 
+let lastObservedAppUrl = '';
+
+function getAppUrl(req?: any): string {
+  if (
+    process.env.APP_URL &&
+    process.env.APP_URL !== 'MY_APP_URL' &&
+    !process.env.APP_URL.includes('MY_APP_URL') &&
+    !process.env.APP_URL.includes('localhost')
+  ) {
+    return process.env.APP_URL;
+  }
+
+  if (req) {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.get('host');
+    if (host) {
+      const detected = `${protocol}://${host}`;
+      lastObservedAppUrl = detected;
+      return detected;
+    }
+  }
+
+  if (lastObservedAppUrl) {
+    return lastObservedAppUrl;
+  }
+
+  return process.env.APP_URL || 'http://localhost:3000';
+}
+
 async function sendEmail({ to, subject, html, text }: { to: string; subject: string; html: string; text: string }) {
   const emailId = `eml_${Math.random().toString(36).substring(2, 11)}`;
   const sentEmailObj = {
@@ -793,6 +822,15 @@ async function startServer() {
 
   app.use(express.json({ limit: '50mb' }));
 
+  app.use((req, res, next) => {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.get('host');
+    if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+      lastObservedAppUrl = `${protocol}://${host}`;
+    }
+    next();
+  });
+
   // --- API ROUTING ENDPOINTS ---
 
   // AUTH API
@@ -930,7 +968,7 @@ async function startServer() {
     dbData.transientVerificationCodes[token] = email.toLowerCase();
     saveDatabase();
 
-    const confirmUrlBase = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const confirmUrlBase = getAppUrl(req);
     const confirmUrl = `${confirmUrlBase}/api/auth/confirm-email?token=${token}`;
 
     const emailHtml = getEmailTemplate(
@@ -974,7 +1012,7 @@ async function startServer() {
     const email = mapping[token];
     if (!email) {
       // Token not found or expired
-      const redirectTo = (process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`) + '/profile?email_verified=0';
+      const redirectTo = getAppUrl(req) + '/profile?email_verified=0';
       return res.redirect(redirectTo);
     }
 
@@ -992,7 +1030,7 @@ async function startServer() {
     saveDatabase();
 
     // Redirect back to profile with success flag
-    const redirectTo = (process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`) + '/profile?email_verified=1';
+    const redirectTo = getAppUrl(req) + '/profile?email_verified=1';
     return res.redirect(redirectTo);
   });
 

@@ -1819,6 +1819,42 @@ CRITICAL RULE: "recommendedVehicleIds" and "vehicleId" MUST be exact IDs from th
         command: '/system-backup',
         title: '💾 Telemetry Sync & System Diagnostics',
         content: `**Operational Database Synchronization & Diagnostics**:\n\n- **Auto-Sync**: Vehicle locations, active booking timers, and payment channels are synchronized with live servers every **60 seconds**.\n- **Manual Backup**: Trigger manual backup snapshots from the Operations Control panel during system updates.\n- **Diagnostics**: If tracking is delayed, verify client websocket status in console and check internet connectivity.`
+      },
+      {
+        keywords: ['documents', 'required documents', 'requirements', 'docs to show', 'driver license', 'cnic required', 'documents list', 'document list', 'required docs'],
+        command: '/required-docs',
+        title: '🪪 Required Rental Documents',
+        content: `**Required Documents for Picking Up an EliteDrive Vehicle**:\n\nTo drive an EliteDrive vehicle, you must submit and verify the following original documents:\n\n1. **Valid Driving License**: Must be active, non-expired, and authorize the category of vehicle booked.\n2. **Original CNIC (National Identity Card)**: Must match the renter's profile name.\n3. **Active Phone Number**: For SMS, booking notifications, and live tracking verification.\n4. **Verified Guarantor (Out-of-City Only)**: Required if traveling outside the default city limits.`
+      },
+      {
+        keywords: ['extension', 'extend booking', 'booking extension', 'time increase', 'more days', 'more hours', 'extend trip'],
+        command: '/extend-booking',
+        title: '📅 Booking Extension Process',
+        content: `**Guidelines for Extending Your EliteDrive Booking**:\n\nNeed more time with your EliteDrive vehicle? Follow these guidelines to extend your booking:\n\n- **Request Period**: You must submit an extension request **at least 3 hours before your scheduled return time** through the dashboard.\n- **Unbooked Vehicles**: Extensions are only approved if the vehicle hasn't been booked by another customer immediately after your slot.\n- **Extension Fee**: Standard hourly/daily rental rates apply to the extended duration.\n- **Late Extensions**: Requesting an extension after your return window has passed triggers late return penalties (1.5x standard rates).`
+      },
+      {
+        keywords: ['return vehicle', 'return process', 'how to return', 'returning car', 'gari wapis', 'handover process', 'return instructions'],
+        command: '/return-process',
+        title: '🏁 Vehicle Return Process',
+        content: `**Standard Vehicle Return Process**:\n\nTo complete your vehicle return smoothly and get your security deposit refunded without deductions:\n\n1. **Cleanliness**: Ensure the vehicle's interior and exterior are returned in a clean and acceptable condition.\n2. **Fuel Level**: Return the vehicle with the **exact same fuel level** as noted during pickup. Refueling surcharges (PKR 500 service fee + fuel cost) apply for shortages.\n3. **Inspection**: Our representative will conduct a physical inspection of the body, interior, and engine to log any damages.\n4. **Handover Signature**: Digitally sign the return handover receipt on the representative's device to officially end your active trip.`
+      },
+      {
+        keywords: ['security deposit', 'deposit amount', 'deposit cash', 'paisa deposit', 'why deposit', 'refund deposit', 'deposit details'],
+        command: '/security-deposit',
+        title: '💰 Security Deposit Details',
+        content: `**EliteDrive Security Deposit Policy**:\n\nEliteDrive Security Deposit policy safeguards our premium fleet:\n\n- **Deposit Amount**: A standard, fully-refundable deposit of **PKR 10,000** is required prior to vehicle pickup.\n- **Payment Channels**: Pay instantly using approved payment methods (Easypaisa, JazzCash, Nayapay, or credit/debit card).\n- **Automatic Refund**: Automatically processed and returned to your original payment channel **within 48 hours** after successful, damage-free vehicle handover.\n- **Deductions**: Pending traffic challans (e-challans), fuel shortages, or late return surcharges are adjusted from this deposit.`
+      },
+      {
+        keywords: ['damage reporting', 'damage report', 'report damage', 'scratches', 'dent', 'accident report', 'incident reporting', 'vehicle damage reporting'],
+        command: '/damage-reporting',
+        title: '🔧 Vehicle Damage & Incident Reporting',
+        content: `**Protocol for Reporting Vehicle Damage & Incidents**:\n\nIf the vehicle sustains any physical or mechanical damage during your trip, follow this protocol immediately:\n\n1. **Report Window**: You **must report all incidents within 6 hours** via the dashboard under the "Report Incident" tab.\n2. **Required Proof**: Upload high-quality photos/videos of the vehicle damage, surrounding area, and third-party details.\n3. **Police FIR**: Major collisions or hit-and-runs require a formal police FIR copy for insurance verification.\n4. **Insurance Notice**: Late reports (past 6 hours) or driving without a verified license automatically void insurance coverages, leaving the renter fully liable for 100% of the repair costs.`
+      },
+      {
+        keywords: ['pickup', 'pickup instructions', 'car pickup', 'gari pickup', 'how to collect', 'pickup guidelines', 'collecting car'],
+        command: '/pickup-instructions',
+        title: '🔑 Vehicle Pickup Guidelines',
+        content: `**Guidelines for Picking Up Your EliteDrive Vehicle**:\n\nWhen arriving to pick up your EliteDrive vehicle, keep these crucial guidelines in mind:\n\n1. **Arrive On Time**: Standard pick-up windows are active for 3 hours from booking start. No-shows are cancelled automatically.\n2. **Document Check**: Bring your original, non-expired CNIC and physical Driving License for manual inspection.\n3. **Inspect the Vehicle**: Walk around the car with our representative. Ensure all pre-existing dents, scratches, and fuel levels are documented in the digital checklist.\n4. **Confirm Features**: Check that the spare tire, tools, and medical first-aid kit are present in the trunk/glove compartment before starting your trip.`
       }
     ];
 

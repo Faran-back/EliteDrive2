@@ -1711,6 +1711,114 @@ CRITICAL RULE: "recommendedVehicleIds" and "vehicleId" MUST be exact IDs from th
         command: '/vip',
         title: '⭐ VIP Chauffeur-Driven Services',
         content: `**VIP Chauffeur & Driver Options**:\n\n- **Availability**: Professional drivers are available for premium vehicles (Civic, Corolla, Fortuner).\n- **Daily Surcharge**: A professional EliteDrive chauffeur is provided at an additional rate of PKR 3,000 per day.\n- **Inclusions**: Driver meals and lodging are managed entirely by EliteDrive.`
+      },
+      {
+        keywords: ['approve kyc', 'verify kyc', 'approve user', 'document approve', 'kyc ok', 'kyc confirmation', 'pass kyc', 'kyc pas'],
+        command: '/approve-kyc',
+        title: '🪪 KYC Approval Procedure',
+        content: `**Procedure to Approve KYC Documents**:\n\n1. **Inspect Photos**: Go to **User Management** and click on the user pending KYC. Confirm CNIC and Driver License photos are clear, high-resolution, and unedited.\n2. **Verify Details**: Ensure names and document numbers match exactly with profile data.\n3. **Set Status**: Click **Verify Account** button. This instantly unlocks booking privileges for the customer and logs verification timestamp.`
+      },
+      {
+        keywords: ['reject kyc', 'fail kyc', 'decline user', 'reject document', 'kyc reject', 'kyc cancel'],
+        command: '/reject-kyc',
+        title: '🚫 KYC Rejection & Correction Guidelines',
+        content: `**Rejection Guidelines for KYC**:\n\n1. **Identify Cause**: Ensure clear reason (e.g. 'unreadable photo', 'expired license', 'forged watermarks').\n2. **Decline Action**: In **User Management**, click **Reject Verification**.\n3. **Provide Notes**: Input specific notes explaining what correction is needed (e.g., 'Please re-upload a clear selfie with your CNIC'). The user will receive these correction notes instantly in their account.`
+      },
+      {
+        keywords: ['dispute review', 'disputes', 'resolve dispute', 'dispute guide', 'client dispute', 'review dispute'],
+        command: '/dispute-review',
+        title: '⚖️ Dispute Resolution Guide',
+        content: `**How to Resolve Customer Disputes**:\n\n1. **Review Claims**: Go to **Support Center > Client Disputes**.\n2. **Examine Booking Details**: Check rental dates, damages, e-challans, and fuel logs associated with the disputed booking.\n3. **Consult Customer Statement**: Read customer comments and review any uploaded evidence.\n4. **Set Status**: Click **Approve Dispute** (which triggers refunds/adjustments) or **Reject Dispute** (if policy was followed). Enter resolution summary notes for transparency.`
+      },
+      {
+        keywords: ['incident payout', 'insurance claim', 'damage cost', 'payout guide', 'repair payout', 'payout claim'],
+        command: '/incident-payout',
+        title: '💥 Incident Payouts & Claims Process',
+        content: `**Processing Incident Damage Claims & Insurance Payouts**:\n\n1. **Check Reports**: Review the case file in **Incident Logs** under **Support Center**.\n2. **Verify Timeframe**: Confirm if the incident was reported **within the 6-hour policy window**.\n3. **Examine FIR & Photos**: Ensure valid FIR copy and high-res photos are uploaded.\n4. **Initiate Claim**: Select status **Approved** or **Under Investigation**, and click 'Apply Charge/Waive' to allocate costs to the insurance gateway or customer deductible (PKR 5,000 for premium coverage, 50% for basic).`
+      },
+      {
+        keywords: ['blacklist', 'block user', 'suspend user', 'ban user', 'block renter', 'blacklist renter'],
+        command: '/blacklist-user',
+        title: '🚫 Blacklisting High-Risk Users',
+        content: `**Renter Suspension and Blacklisting Protocol**:\n\n- **When to Blacklist**: Perform immediate blacklisting for fraud, unapproved out-of-city travel, repeat vehicle damage, or refusal to settle e-challans/rents.\n- **Action**: In **User Management**, locate user and toggle the **Blacklisted** checkbox status.\n- **Consequence**: This instantly disables active booking sessions, locks their wallet balance, and prevents placing any future booking requests across the platform.`
+      },
+      {
+        keywords: ['unban', 'unblacklist', 'unlock user', 'unblock user', 'restore user'],
+        command: '/unban-user',
+        title: '✅ Reinstating Suspended Accounts',
+        content: `**Account Reinstatement Procedure**:\n\n1. **Review Compliance**: Ensure all pending payments, fines, and damage liabilities are settled by the renter.\n2. **Conduct Audit**: Verify that guarantor records are updated if traveling out of city was the root cause.\n3. **Remove Suspension**: Toggle off the **Blacklisted** status in **User Management** dashboard. Log the operational reason in administrative notes.`
+      },
+      {
+        keywords: ['issue refund', 'refund deposit', 'manual refund', 'refund process', 'refund security'],
+        command: '/issue-refund',
+        title: '💸 Processing Security Deposit Refunds',
+        content: `**Manually Refunding Security Deposits**:\n\n- **Automatic Trigger**: Standard security deposits (PKR 10,000) are auto-refunded within **48 hours** post-handover if no violations exist.\n- **Manual Release**: If flagged, review the booking log. If e-challans and fuel shortages are settled, click **Refund Deposit** on the booking details page.\n- **Wallet Credit**: The amount is credited back to their primary mobile wallet/bank channel.`
+      },
+      {
+        keywords: ['fuel shortage', 'fuel charge', 'calculate fuel', 'petrol charge', 'shortage charge'],
+        command: '/fuel-shortage',
+        title: '⛽ Calculating Fuel Shortage Surcharges',
+        content: `**Standard Fuel Shortage Billing Policy**:\n\n- **Verification**: Cross-examine handover and return fuel level percentages recorded in the vehicle inspection card.\n- **Calculation**: Charge shortage at current PSO retail fuel price per liter.\n- **Surcharge**: Apply a flat **PKR 500 service fee** on top of the fuel difference.\n- **Add to Billing**: Apply the surcharge to the Booking Summary to deduct from the client's security deposit.`
+      },
+      {
+        keywords: ['challan process', 'e-challan process', 'traffic fine', 'upload challan', 'police fine'],
+        command: '/challan-processing',
+        title: '👮 Uploading & Processing E-Challans',
+        content: `**Traffic Violations & E-Challan Operations**:\n\n1. **Add Challan**: Go to **Support Center > E-Challans** and click **Create E-Challan**.\n2. **Input Fields**: Provide E-Challan Number, Date, Fine Amount, and select the corresponding Vehicle ID.\n3. **Auto-Allocation**: Our database automatically matches the violation timestamp to the active booking, assigning the liability to the correct driver's account.\n4. **Status Checks**: Monitor payment status (Pending / Paid). Users are notified immediately.`
+      },
+      {
+        keywords: ['late charge', 'late return fee', 'waive fee', 'delay surcharge', 'waive surcharge'],
+        command: '/late-surcharge',
+        title: '⏰ Managing Late Return Surcharges',
+        content: `**Late Return Surcharge Administration**:\n\n- **Policy**: Delays beyond 30 minutes are charged at **1.5x the hourly rate**.\n- **Discretionary Waive**: Managers may waive the late surcharge in cases of proven roadside breakdowns or medical emergencies.\n- **Execution**: Open the Booking Summary, select **Adjust Fees**, input the negative waiver amount with justification, and click save.`
+      },
+      {
+        keywords: ['incident remarks', 'add remark', 'add comment', 'cross discussion', 'staff discussion'],
+        command: '/incident-remarks',
+        title: '💬 Posting Internal & Discussion Comments',
+        content: `**Using the Remarks & Cross-Discussion Feature**:\n\n- **Internal Discussion**: In **Report Incident > Incident details** (or Support Center), use the brand-new interactive **Remarks & Cross-Discussion** form at the bottom of any incident card.\n- **Coordinating**: Both staff and renters can post real-time text comments here to coordinate, explain damage reasons, and submit updates.\n- **Filing**: Staff remarks appear with blue backgrounds and a distinct 'admin'/'manager' role label for easy identification.`
+      },
+      {
+        keywords: ['booking override', 'override', 'cancel booking', 'admin cancel', 'change vehicle'],
+        command: '/booking-override',
+        title: '🔄 Forced Booking Override Actions',
+        content: `**Administrative Booking Override Controls**:\n\n- **Force Cancellation**: Under **Bookings**, click **Cancel Booking** to override user-side locks. If cancelled due to fleet unavailability, ensure free cancellations are granted.\n- **Upgrade Vehicle**: You can re-assign a premium vehicle to an existing booking at no extra cost if their booked standard vehicle is offline due to repairs.`
+      },
+      {
+        keywords: ['gps tracking', 'track vehicle', 'lock vehicle', 'disable engine', 'remote lock'],
+        command: '/gps-tracking',
+        title: '📡 GPS Tracking & Remote Starter Locks',
+        content: `**Remote Telematics & GPS Procedures**:\n\n- **Tracking Scans**: Locate vehicles in real-time under **Active Trips** via the map telemetry nodes.\n- **Starter Immobilization**: In severe emergencies (theft, high-speed flight, missing over 3 hours past return deadline without contact), admins can click **Disable Starter** from the vehicle details drawer.\n- **Protocol**: Verify team consensus and document justification before remote locking.`
+      },
+      {
+        keywords: ['insurance claim', 'commercial claim', 'compile proof', 'claim documents'],
+        command: '/insurance-claim',
+        title: '🛡️ Compiling Commercial Insurance Claims',
+        content: `**Commercial Fleet Claims Protocol**:\n\n- **Required Bundle**: Compile high-resolution damage photos, the renter's driver license scan, copy of booking receipt, and the official police FIR.\n- **Submission**: Forward the bundle to EliteDrive Claims Department at **claims@elitedrive.pk** within **48 hours**.\n- **Deductibles**: The renter's security deposit covers the base deductible, while the insurer handles the remaining fleet repairs.`
+      },
+      {
+        keywords: ['guarantor check', 'verify guarantor', 'guarantor detail', 'out of city verify'],
+        command: '/guarantor-check',
+        title: '🔑 Out-of-City Guarantor Verification',
+        content: `**Guarantor Compliance Checks**:\n\n1. **Review Booking**: Check if booking is flagged with *'Out-of-City Route'* status.\n2. **Validate Info**: Call the listed guarantor's phone number to verify identity and relation to the renter.\n3. **Set Status**: Click **Approve Out-of-City** in booking operations. If unverified or missing, mark as **Verification Failed** to hold vehicle keys until compliance is met.`
+      },
+      {
+        keywords: ['chauffeur SOP', 'assign driver', 'driver duty', 'vip chauffeur assignment'],
+        command: '/vip-chauffeur',
+        title: '⭐ VIP Chauffeur Driver Assignments',
+        content: `**Chauffeur Assignment Operational Protocol**:\n\n- **Allocation**: Check if booking includes the *'VIP Chauffeur Service'* daily surcharge (PKR 3,000/day).\n- **Driver Match**: Dispatch an active, certified EliteDrive driver from our driver registry.\n- **Pre-trip Brief**: Ensure the driver is briefed on pickup location, itinerary, and vehicle details.\n- **Status Update**: Set the driver status to *'Assigned'* inside the booking dispatch drawer.`
+      },
+      {
+        keywords: ['staff roles', 'admin vs manager', 'permissions', 'admin role', 'manager role'],
+        command: '/staff-roles',
+        title: '👥 Staff Role Permissions Matrix',
+        content: `**EliteDrive Dashboard Role Matrix**:\n\n- **Manager**: Can edit vehicle lists, approve KYC, update incident statuses, process e-challans, and handle client disputes.\n- **Admin**: Full read/write access across all system parameters, user roles management, telematics engine starter controls, and final financial override capabilities.`
+      },
+      {
+        keywords: ['system backup', 'sync database', 'telemetry backup', 'system sync'],
+        command: '/system-backup',
+        title: '💾 Telemetry Sync & System Diagnostics',
+        content: `**Operational Database Synchronization & Diagnostics**:\n\n- **Auto-Sync**: Vehicle locations, active booking timers, and payment channels are synchronized with live servers every **60 seconds**.\n- **Manual Backup**: Trigger manual backup snapshots from the Operations Control panel during system updates.\n- **Diagnostics**: If tracking is delayed, verify client websocket status in console and check internet connectivity.`
       }
     ];
 

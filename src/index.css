@@ -183,3 +183,12 @@ body {
   border-bottom: 1px solid #F1F5F9 !important;
 }
 
+/* Hide scrollbars for chrome/safari/firefox */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+

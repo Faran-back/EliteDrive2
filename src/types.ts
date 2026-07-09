@@ -135,6 +135,15 @@ export interface Booking {
   };
 }
 
+export interface IncidentComment {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'admin' | 'manager' | 'customer';
+  message: string;
+  createdAt: string;
+}
+
 export interface Incident {
   id: string;
   bookingId: string;
@@ -159,6 +168,7 @@ export interface Incident {
   filedByAdmin?: boolean;
   insuranceTier?: 'none' | 'basic' | 'premium';
   insuranceCoverageDetails?: string;
+  comments?: IncidentComment[];
 }
 
 export interface Dispute {

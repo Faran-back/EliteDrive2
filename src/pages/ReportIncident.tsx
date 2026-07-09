@@ -117,8 +117,48 @@ const renderStatusTracker = (status: string) => {
   );
 };
 
+const CommentForm: React.FC<{ incidentId: string; onSend: (id: string, message: string) => Promise<void> }> = ({ incidentId, onSend }) => {
+  const [msg, setMsg] = useState('');
+  const [isSending, setIsSending] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!msg.trim()) return;
+    try {
+      setIsSending(true);
+      await onSend(incidentId, msg.trim());
+      setMsg('');
+    } catch (err) {
+      // handled
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex gap-2 items-center mt-3">
+      <input
+        type="text"
+        placeholder="Type your reply, remark, or cross-discussion point..."
+        value={msg}
+        onChange={(e) => setMsg(e.target.value)}
+        disabled={isSending}
+        className="flex-1 bg-slate-50 text-xs text-slate-800 font-semibold px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 placeholder-slate-400"
+      />
+      <button
+        type="submit"
+        disabled={isSending || !msg.trim()}
+        className="px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-black uppercase tracking-widest rounded-2xl shadow-sm transition-all flex items-center gap-2 whitespace-nowrap"
+      >
+        <Send size={12} />
+        {isSending ? 'Sending...' : 'Reply'}
+      </button>
+    </form>
+  );
+};
+
 const ReportIncident: React.FC = () => {
-  const { user, bookings, allBookings, allUsers, vehicles, createIncident, incidents, updateIncidentStatus, showToast, disputes, createDispute } = useStore();
+  const { user, bookings, allBookings, allUsers, vehicles, createIncident, incidents, updateIncidentStatus, addIncidentComment, showToast, disputes, createDispute } = useStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -599,6 +639,44 @@ const ReportIncident: React.FC = () => {
                           )}
                         </div>
                       </div>
+
+                      {/* Interactive Remarks & Cross-Discussion */}
+                      <div className="mt-6 border-t border-slate-150 pt-6 space-y-4">
+                        <div className="flex items-center gap-2 text-slate-800">
+                          <span className="text-lg">💬</span>
+                          <h4 className="text-sm font-extrabold uppercase tracking-wider text-slate-900">Remarks & Cross-Discussion</h4>
+                        </div>
+                        
+                        <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                          {(!inc.comments || inc.comments.length === 0) ? (
+                            <p className="text-xs text-slate-400 italic">No previous discussion comments logged. Use the form below to start a discussion or reply to administrative notes.</p>
+                          ) : (
+                            inc.comments.map((comment: any) => {
+                              const isAdmin = comment.senderRole === 'admin' || comment.senderRole === 'manager';
+                              return (
+                                <div key={comment.id} className={`p-3 rounded-2xl border text-xs leading-relaxed max-w-[85%] ${
+                                  isAdmin 
+                                    ? 'bg-blue-50/60 border-blue-100 text-blue-900 ml-0 mr-auto' 
+                                    : 'bg-slate-50/80 border-slate-200 text-slate-800 ml-auto mr-0'
+                                }`}>
+                                  <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                    <span className="font-extrabold">{comment.senderName}</span>
+                                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-widest ${
+                                      isAdmin ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-700'
+                                    }`}>
+                                      {comment.senderRole}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 ml-auto">{new Date(comment.createdAt).toLocaleString()}</span>
+                                  </div>
+                                  <p className="font-medium whitespace-pre-wrap">{comment.message}</p>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        <CommentForm incidentId={inc.id} onSend={addIncidentComment} />
+                      </div>
                     </div>
                   );
                 })}
@@ -759,6 +837,44 @@ const ReportIncident: React.FC = () => {
                           </span>
                         </div>
                       )}
+
+                      {/* Interactive Remarks & Cross-Discussion */}
+                      <div className="mt-6 border-t border-slate-150 pt-6 space-y-4">
+                        <div className="flex items-center gap-2 text-slate-800">
+                          <span className="text-lg">💬</span>
+                          <h4 className="text-sm font-extrabold uppercase tracking-wider text-slate-900">Remarks & Cross-Discussion</h4>
+                        </div>
+                        
+                        <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                          {(!inc.comments || inc.comments.length === 0) ? (
+                            <p className="text-xs text-slate-400 italic">No previous discussion comments logged. Use the form below to start a discussion or reply to administrative notes.</p>
+                          ) : (
+                            inc.comments.map((comment: any) => {
+                              const isAdmin = comment.senderRole === 'admin' || comment.senderRole === 'manager';
+                              return (
+                                <div key={comment.id} className={`p-3 rounded-2xl border text-xs leading-relaxed max-w-[85%] ${
+                                  isAdmin 
+                                    ? 'bg-blue-50/60 border-blue-100 text-blue-900 ml-0 mr-auto' 
+                                    : 'bg-slate-50/80 border-slate-200 text-slate-800 ml-auto mr-0'
+                                }`}>
+                                  <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                    <span className="font-extrabold">{comment.senderName}</span>
+                                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-widest ${
+                                      isAdmin ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-700'
+                                    }`}>
+                                      {comment.senderRole}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 ml-auto">{new Date(comment.createdAt).toLocaleString()}</span>
+                                  </div>
+                                  <p className="font-medium whitespace-pre-wrap">{comment.message}</p>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        <CommentForm incidentId={inc.id} onSend={addIncidentComment} />
+                      </div>
                     </div>
                   );
                 })}

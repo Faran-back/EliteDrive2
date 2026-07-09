@@ -50,6 +50,7 @@ interface StoreContextType {
   verifyPhoneCode: (confirmationResult: any, code: string) => Promise<void>;
   createIncident: (incidentData: { bookingId: string; type: string; occurredAt: string; location: string; statement: string; witnessName?: string; witnessPhone?: string; photos?: string[]; firNumber?: string; userId?: string }) => Promise<void>;
   updateIncidentStatus: (id: string, status: string, actionType?: string, notes?: string) => Promise<void>;
+  addIncidentComment: (id: string, message: string) => Promise<void>;
   createDispute: (disputeData: { title: string; description: string; bookingId?: string; type: string }) => Promise<void>;
   updateDisputeStatus: (id: string, status: string, resolutionDetails?: string, actionType?: string, actionAmount?: number) => Promise<void>;
   createEChallan: (challanData: { challanNumber: string; date: string; amount: number; vehicleId: string }) => Promise<void>;
@@ -653,6 +654,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await refreshData();
   };
 
+  const addIncidentComment = async (id: string, message: string) => {
+    await apiFetch(`/api/incidents/${id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ message })
+    });
+    showToast('Remark/comment added successfully.', 'success');
+    await refreshData();
+  };
+
   const createDispute = async (disputeData: any) => {
     await apiFetch('/api/disputes', {
       method: 'POST',
@@ -760,6 +770,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       eChallans,
       createIncident,
       updateIncidentStatus,
+      addIncidentComment,
       createDispute,
       updateDisputeStatus,
       createEChallan,

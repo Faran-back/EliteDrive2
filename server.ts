@@ -3345,6 +3345,72 @@ Be friendly, professional, and provide clear step-by-step guidance for their spe
     res.json(dbData.incidents[idx]);
   });
 
+  app.post('/api/incidents/:id/comments', authenticateToken, (req: any, res) => {
+    const { id } = req.params;
+    const { message } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Message cannot be empty.' });
+    }
+
+    const idx = dbData.incidents.findIndex(i => i.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Incident not found' });
+
+    const incident = dbData.incidents[idx];
+
+    if (req.user.role !== 'admin' && req.user.role !== 'manager' && req.user.id !== incident.userId) {
+      return res.status(403).json({ error: 'Permission denied: You are not authorized to comment on this incident.' });
+    }
+
+    if (!incident.comments) {
+      incident.comments = [];
+    }
+
+    const newComment = {
+      id: `cmt_${Math.random().toString(36).substring(2, 11)}`,
+      senderId: req.user.id,
+      senderName: req.user.name,
+      senderRole: req.user.role,
+      message: message.trim(),
+      createdAt: new Date().toISOString()
+    };
+
+    incident.comments.push(newComment);
+
+    let targetUserId = '';
+    let notificationMessage = '';
+    if (req.user.role === 'admin' || req.user.role === 'manager') {
+      targetUserId = incident.userId;
+      notificationMessage = `The compliance team added a remark on your incident (ID: ${id}): "${message.substring(0, 60)}${message.length > 60 ? '...' : ''}"`;
+    } else {
+      dbData.users.filter(u => u.role === 'admin' || u.role === 'manager').forEach(staff => {
+        dbData.notifications.push({
+          id: `not_${Math.random().toString(36).substring(2, 11)}`,
+          userId: staff.id,
+          title: 'New Client Remark on Incident',
+          message: `${req.user.name} posted a comment on incident ${id}: "${message.substring(0, 60)}${message.length > 60 ? '...' : ''}"`,
+          type: 'info',
+          read: false,
+          createdAt: new Date().toISOString()
+        });
+      });
+    }
+
+    if (targetUserId) {
+      dbData.notifications.push({
+        id: `not_${Math.random().toString(36).substring(2, 11)}`,
+        userId: targetUserId,
+        title: 'New Remark on Incident',
+        message: notificationMessage,
+        type: 'info',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    saveDatabase();
+    res.json(incident);
+  });
+
   // DISPUTES API
   app.get('/api/disputes', authenticateToken, (req: any, res) => {
     if (req.user.role === 'admin' || req.user.role === 'manager') {
